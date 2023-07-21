@@ -1,5 +1,5 @@
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-use dearrow_browser::DearrowDB;
+use dearrow_parser::DearrowDB;
 use anyhow::Error;
 use getrandom::getrandom;
 use std::path::PathBuf;
@@ -8,6 +8,7 @@ use serde::{Serialize, Deserialize};
 #[derive(Serialize, Deserialize)]
 pub struct AppConfig {
     pub mirror_path: PathBuf,
+    pub static_content_path: PathBuf,
     pub listen: ListenConfig,
     pub auth_secret: String,
 }
@@ -18,6 +19,7 @@ impl Default for AppConfig {
         getrandom(&mut buffer[..]).unwrap();
         Self {
             mirror_path: PathBuf::from("./mirror"),
+            static_content_path: PathBuf::from("./static"),
             listen: ListenConfig::default(),
             auth_secret: URL_SAFE_NO_PAD.encode(buffer),
         }

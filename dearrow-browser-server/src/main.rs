@@ -3,12 +3,11 @@ use actix_files::Files;
 use actix_web::{HttpServer, App, web};
 use anyhow::{Context, anyhow, bail};
 use chrono::Utc;
-use dearrow_browser::{DearrowDB, StringSet};
+use dearrow_parser::{DearrowDB, StringSet};
 
 mod utils;
 mod routes;
 mod state;
-mod api_models;
 use state::*;
 
 const CONFIG_PATH: &str = "config.toml";
@@ -57,7 +56,7 @@ async fn main() -> anyhow::Result<()> {
                 .app_data(db.clone())
                 .app_data(string_set.clone())
             )
-            .service(Files::new("/", "static").index_file("index.html"))
+            .service(Files::new("/", config_copy.static_content_path.as_path()).index_file("index.html"))
     });
     server = match config.listen.tcp {
         None => server,

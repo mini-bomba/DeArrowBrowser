@@ -29,9 +29,10 @@ pub struct ApiTitle {
     pub unverified: bool,
     pub score: i8,
 }
-impl From<&dearrow_browser::Title> for ApiTitle {
-    fn from(value: &dearrow_browser::Title) -> Self {
-        use dearrow_browser::TitleFlags;
+#[cfg(feature = "dearrow-parser")]
+impl From<&dearrow_parser::Title> for ApiTitle {
+    fn from(value: &dearrow_parser::Title) -> Self {
+        use dearrow_parser::TitleFlags;
         let unverified = value.flags.contains(TitleFlags::Unverified);
         Self { 
             uuid: value.uuid.clone(),
@@ -65,9 +66,10 @@ pub struct ApiThumbnail {
     pub locked: bool,
     pub shadow_hidden: bool,
 }
-impl From<&dearrow_browser::Thumbnail> for ApiThumbnail {
-    fn from(value: &dearrow_browser::Thumbnail) -> Self {
-        use dearrow_browser::ThumbnailFlags;
+#[cfg(feature = "dearrow-parser")]
+impl From<&dearrow_parser::Thumbnail> for ApiThumbnail {
+    fn from(value: &dearrow_parser::Thumbnail) -> Self {
+        use dearrow_parser::ThumbnailFlags;
         Self {
             uuid: value.uuid.clone(),
             video_id: value.video_id.clone(),

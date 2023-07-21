@@ -36,7 +36,7 @@ pub struct Thumbnail {
 pub struct Title {
     pub uuid: Arc<str>,
     pub video_id: Arc<str>,
-    pub title: Box<str>,
+    pub title: Arc<str>,
     pub user_id: Arc<str>,
     pub time_submitted: i64,
     pub votes: i8,
@@ -45,7 +45,7 @@ pub struct Title {
 
 #[derive(Default)]
 pub struct StringSet {
-    set: HashSet<Arc<str>>
+    pub set: HashSet<Arc<str>>
 }
 
 impl StringSet {
@@ -84,6 +84,7 @@ impl Dedupe for Thumbnail {
 impl Dedupe for Title {
     fn dedupe(&mut self, set: &mut StringSet) {
         set.dedupe_arc(&mut self.uuid);
+        set.dedupe_arc(&mut self.title);
         set.dedupe_arc(&mut self.video_id);
         set.dedupe_arc(&mut self.user_id);
     }
@@ -327,7 +328,7 @@ mod csv_data {
     pub struct Title {
         #[serde(rename="videoID")]
         video_id: Arc<str>,
-        title: Box<str>,
+        title: Arc<str>,
         original: i8,
         #[serde(rename="userID")]
         user_id: Arc<str>,
@@ -433,6 +434,7 @@ mod csv_data {
     impl Dedupe for Title {
         fn dedupe(&mut self, set: &mut StringSet) {
             set.dedupe_arc(&mut self.uuid);
+            set.dedupe_arc(&mut self.title);
             set.dedupe_arc(&mut self.video_id);
             set.dedupe_arc(&mut self.user_id);
         }

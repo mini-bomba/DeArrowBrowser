@@ -1,4 +1,4 @@
-use std::{path::Path, sync::{RwLock, Mutex}, ops::DerefMut};
+use std::{path::Path, sync::RwLock, ops::DerefMut};
 use actix_files::Files;
 use actix_web::{HttpServer, App, web};
 use anyhow::{Context, anyhow};
@@ -17,8 +17,8 @@ async fn main() -> anyhow::Result<()> {
     let config = web::Data::new(AppConfig {
         mirror_path: Path::new("/tmp").into(),
     });
-    let string_set = web::Data::new(Mutex::new(StringSet::with_capacity(16384)));
-    let (db, errors) = DearrowDB::load_dir(&config.mirror_path, string_set.lock().map_err(|_| anyhow!("Failed to aquire StringSet mutex due to poison"))?.deref_mut()).context("Initial DearrowDB load failed")?;
+    let string_set = web::Data::new(RwLock::new(StringSet::with_capacity(16384)));
+    let (db, errors) = DearrowDB::load_dir(&config.mirror_path, string_set.write().map_err(|_| anyhow!("Failed to aquire StringSet lock for writing"))?.deref_mut()).context("Initial DearrowDB load failed")?;
 
     let db: web::Data<RwLock<DatabaseState>> = web::Data::new(RwLock::new(DatabaseState {
         db,

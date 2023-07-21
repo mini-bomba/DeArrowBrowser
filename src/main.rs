@@ -1,58 +1,16 @@
 use std::{path::Path, sync::{RwLock, Mutex}, ops::DerefMut};
 use actix_files::Files;
-use actix_web::{HttpServer, App, Responder, get, web};
-use anyhow::{Error, Context, anyhow};
-use serde::Serialize;
+use actix_web::{HttpServer, App, web};
+use anyhow::{Context, anyhow};
 use chrono::Utc;
 use dearrow_browser::{DearrowDB, StringSet};
 
 mod utils;
+mod routes;
+mod state;
+mod api_models;
+use state::*;
 
-struct AppConfig {
-    mirror_path: Box<Path>,
-}
-
-struct DatabaseState {
-    db: DearrowDB,
-    last_error: Option<Error>,
-    errors: Box<[Error]>,
-    last_updated: i64,
-    updating_now: bool,
-}
-
-#[get("/")]
-async fn helo() -> impl Responder {
-    "hi"
-}
-
-#[derive(Serialize)]
-struct StatusResponse {
-    last_updated: i64,
-    updating_now: bool,
-    titles: usize,
-    thumbnails: usize,
-    errors: usize,
-    last_error: Option<String>,
-}
-
-#[get("/status")]
-async fn status(db_lock: web::Data<RwLock<DatabaseState>>) -> utils::Result<web::Json<StatusResponse>> {
-    let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
-    Ok(web::Json(StatusResponse {
-        last_updated: db.last_updated,
-        updating_now: db.updating_now,
-        titles: db.db.titles.len(),
-        thumbnails: db.db.thumbnails.len(),
-        errors: db.errors.len(),
-        last_error: db.last_error.as_ref().map(|e| format!("{e:?}"))
-    }))
-}
-
-#[get("/errors")]
-async fn get_errors(db_lock: web::Data<RwLock<DatabaseState>>) -> utils::Result<web::Json<Vec<String>>> {
-    let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
-    Ok(web::Json(db.errors.iter().map(|e| format!("{e:?}")).collect()))
-}
 
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
@@ -73,12 +31,10 @@ async fn main() -> anyhow::Result<()> {
     HttpServer::new(move || {
         App::new()
             .service(web::scope("/api")
+                .configure(routes::configure_routes)
                 .app_data(config.clone())
                 .app_data(db.clone())
                 .app_data(string_set.clone())
-                .service(helo)
-                .service(status)
-                .service(get_errors)
             )
             .service(Files::new("/", "static").index_file("index.html"))
     })

@@ -26,15 +26,17 @@ impl Default for AppConfig {
 
 #[derive(Serialize, Deserialize)]
 pub struct ListenConfig {
-    pub ip: String,
-    pub port: u16,
+    pub tcp: Option<(String, u16)>,
+    pub unix: Option<String>,
+    pub unix_mode: Option<u32>,
 }
 
 impl Default for ListenConfig {
     fn default() -> Self {
         Self {
-            ip: "0.0.0.0".to_owned(),
-            port: 9292,
+            tcp: Some(("0.0.0.0".to_owned(), 9292)),
+            unix: None,
+            unix_mode: None,
         }
     }
 }

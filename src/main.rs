@@ -1,7 +1,7 @@
-use std::{sync::RwLock, ops::DerefMut, fs::File, io::{Read, Write, self}};
+use std::{sync::RwLock, ops::DerefMut, fs::{File, Permissions, set_permissions}, io::{Read, Write, self}, os::unix::prelude::PermissionsExt};
 use actix_files::Files;
 use actix_web::{HttpServer, App, web};
-use anyhow::{Context, anyhow};
+use anyhow::{Context, anyhow, bail};
 use chrono::Utc;
 use dearrow_browser::{DearrowDB, StringSet};
 
@@ -20,7 +20,11 @@ async fn main() -> anyhow::Result<()> {
         Ok(mut file) => {
             let mut contents = String::new();
             file.read_to_string(&mut contents).with_context(|| format!("Failed to read {CONFIG_PATH}"))?;
-            toml::from_str(&contents).with_context(|| format!("Failed to deserialize contents of {CONFIG_PATH}"))?
+            let cfg: AppConfig = toml::from_str(&contents).with_context(|| format!("Failed to deserialize contents of {CONFIG_PATH}"))?;
+            if cfg.listen.tcp.is_none() && cfg.listen.unix.is_none() {
+                bail!("Invalid configuration - no tcp port or unix socket path specified");
+            }
+            cfg
         },
         Err(e) if e.kind() == io::ErrorKind::NotFound => {
             let cfg = AppConfig::default();
@@ -45,7 +49,7 @@ async fn main() -> anyhow::Result<()> {
     }));
 
     let config_copy = config.clone();
-    HttpServer::new(move || {
+    let mut server = HttpServer::new(move || {
         App::new()
             .service(web::scope("/api")
                 .configure(routes::configure_routes)
@@ -54,9 +58,33 @@ async fn main() -> anyhow::Result<()> {
                 .app_data(string_set.clone())
             )
             .service(Files::new("/", "static").index_file("index.html"))
-    })
-    .bind((config.listen.ip.as_str(), config.listen.port)).with_context(|| format!("Failed to bind to {}:{}", config.listen.ip.as_str(), config.listen.port))?
-    .run()
+    });
+    server = match config.listen.tcp {
+        None => server,
+        Some((ref ip, port)) => {
+            let ip_str = ip.as_str();
+            let srv = server.bind((ip_str, port)).with_context(|| format!("Failed to bind to tcp port {ip_str}:{port}"))?;
+            println!("Listening on {ip_str}:{port}");
+            srv
+        }
+    };
+    server = match config.listen.unix {
+        None => server,
+        Some(ref path) => {
+            let path_str = path.as_str();
+            let srv = server.bind_uds(path_str).with_context(|| format!("Failed to bind to unix socket {path_str}"))?;
+            match config.listen.unix_mode {
+                None => (),
+                Some(mode) => {
+                    let perms = Permissions::from_mode(mode);
+                    set_permissions(path_str, perms).with_context(|| format!("Failed to change mode of unix socket {path_str} to {mode}"))?
+                }
+            }
+            println!("Listening on {path_str}");
+            srv
+        }
+    };
+    server.run()
     .await
     .context("Error while running the server")
 }

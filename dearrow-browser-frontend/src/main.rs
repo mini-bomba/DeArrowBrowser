@@ -314,7 +314,7 @@ macro_rules! video_link {
     ($videoid:expr) => {
         html! {
             <>
-                <a href={format!("https://youtu.be/{}", $videoid)} title="View this video on YouTube">{$videoid.clone()}</a>
+                <a href={format!("https://youtu.be/{}", $videoid)} title="View this video on YouTube" target="_blank">{$videoid.clone()}</a>
                 {" "}
                 <span class="icon-link" title="View this video in DeArrow Browser">
                     <Link<Route> to={Route::Video { id: $videoid.to_string() }}>{"🔍"}</Link<Route>>

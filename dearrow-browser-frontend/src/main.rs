@@ -1,5 +1,5 @@
 use yew::prelude::*;
-use web_sys::HtmlInputElement;
+use web_sys::window;
 
 mod hooks;
 use hooks::use_async_with_deps;
@@ -24,29 +24,54 @@ fn RequestRenderer(props: &RequestRendererProps) -> HtmlResult {
     }
 }
 
-#[function_component]
-fn App() -> Html {
-    let url = use_state(|| "".to_string());
-    let onkeydown = {
-        let url = url.clone();
-        move |e: KeyboardEvent| {
-            if e.key() != "Enter" {
-                return;
-            }
-            let input: HtmlInputElement = e.target_unchecked_into();
-            url.set(input.value());
+macro_rules! search_block {
+    ($id:expr, $name:expr) => {
+        html! {
+            <div>
+                <label for={$id} >{concat!("Search by ", $name)}</label>
+                <input id={$id} placeholder={$name} value="" />
+            </div>
         }
     };
+}
+
+#[function_component]
+fn App() -> Html {
+    let logo_url = use_memo(|_| {
+        window()
+            .and_then(|w| w.document())
+            .and_then(|d| d.query_selector("link[rel=icon]").ok().flatten())
+            .and_then(|el| el.get_attribute("href"))
+            .map(AttrValue::from)
+    }, ());
     
-    let fallback = html! {<div>{"Loading..."}</div>};
+    let logo = match *logo_url {
+        None => html! {},
+        Some(ref url) => html! { <img src={url} /> },
+    };
     html! {
         <>
-            <div>
-                <input placeholder="Enter an URL here" {onkeydown} />
+            <div class="header">
+                {logo}
+                <div>
+                    <h2>{"DeArrow Browser"}</h2>
+                </div>
             </div>
-            <Suspense {fallback}>
-                <RequestRenderer url={url.to_string()} />
-            </Suspense>
+            <div class="searchbar">
+                {search_block!("uuid_search", "UUID")}
+                {search_block!("vid_search", "Video ID")}
+                {search_block!("uid_search", "User ID")}
+            </div>
+            <div class="footer">
+                <span>{"Last update: ..."}</span>
+                <span>
+                    {"DeArrow Browser © mini_bomba 2023. Uses DeArrow data licensed under "}
+                    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">{"CC BY-NC-SA 4.0"}</a>
+                    {" from "}
+                    <a href="https://dearrow.ajay.app/">{"https://dearrow.ajay.app/"}</a>
+                    {"."}
+                </span>
+            </div>
         </>
     }
 }

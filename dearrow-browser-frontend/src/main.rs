@@ -1,27 +1,44 @@
+use std::rc::Rc;
+use chrono::{NaiveDateTime, Utc};
+use dearrow_browser_api::{StatusResponse, ApiThumbnail, ApiTitle};
+use reqwest::Url;
+use strum::IntoStaticStr;
 use yew::prelude::*;
+use yew_hooks::{use_async_with_options, UseAsyncOptions, use_interval};
+use yew_router::prelude::*;
 use web_sys::window;
 
 mod hooks;
-use hooks::use_async_with_deps;
+use hooks::use_async_suspension;
 
-#[derive(Properties, PartialEq)]
-pub struct RequestRendererProps {
-    url: AttrValue,
+const TIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
+
+#[derive(Clone, Routable, PartialEq, IntoStaticStr)]
+enum Route {
+    #[at("/")]
+    Home,
+    #[at("/video_id/:id")]
+    Video { id: String },
+    #[not_found]
+    #[at("/404")]
+    NotFound,
 }
 
-#[function_component]
-fn RequestRenderer(props: &RequestRendererProps) -> HtmlResult {
-    let request = use_async_with_deps(|url| async move {
-        reqwest::get(url.as_str()).await?.text().await
-    }, props.url.clone())?;
-    match *request {
-        Err(_) => Ok(html! {
-            <b>{format!("Failed to fetch {}", props.url)}</b>
-        }),
-        Ok(ref text) => Ok(html! {
-            <pre>{text}</pre>
-        }),
-    }
+#[derive(PartialEq, Clone, Copy)]
+enum DetailType {
+    Title,
+    Thumbnail,
+}
+
+#[derive(Clone, PartialEq)]
+struct WindowContext {
+    origin: Url,
+    logo_url: Option<AttrValue>,
+}
+
+#[derive(Clone, PartialEq)]
+struct AppContext {
+    last_updated: Option<i64>,
 }
 
 macro_rules! search_block {
@@ -37,33 +54,76 @@ macro_rules! search_block {
 
 #[function_component]
 fn App() -> Html {
-    let logo_url = use_memo(|_| {
-        window()
-            .and_then(|w| w.document())
-            .and_then(|d| d.query_selector("link[rel=icon]").ok().flatten())
-            .and_then(|el| el.get_attribute("href"))
-            .map(AttrValue::from)
+    let searchbar_visible = use_state(|| true);
+    let window_context = use_memo(|_| {
+        let window = window().expect("window should exist");
+        WindowContext {
+            origin: Url::parse(
+                window.location().origin().expect("window.location.origin should exist").as_str()
+            ).expect("window.location.origin should be a valid URL"),
+            logo_url: window.document()
+                .and_then(|d| d.query_selector("link[rel=icon]").ok().flatten())
+                .and_then(|el| el.get_attribute("href"))
+                .map(AttrValue::from),
+        }
     }, ());
+
+    let status = {
+        let window_context = window_context.clone();
+        use_async_with_options::<_, StatusResponse, Rc<anyhow::Error>>(async move { 
+            async { Ok(
+                reqwest::get(window_context.origin.join("/api/status")?).await?
+                    .json().await?
+            )}.await.map_err(Rc::new)
+        }, UseAsyncOptions::enable_auto())
+    };
+    {
+        let status = status.clone();
+        use_interval(move || {
+            status.run();
+        }, 60*1000);
+    }
+    let app_context = use_memo(|&last_updated| AppContext {
+        last_updated,
+    }, status.data.as_ref().map(|d| d.last_updated));
+
+    let last_updated = match status.data.as_ref().map(|d| d.last_updated).and_then(NaiveDateTime::from_timestamp_millis).map(|dt| dt.and_utc()) {
+        None => AttrValue::from("Last update: ..."),
+        Some(time) => AttrValue::from(format!("Last update: {} UTC ({} minutes ago)", time.format(TIME_FORMAT), (Utc::now()-time).num_minutes())),
+    };
+
+    let toggle_searchbar = { 
+        let searchbar_visible = searchbar_visible.clone();
+        Callback::from(move |_| {
+            searchbar_visible.set(!*searchbar_visible);
+        })
+    };
     
-    let logo = match *logo_url {
+    let logo = match window_context.logo_url {
         None => html! {},
-        Some(ref url) => html! { <img src={url} /> },
+        Some(ref url) => html! { <img src={url} class="clickable" onclick={toggle_searchbar.clone()} /> },
     };
     html! {
-        <>
-            <div class="header">
+        <ContextProvider<Rc<WindowContext>> context={window_context}>
+        <ContextProvider<Rc<AppContext>> context={app_context}>
+            <div id="header">
                 {logo}
                 <div>
-                    <h2>{"DeArrow Browser"}</h2>
+                    <h1 class="clickable" onclick={toggle_searchbar}>{"DeArrow Browser"}</h1>
                 </div>
             </div>
-            <div class="searchbar">
-                {search_block!("uuid_search", "UUID")}
-                {search_block!("vid_search", "Video ID")}
-                {search_block!("uid_search", "User ID")}
-            </div>
-            <div class="footer">
-                <span>{"Last update: ..."}</span>
+            if *searchbar_visible {
+                <div id="searchbar">
+                    {search_block!("uuid_search", "UUID")}
+                    {search_block!("vid_search", "Video ID")}
+                    {search_block!("uid_search", "User ID")}
+                </div>
+            }
+            <BrowserRouter>
+                <Switch<Route> render={render_route} />
+            </BrowserRouter>
+            <div id="footer">
+                <span>{last_updated}</span>
                 <span>
                     {"DeArrow Browser © mini_bomba 2023. Uses DeArrow data licensed under "}
                     <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">{"CC BY-NC-SA 4.0"}</a>
@@ -72,9 +132,208 @@ fn App() -> Html {
                     {"."}
                 </span>
             </div>
+        </ContextProvider<Rc<AppContext>>>
+        </ContextProvider<Rc<WindowContext>>>
+    }
+}
+
+fn render_route(route: Route) -> Html {
+    let route_html = match route {
+        Route::Home => html! {<HomePage></HomePage>},
+        Route::Video { ref id } => html! {},
+        Route::NotFound => html! {
+            <>
+                <h2>{"404 - Not found"}</h2>
+                <h3>{"Looks like you've entered an invalid URL"}</h3>
+                <Link<Route> to={Route::Home}>{"Return to home page"}</Link<Route>>
+            </>
+        },
+    };
+    let route_name: &'static str = route.into();
+    html! {
+        <div id="content" data-route={route_name}>
+            {route_html}
+        </div>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct TableModeSwitchProps {
+    state: UseStateHandle<DetailType>,
+}
+
+#[function_component]
+fn TableModeSwitch(props: &TableModeSwitchProps) -> Html {
+    let set_titles_mode = {
+        let state = props.state.clone();
+        Callback::from(move |_| {
+            state.set(DetailType::Title);
+        })
+    };
+    let set_thumbs_mode = {
+        let state = props.state.clone();
+        Callback::from(move |_| {
+            state.set(DetailType::Thumbnail);
+        })
+    };
+
+    html! {
+        <div class="table-mode-switch">
+            <span onclick={set_titles_mode} selected={*props.state == DetailType::Title}>{"Titles"}</span>
+            <span onclick={set_thumbs_mode} selected={*props.state == DetailType::Thumbnail}>{"Thumbnails"}</span>
+        </div>
+    }
+    
+}
+
+#[derive(Properties, PartialEq)]
+struct DetailTableRendererProps {
+    url: Rc<Url>,
+    mode: DetailType,
+}
+
+enum DetailList {
+    Thumbnails(Vec<ApiThumbnail>),
+    Titles(Vec<ApiTitle>),
+}
+
+fn title_score(title: &ApiTitle) -> Html {
+    html! {
+        <>
+            {title.score}
+            if title.score < 0 {
+                <span title="This title's score is too low to be displayed">{"❌"}</span>
+            }
+            if title.unverified {
+                <span title="This title was submitted by an unverified user">{"❓"}</span>
+            }
+            if title.locked {
+                <span title="This title was locked by a VIP">{"🔒"}</span>
+            }
+            if title.shadow_hidden {
+                <span title="This title is shadowhidden">{"🚫"}</span>
+            }
         </>
     }
 }
+
+fn thumbnail_score(thumb: &ApiThumbnail) -> Html {
+    html! {
+        <>
+            {thumb.votes}
+            if thumb.votes < 0 {
+                <span title="This thumbnail's score is too low to be displayed">{"❌"}</span>
+            }
+            if thumb.locked {
+                <span title="This thumbnail was locked by a VIP">{"🔒"}</span>
+            }
+            if thumb.shadow_hidden {
+                <span title="This thumbnail is shadowhidden">{"🚫"}</span>
+            }
+        </>
+    }
+}
+
+macro_rules! original_indicator {
+    ($original:expr, $detail_name:expr) => {
+        if $original {
+            html! {
+                <span title={stringify!(This is the original video $detail_name)}>{"♻️"}</span>
+            }
+        } else {
+            html! {}
+        }
+    };
+}
+
+#[function_component]
+fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
+    let app_context: Rc<AppContext> = use_context().expect("AppContext should be defined");
+    let details: Rc<Result<DetailList, anyhow::Error>> = use_async_suspension(|(mode, url, _)| async move {
+        let request = reqwest::get((*url).clone()).await?;
+        match mode {
+            DetailType::Thumbnail => Ok(DetailList::Thumbnails(request.json().await?)),
+            DetailType::Title => Ok(DetailList::Titles(request.json().await?)),
+        }
+    }, (props.mode, props.url.clone(), app_context.last_updated))?;
+
+    Ok(match *details {
+        Err(..) => html! {
+            <center><b>{"Failed to fetch details from the API :/"}</b></center>
+        },
+        Ok(DetailList::Titles(ref list)) => html! {
+            <table class="detail-table titles">
+                <tr>
+                    <th>{"Submitted"}</th>
+                    <th>{"Video ID"}</th>
+                    <th>{"Title"}</th>
+                    <th>{"Score"}</th>
+                    <th>{"Votes"}</th>
+                    <th>{"UUID"}</th>
+                    <th>{"User ID"}</th>
+                </tr>
+                { for list.iter().map(|t| html! {
+                    <tr key={&*t.uuid}>
+                        <td>{NaiveDateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), |dt| format!("{}", dt.format(TIME_FORMAT)))}</td>
+                        <td><a href={format!("https://youtu.be/{}", t.video_id)}>{t.video_id.clone()}</a></td>
+                        <td>{t.title.clone()}{original_indicator!(t.original, title)}</td>
+                        <td>{title_score(t)}</td>
+                        <td>{t.votes}</td>
+                        <td>{t.uuid.clone()}</td>
+                        <td>{t.user_id.clone()}</td>
+                    </tr>
+                }) }
+            </table>
+        },
+        Ok(DetailList::Thumbnails(ref list)) => html! {
+            <table class="detail-table thumbnails">
+                <tr>
+                    <th>{"Submitted"}</th>
+                    <th>{"Video ID"}</th>
+                    <th>{"Timestamp"}</th>
+                    <th>{"Score/Votes"}</th>
+                    <th>{"UUID"}</th>
+                    <th>{"User ID"}</th>
+                </tr>
+                { for list.iter().map(|t| html! {
+                    <tr key={&*t.uuid}>
+                        <td>{NaiveDateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), |dt| format!("{}", dt.format(TIME_FORMAT)))}</td>
+                        <td><a href={format!("https://youtu.be/{}", t.video_id)}>{t.video_id.clone()}</a></td>
+                        <td>{t.timestamp.map_or("-".to_owned(), |ts| ts.to_string())}{original_indicator!(t.original, thumbnail)}</td>
+                        <td>{thumbnail_score(t)}</td>
+                        <td>{t.uuid.clone()}</td>
+                        <td>{t.user_id.clone()}</td>
+                    </tr>
+                }) }
+            </table>
+        },
+    })
+}
+
+#[function_component]
+fn HomePage() -> Html {
+    let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
+    let table_mode = use_state_eq(|| DetailType::Title);
+
+    let url = match *table_mode {
+        DetailType::Title => window_context.origin.join("/api/titles"),
+        DetailType::Thumbnail => window_context.origin.join("/api/thumbnails"),
+    }.expect("Should be able to create an API url");
+
+    let fallback = html! {
+        <center><b>{"Loading..."}</b></center>
+    };
+    
+    html! {
+        <>
+            <TableModeSwitch state={table_mode.clone()} />
+            <Suspense {fallback}>
+                <DetailTableRenderer mode={*table_mode} url={Rc::new(url)} />
+            </Suspense>
+        </>
+    }
+}
+
 
 fn main() {
     yew::Renderer::<App>::new().render();

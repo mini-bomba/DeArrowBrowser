@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct StatusResponse {
     pub last_updated: i64,
     pub updating_now: bool,
@@ -15,7 +15,7 @@ pub struct StatusResponse {
 
 pub type ErrorList = Vec<String>;
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ApiTitle {
     pub uuid: Arc<str>,
     pub video_id: Arc<str>,
@@ -54,7 +54,7 @@ impl From<&dearrow_parser::Title> for ApiTitle {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ApiThumbnail {
     pub uuid: Arc<str>,
     pub video_id: Arc<str>,

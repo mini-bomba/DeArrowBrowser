@@ -1,6 +1,6 @@
 use std::{sync::RwLock, ops::DerefMut, fs::{File, Permissions, set_permissions}, io::{Read, Write, self}, os::unix::prelude::PermissionsExt};
-use actix_files::Files;
-use actix_web::{HttpServer, App, web};
+use actix_files::{Files, NamedFile};
+use actix_web::{HttpServer, App, web, dev::{ServiceResponse, fn_service, ServiceRequest}};
 use anyhow::{Context, anyhow, bail};
 use chrono::Utc;
 use dearrow_parser::{DearrowDB, StringSet};
@@ -47,17 +47,33 @@ async fn main() -> anyhow::Result<()> {
         updating_now: false
     }));
 
-    let config_copy = config.clone();
-    let mut server = HttpServer::new(move || {
-        App::new()
-            .service(web::scope("/api")
-                .configure(routes::configure_routes)
-                .app_data(config_copy.clone())
-                .app_data(db.clone())
-                .app_data(string_set.clone())
-            )
-            .service(Files::new("/", config_copy.static_content_path.as_path()).index_file("index.html"))
-    });
+    let mut server = {
+        let config = config.clone();
+        HttpServer::new(move || {
+            let config2 = config.clone();
+            App::new()
+                .service(web::scope("/api")
+                    .configure(routes::configure_routes)
+                    .app_data(config.clone())
+                    .app_data(db.clone())
+                    .app_data(string_set.clone())
+                )
+                .service(
+                    Files::new("/", config.static_content_path.as_path())
+                        .index_file("index.html")
+                        .default_handler(fn_service(move |req: ServiceRequest| {
+                            let config = config2.clone();
+                            async move {
+                                let (req, _) = req.into_parts();
+                                let index_file = config.static_content_path.join("index.html");
+                                let file = NamedFile::open_async(index_file.as_path()).await?;
+                                let resp = file.into_response(&req);
+                                Ok(ServiceResponse::new(req, resp))
+                            }
+                        }))
+                )
+        })
+    };
     server = match config.listen.tcp {
         None => server,
         Some((ref ip, port)) => {

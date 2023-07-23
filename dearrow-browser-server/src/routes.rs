@@ -8,9 +8,11 @@ use crate::{utils::{self, MapInto}, state::*};
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(helo)
+       .service(get_random_titles)
        .service(get_title_by_uuid)
        .service(get_titles_by_video_id)
        .service(get_titles_by_user_id)
+       .service(get_random_thumbnails)
        .service(get_thumbnail_by_uuid)
        .service(get_thumbnails_by_video_id)
        .service(get_thumbnails_by_user_id)
@@ -48,6 +50,15 @@ async fn get_status(db_lock: web::Data<RwLock<DatabaseState>>, string_set: web::
 async fn get_errors(db_lock: web::Data<RwLock<DatabaseState>>) -> JsonResult<ErrorList> {
     let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
     Ok(web::Json(db.errors.iter().map(|e| format!("{e:?}")).collect()))
+}
+
+#[get("/titles")]
+async fn get_random_titles(db_lock: web::Data<RwLock<DatabaseState>>) -> JsonResult<Vec<ApiTitle>> {
+    Ok(web::Json(
+        db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?
+            .db.titles.values().take(20)
+            .map(Into::into).collect()
+    ))
 }
 
 #[get("/titles/uuid/{uuid}")]
@@ -98,6 +109,15 @@ async fn get_titles_by_user_id(db_lock: web::Data<RwLock<DatabaseState>>, string
         StatusCode::OK
     };
     Ok(web::Json(titles).customize().with_status(status))
+}
+
+#[get("/thumbnails")]
+async fn get_random_thumbnails(db_lock: web::Data<RwLock<DatabaseState>>) -> JsonResult<Vec<ApiThumbnail>> {
+    Ok(web::Json(
+        db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?
+            .db.thumbnails.values().take(20)
+            .map(Into::into).collect()
+    ))
 }
 
 #[get("/thumbnails/uuid/{uuid}")]

@@ -529,23 +529,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dearrow-browser"
-version = "0.1.0"
-dependencies = [
- "actix-files",
- "actix-web",
- "anyhow",
- "base64",
- "bitflags 2.3.3",
- "chrono",
- "dearrow-browser-api",
- "dearrow-parser",
- "getrandom",
- "serde",
- "toml",
-]
-
-[[package]]
 name = "dearrow-browser-api"
 version = "0.1.0"
 dependencies = [
@@ -560,6 +543,23 @@ dependencies = [
  "reqwest",
  "web-sys",
  "yew",
+]
+
+[[package]]
+name = "dearrow-browser-server"
+version = "0.1.0"
+dependencies = [
+ "actix-files",
+ "actix-web",
+ "anyhow",
+ "base64",
+ "bitflags 2.3.3",
+ "chrono",
+ "dearrow-browser-api",
+ "dearrow-parser",
+ "getrandom",
+ "serde",
+ "toml",
 ]
 
 [[package]]

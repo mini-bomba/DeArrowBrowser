@@ -1,5 +1,5 @@
 [package]
-name = "dearrow-browser"
+name = "dearrow-browser-server"
 version = "0.1.0"
 edition = "2021"
 

@@ -252,6 +252,8 @@ fn TableModeSwitch(props: &TableModeSwitchProps) -> Html {
 struct DetailTableRendererProps {
     url: Rc<Url>,
     mode: DetailType,
+    hide_userid: Option<()>,
+    hide_videoid: Option<()>,
 }
 
 enum DetailList {
@@ -354,22 +356,30 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
             <table class="detail-table titles">
                 <tr>
                     <th>{"Submitted"}</th>
-                    <th>{"Video ID"}</th>
+                    if props.hide_videoid.is_none() {
+                        <th>{"Video ID"}</th>
+                    }
                     <th>{"Title"}</th>
                     <th>{"Score"}</th>
                     <th>{"Votes"}</th>
                     <th>{"UUID"}</th>
-                    <th>{"User ID"}</th>
+                    if props.hide_userid.is_none() {
+                        <th>{"User ID"}</th>
+                    }
                 </tr>
                 { for list.iter().map(|t| html! {
                     <tr key={&*t.uuid}>
                         <td>{NaiveDateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), |dt| format!("{}", dt.format(TIME_FORMAT)))}</td>
-                        <td>{video_link!(t.video_id)}</td>
+                        if props.hide_videoid.is_none() {
+                            <td>{video_link!(t.video_id)}</td>
+                        }
                         <td>{t.title.clone()}{original_indicator!(t.original, title)}</td>
                         <td>{title_score(t)}</td>
                         <td>{t.votes}</td>
                         <td>{t.uuid.clone()}</td>
-                        <td>{user_link!(t.user_id)}</td>
+                        if props.hide_userid.is_none() {
+                            <td>{user_link!(t.user_id)}</td>
+                        }
                     </tr>
                 }) }
             </table>
@@ -378,20 +388,28 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
             <table class="detail-table thumbnails">
                 <tr>
                     <th>{"Submitted"}</th>
-                    <th>{"Video ID"}</th>
+                    if props.hide_videoid.is_none() {
+                        <th>{"Video ID"}</th>
+                    }
                     <th>{"Timestamp"}</th>
                     <th>{"Score/Votes"}</th>
                     <th>{"UUID"}</th>
-                    <th>{"User ID"}</th>
+                    if props.hide_userid.is_none() {
+                        <th>{"User ID"}</th>
+                    }
                 </tr>
                 { for list.iter().map(|t| html! {
                     <tr key={&*t.uuid}>
                         <td>{NaiveDateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), |dt| format!("{}", dt.format(TIME_FORMAT)))}</td>
-                        <td>{video_link!(t.video_id)}</td>
+                        if props.hide_videoid.is_none() {
+                            <td>{video_link!(t.video_id)}</td>
+                        }
                         <td>{t.timestamp.map_or(original_indicator!(t.original, thumbnail), |ts| html! {{ts.to_string()}})}</td>
                         <td>{thumbnail_score(t)}</td>
                         <td>{t.uuid.clone()}</td>
-                        <td>{user_link!(t.user_id)}</td>
+                        if props.hide_userid.is_none() {
+                            <td>{user_link!(t.user_id)}</td>
+                        }
                     </tr>
                 }) }
             </table>
@@ -446,7 +464,7 @@ fn VideoPage(props: &VideoPageProps) -> Html {
         <>
             <TableModeSwitch state={table_mode.clone()} />
             <Suspense {fallback}>
-                <DetailTableRenderer mode={*table_mode} url={Rc::new(url)} />
+                <DetailTableRenderer mode={*table_mode} url={Rc::new(url)} hide_videoid={()} />
             </Suspense>
         </>
     }
@@ -475,7 +493,7 @@ fn UserPage(props: &UserPageProps) -> Html {
         <>
             <TableModeSwitch state={table_mode.clone()} />
             <Suspense {fallback}>
-                <DetailTableRenderer mode={*table_mode} url={Rc::new(url)} />
+                <DetailTableRenderer mode={*table_mode} url={Rc::new(url)} hide_userid={()} />
             </Suspense>
         </>
     }

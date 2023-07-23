@@ -6,7 +6,7 @@ use strum::IntoStaticStr;
 use yew::prelude::*;
 use yew_hooks::{use_async_with_options, UseAsyncOptions, use_interval};
 use yew_router::prelude::*;
-use web_sys::window;
+use web_sys::{window, HtmlInputElement};
 
 mod hooks;
 use hooks::use_async_suspension;
@@ -19,6 +19,8 @@ enum Route {
     Home,
     #[at("/video_id/:id")]
     Video { id: String },
+    #[at("/user_id/:id")]
+    User { id: String },
     #[not_found]
     #[at("/404")]
     NotFound,
@@ -41,20 +43,8 @@ struct AppContext {
     last_updated: Option<i64>,
 }
 
-macro_rules! search_block {
-    ($id:expr, $name:expr) => {
-        html! {
-            <div>
-                <label for={$id} >{concat!("Search by ", $name)}</label>
-                <input id={$id} placeholder={$name} value="" />
-            </div>
-        }
-    };
-}
-
 #[function_component]
 fn App() -> Html {
-    let searchbar_visible = use_state(|| true);
     let window_context = use_memo(|_| {
         let window = window().expect("window should exist");
         WindowContext {
@@ -87,10 +77,33 @@ fn App() -> Html {
         last_updated,
     }, status.data.as_ref().map(|d| d.last_updated));
 
-    let last_updated = match status.data.as_ref().map(|d| d.last_updated).and_then(NaiveDateTime::from_timestamp_millis).map(|dt| dt.and_utc()) {
-        None => AttrValue::from("Last update: ..."),
-        Some(time) => AttrValue::from(format!("Last update: {} UTC ({} minutes ago)", time.format(TIME_FORMAT), (Utc::now()-time).num_minutes())),
+    html! {
+        <ContextProvider<Rc<WindowContext>> context={window_context}>
+        <ContextProvider<Rc<AppContext>> context={app_context}>
+            <BrowserRouter>
+                <Switch<Route> render={render_route} />
+            </BrowserRouter>
+        </ContextProvider<Rc<AppContext>>>
+        </ContextProvider<Rc<WindowContext>>>
+    }
+}
+
+macro_rules! search_block {
+    ($id:expr, $name:expr, $callback:expr) => {
+        html! {
+            <div>
+                <label for={$id} >{concat!("Search by ", $name)}</label>
+                <input id={$id} placeholder={$name} onkeydown={$callback} value="" />
+            </div>
+        }
     };
+}
+
+#[function_component]
+fn Header() -> Html {
+    let navigator = use_navigator().expect("navigator should exist");
+    let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
+    let searchbar_visible = use_state_eq(|| true);
 
     let toggle_searchbar = { 
         let searchbar_visible = searchbar_visible.clone();
@@ -98,49 +111,94 @@ fn App() -> Html {
             searchbar_visible.set(!*searchbar_visible);
         })
     };
-    
-    let logo = match window_context.logo_url {
-        None => html! {},
-        Some(ref url) => html! { <img src={url} class="clickable" onclick={toggle_searchbar.clone()} /> },
+    let uuid_search = {
+        let navigator = navigator.clone();
+        let searchbar_visible = searchbar_visible.clone();
+        Callback::from(move |e: KeyboardEvent| {
+            if e.key() == "Enter" {
+                searchbar_visible.set(false);
+                navigator.push(&Route::NotFound);
+            }
+        })
     };
+    let uid_search = {
+        let navigator = navigator.clone();
+        let searchbar_visible = searchbar_visible.clone();
+        Callback::from(move |e: KeyboardEvent| {
+            if e.key() == "Enter" {
+                let input: HtmlInputElement = e.target_unchecked_into();
+                searchbar_visible.set(false);
+                navigator.push(&Route::User {id: input.value()});
+            }
+        })
+    };
+    let vid_search = { 
+        let navigator = navigator.clone();
+        let searchbar_visible = searchbar_visible.clone();
+        Callback::from(move |e: KeyboardEvent| {
+            if e.key() == "Enter" {
+                let input: HtmlInputElement = e.target_unchecked_into();
+                searchbar_visible.set(false);
+                navigator.push(&Route::Video { id: input.value() });
+            }
+        })
+    };
+    let go_home = {
+        let searchbar_visible = searchbar_visible.clone();
+        Callback::from(move |_| {
+            searchbar_visible.set(true);
+            navigator.push(&Route::Home);
+        })
+    };
+
     html! {
-        <ContextProvider<Rc<WindowContext>> context={window_context}>
-        <ContextProvider<Rc<AppContext>> context={app_context}>
+        <>
             <div id="header">
-                {logo}
+                if let Some(url) = &window_context.logo_url {
+                    <img src={url} class="clickable" onclick={toggle_searchbar.clone()} ondblclick={go_home.clone()} />
+                }
                 <div>
-                    <h1 class="clickable" onclick={toggle_searchbar}>{"DeArrow Browser"}</h1>
+                    <h1 class="clickable" onclick={toggle_searchbar} ondblclick={go_home.clone()}>{"DeArrow Browser"}</h1>
                 </div>
             </div>
             if *searchbar_visible {
                 <div id="searchbar">
-                    {search_block!("uuid_search", "UUID")}
-                    {search_block!("vid_search", "Video ID")}
-                    {search_block!("uid_search", "User ID")}
+                    {search_block!("uuid_search", "UUID", uuid_search)}
+                    {search_block!("vid_search", "Video ID", vid_search)}
+                    {search_block!("uid_search", "User ID", uid_search)}
                 </div>
             }
-            <BrowserRouter>
-                <Switch<Route> render={render_route} />
-            </BrowserRouter>
-            <div id="footer">
-                <span>{last_updated}</span>
-                <span>
-                    {"DeArrow Browser © mini_bomba 2023. Uses DeArrow data licensed under "}
-                    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">{"CC BY-NC-SA 4.0"}</a>
-                    {" from "}
-                    <a href="https://dearrow.ajay.app/">{"https://dearrow.ajay.app/"}</a>
-                    {"."}
-                </span>
-            </div>
-        </ContextProvider<Rc<AppContext>>>
-        </ContextProvider<Rc<WindowContext>>>
+        </>
+    }
+}
+
+#[function_component]
+fn Footer() -> Html {
+    let app_context: Rc<AppContext> = use_context().expect("AppContext should be defined");
+    let last_updated = match app_context.last_updated.and_then(NaiveDateTime::from_timestamp_millis).map(|dt| dt.and_utc()) {
+        None => AttrValue::from("Last update: ..."),
+        Some(time) => AttrValue::from(format!("Last update: {} UTC ({} minutes ago)", time.format(TIME_FORMAT), (Utc::now()-time).num_minutes())),
+    };
+
+    html! {
+        <div id="footer">
+            <span>{last_updated}</span>
+            <span>
+                {"DeArrow Browser © mini_bomba 2023. Uses DeArrow data licensed under "}
+                <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">{"CC BY-NC-SA 4.0"}</a>
+                {" from "}
+                <a href="https://dearrow.ajay.app/">{"https://dearrow.ajay.app/"}</a>
+                {"."}
+            </span>
+        </div>
     }
 }
 
 fn render_route(route: Route) -> Html {
     let route_html = match route {
         Route::Home => html! {<HomePage></HomePage>},
-        Route::Video { ref id } => html! {},
+        Route::Video { ref id } => html! {<VideoPage videoid={id.clone()}></VideoPage>},
+        Route::User { ref id } => html! {<UserPage userid={id.clone()}></UserPage>},
         Route::NotFound => html! {
             <>
                 <h2>{"404 - Not found"}</h2>
@@ -151,9 +209,13 @@ fn render_route(route: Route) -> Html {
     };
     let route_name: &'static str = route.into();
     html! {
-        <div id="content" data-route={route_name}>
-            {route_html}
-        </div>
+        <>
+            <Header />
+            <div id="content" data-route={route_name}>
+                {route_html}
+            </div>
+            <Footer />
+        </>
     }
 }
 
@@ -246,6 +308,33 @@ macro_rules! original_indicator {
     };
 }
 
+macro_rules! video_link {
+    ($videoid:expr) => {
+        html! {
+            <>
+                <a href={format!("https://youtu.be/{}", $videoid)} title="View this video on YouTube">{$videoid.clone()}</a>
+                {" "}
+                <span class="icon-link" title="View this video in DeArrow Browser">
+                    <Link<Route> to={Route::Video { id: $videoid.to_string() }}>{"🔍"}</Link<Route>>
+                </span>
+            </>
+        }
+    };
+}
+
+macro_rules! user_link {
+    ($userid:expr) => {
+        html! {
+            <>
+                {$userid.clone()}{" "}
+                <span class="icon-link" title="View this user in DeArrow Browser">
+                    <Link<Route> to={Route::User { id: $userid.to_string() }}>{"🔍"}</Link<Route>>
+                </span>
+            </>
+        }
+    };
+}
+
 #[function_component]
 fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
     let app_context: Rc<AppContext> = use_context().expect("AppContext should be defined");
@@ -275,12 +364,12 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
                 { for list.iter().map(|t| html! {
                     <tr key={&*t.uuid}>
                         <td>{NaiveDateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), |dt| format!("{}", dt.format(TIME_FORMAT)))}</td>
-                        <td><a href={format!("https://youtu.be/{}", t.video_id)}>{t.video_id.clone()}</a></td>
+                        <td>{video_link!(t.video_id)}</td>
                         <td>{t.title.clone()}{original_indicator!(t.original, title)}</td>
                         <td>{title_score(t)}</td>
                         <td>{t.votes}</td>
                         <td>{t.uuid.clone()}</td>
-                        <td>{t.user_id.clone()}</td>
+                        <td>{user_link!(t.user_id)}</td>
                     </tr>
                 }) }
             </table>
@@ -298,11 +387,11 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
                 { for list.iter().map(|t| html! {
                     <tr key={&*t.uuid}>
                         <td>{NaiveDateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), |dt| format!("{}", dt.format(TIME_FORMAT)))}</td>
-                        <td><a href={format!("https://youtu.be/{}", t.video_id)}>{t.video_id.clone()}</a></td>
-                        <td>{t.timestamp.map_or("-".to_owned(), |ts| ts.to_string())}{original_indicator!(t.original, thumbnail)}</td>
+                        <td>{video_link!(t.video_id)}</td>
+                        <td>{t.timestamp.map_or(original_indicator!(t.original, thumbnail), |ts| html! {{ts.to_string()}})}</td>
                         <td>{thumbnail_score(t)}</td>
                         <td>{t.uuid.clone()}</td>
-                        <td>{t.user_id.clone()}</td>
+                        <td>{user_link!(t.user_id)}</td>
                     </tr>
                 }) }
             </table>
@@ -318,6 +407,64 @@ fn HomePage() -> Html {
     let url = match *table_mode {
         DetailType::Title => window_context.origin.join("/api/titles"),
         DetailType::Thumbnail => window_context.origin.join("/api/thumbnails"),
+    }.expect("Should be able to create an API url");
+
+    let fallback = html! {
+        <center><b>{"Loading..."}</b></center>
+    };
+    
+    html! {
+        <>
+            <TableModeSwitch state={table_mode.clone()} />
+            <Suspense {fallback}>
+                <DetailTableRenderer mode={*table_mode} url={Rc::new(url)} />
+            </Suspense>
+        </>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct VideoPageProps {
+    videoid: AttrValue,
+}
+
+#[function_component]
+fn VideoPage(props: &VideoPageProps) -> Html {
+    let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
+    let table_mode = use_state_eq(|| DetailType::Title);
+
+    let url = match *table_mode {
+        DetailType::Title => window_context.origin.join(format!("/api/titles/video_id/{}", props.videoid).as_str()),
+        DetailType::Thumbnail => window_context.origin.join(format!("/api/thumbnails/video_id/{}", props.videoid).as_str()),
+    }.expect("Should be able to create an API url");
+
+    let fallback = html! {
+        <center><b>{"Loading..."}</b></center>
+    };
+    
+    html! {
+        <>
+            <TableModeSwitch state={table_mode.clone()} />
+            <Suspense {fallback}>
+                <DetailTableRenderer mode={*table_mode} url={Rc::new(url)} />
+            </Suspense>
+        </>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct UserPageProps {
+    userid: AttrValue,
+}
+
+#[function_component]
+fn UserPage(props: &UserPageProps) -> Html {
+    let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
+    let table_mode = use_state_eq(|| DetailType::Title);
+
+    let url = match *table_mode {
+        DetailType::Title => window_context.origin.join(format!("/api/titles/user_id/{}", props.userid).as_str()),
+        DetailType::Thumbnail => window_context.origin.join(format!("/api/thumbnails/user_id/{}", props.userid).as_str()),
     }.expect("Should be able to create an API url");
 
     let fallback = html! {

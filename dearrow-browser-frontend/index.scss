@@ -92,7 +92,7 @@ body {
     }
   }
 
-  &[data-route="Home"] {
+  &[data-route="Home"], &[data-route="Video"] {
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
@@ -120,4 +120,9 @@ body {
       background-color: gray;
     }
   }
+}
+
+.icon-link, .icon-link a {
+  text-decoration: none;
+  color: black;
 }

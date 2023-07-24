@@ -9,9 +9,10 @@ use yew_router::prelude::*;
 use web_sys::{window, HtmlInputElement};
 
 mod hooks;
+mod utils;
 use hooks::use_async_suspension;
+use utils::*;
 
-const TIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
 #[derive(Clone, Routable, PartialEq, IntoStaticStr)]
 enum Route {
@@ -44,6 +45,9 @@ struct AppContext {
     last_modified: Option<i64>,
 }
 
+#[derive(Clone, Copy, PartialEq)]
+struct UpdateClock(bool);
+
 #[function_component]
 fn App() -> Html {
     let window_context = use_memo(|_| {
@@ -58,6 +62,7 @@ fn App() -> Html {
                 .map(AttrValue::from),
         }
     }, ());
+    let update_clock = use_state(|| UpdateClock(false));
 
     let status = {
         let window_context = window_context.clone();
@@ -70,11 +75,13 @@ fn App() -> Html {
     };
     {
         let status = status.clone();
+        let update_clock = update_clock.clone();
         use_interval(move || {
+            update_clock.set(UpdateClock(!update_clock.0));
             status.run();
         }, 60*1000);
     }
-    let app_context = use_memo(|&data|{ 
+    let app_context = use_memo(|&data|{
         let (last_updated, last_modified) = data;
         AppContext {
             last_updated,
@@ -85,9 +92,11 @@ fn App() -> Html {
     html! {
         <ContextProvider<Rc<WindowContext>> context={window_context}>
         <ContextProvider<Rc<AppContext>> context={app_context}>
+        <ContextProvider<UpdateClock> context={*update_clock}>
             <BrowserRouter>
                 <Switch<Route> render={render_route} />
             </BrowserRouter>
+        </ContextProvider<UpdateClock>>
         </ContextProvider<Rc<AppContext>>>
         </ContextProvider<Rc<WindowContext>>>
     }
@@ -180,13 +189,15 @@ fn Header() -> Html {
 #[function_component]
 fn Footer() -> Html {
     let app_context: Rc<AppContext> = use_context().expect("AppContext should be defined");
+    let _ = use_context::<UpdateClock>();
+
     let last_updated = match app_context.last_updated.and_then(NaiveDateTime::from_timestamp_millis).map(|dt| dt.and_utc()) {
         None => AttrValue::from("..."),
-        Some(time) => AttrValue::from(format!("{} UTC ({} minutes ago)", time.format(TIME_FORMAT), (Utc::now()-time).num_minutes())),
+        Some(time) => AttrValue::from(render_datetime_with_delta(time)),
     };
     let last_modified = match app_context.last_modified.and_then(NaiveDateTime::from_timestamp_millis).map(|dt| dt.and_utc()) {
         None => AttrValue::from("..."),
-        Some(time) => AttrValue::from(format!("{} UTC ({} minutes ago)", time.format(TIME_FORMAT), (Utc::now()-time).num_minutes())),
+        Some(time) => AttrValue::from(render_datetime_with_delta(time)),
     };
 
     html! {
@@ -203,7 +214,11 @@ fn Footer() -> Html {
             </table>
             <span>
                 <table>
-                    <tr><td>{"DeArrow Browser © mini_bomba 2023"}</td></tr>
+                    <tr><td>
+                        <a href="https://github.com/mini-bomba/DeArrowBrowser">{"DeArrow Browser"}</a>
+                        {" © mini_bomba 2023, licensed under "}
+                        <a href="https://www.gnu.org/licenses/agpl-3.0.en.html">{"AGPL v3"}</a>
+                    </td></tr>
                     <tr><td>
                         {"Uses DeArrow data licensed under "}
                         <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">{"CC BY-NC-SA 4.0"}</a>
@@ -388,7 +403,7 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
                 </tr>
                 { for list.iter().map(|t| html! {
                     <tr key={&*t.uuid}>
-                        <td>{NaiveDateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), |dt| format!("{}", dt.format(TIME_FORMAT)))}</td>
+                        <td>{NaiveDateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), render_naive_datetime)}</td>
                         if props.hide_videoid.is_none() {
                             <td>{video_link!(t.video_id)}</td>
                         }
@@ -418,7 +433,7 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
                 </tr>
                 { for list.iter().map(|t| html! {
                     <tr key={&*t.uuid}>
-                        <td>{NaiveDateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), |dt| format!("{}", dt.format(TIME_FORMAT)))}</td>
+                        <td>{NaiveDateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), render_naive_datetime)}</td>
                         if props.hide_videoid.is_none() {
                             <td>{video_link!(t.video_id)}</td>
                         }

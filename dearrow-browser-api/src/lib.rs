@@ -5,6 +5,7 @@ use serde::{Serialize, Deserialize};
 #[derive(Serialize, Deserialize, Clone)]
 pub struct StatusResponse {
     pub last_updated: i64,
+    pub last_modified: i64,
     pub updating_now: bool,
     pub titles: usize,
     pub thumbnails: usize,

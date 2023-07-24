@@ -43,7 +43,7 @@ pub struct Title {
     pub flags: TitleFlags,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct StringSet {
     pub set: HashSet<Arc<str>>
 }

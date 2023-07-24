@@ -1,4 +1,4 @@
-use std::{sync::RwLock, ops::DerefMut, fs::{File, Permissions, set_permissions}, io::{Read, Write, self}, os::unix::prelude::PermissionsExt};
+use std::{sync::RwLock, fs::{File, Permissions, set_permissions}, io::{Read, Write, self}, os::unix::prelude::PermissionsExt};
 use actix_files::{Files, NamedFile};
 use actix_web::{HttpServer, App, web, dev::{ServiceResponse, fn_service, ServiceRequest}};
 use anyhow::{Context, anyhow, bail};
@@ -37,15 +37,20 @@ async fn main() -> anyhow::Result<()> {
         }
     });
     let string_set = web::Data::new(RwLock::new(StringSet::with_capacity(16384)));
-    let (db, errors) = DearrowDB::load_dir(&config.mirror_path, string_set.write().map_err(|_| anyhow!("Failed to aquire StringSet lock for writing"))?.deref_mut()).context("Initial DearrowDB load failed")?;
+    let db: web::Data<RwLock<DatabaseState>> = {
+        let mut string_set = string_set.write().map_err(|_| anyhow!("Failed to aquire StringSet lock for writing"))?;
+        let (db, errors) = DearrowDB::load_dir(&config.mirror_path, &mut string_set).context("Initial DearrowDB load failed")?;
+        string_set.clean();
 
-    let db: web::Data<RwLock<DatabaseState>> = web::Data::new(RwLock::new(DatabaseState {
-        db,
-        last_error: None,
-        errors: errors.into(),
-        last_updated: Utc::now().timestamp_millis(),
-        updating_now: false
-    }));
+        web::Data::new(RwLock::new(DatabaseState {
+            db,
+            last_error: None,
+            errors: errors.into(),
+            last_updated: Utc::now().timestamp_millis(),
+            last_modified: utils::get_mtime(&config.mirror_path.join("titles.csv")),
+            updating_now: false
+        }))
+    };
 
     let mut server = {
         let config = config.clone();

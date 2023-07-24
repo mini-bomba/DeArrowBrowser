@@ -1,8 +1,10 @@
 use std::sync::{RwLock, Arc};
-use actix_web::{Responder, get, web, http::StatusCode, CustomizeResponder};
-use anyhow::anyhow;
-use dearrow_parser::StringSet;
+use actix_web::{Responder, get, post, web, http::StatusCode, CustomizeResponder, HttpResponse, rt::task::spawn_blocking};
+use anyhow::{anyhow, bail};
+use chrono::Utc;
+use dearrow_parser::{StringSet, DearrowDB};
 use dearrow_browser_api::*;
+use serde::Deserialize;
 
 use crate::{utils::{self, MapInto}, state::*};
 
@@ -17,7 +19,8 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
        .service(get_thumbnails_by_video_id)
        .service(get_thumbnails_by_user_id)
        .service(get_status)
-       .service(get_errors);
+       .service(get_errors)
+       .service(request_reload);
 }
 
 type JsonResult<T> = utils::Result<web::Json<T>>;
@@ -37,6 +40,7 @@ async fn get_status(db_lock: web::Data<RwLock<DatabaseState>>, string_set: web::
     let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
     Ok(web::Json(StatusResponse {
         last_updated: db.last_updated,
+        last_modified: db.last_modified,
         updating_now: db.updating_now,
         titles: db.db.titles.len(),
         thumbnails: db.db.thumbnails.len(),
@@ -44,6 +48,54 @@ async fn get_status(db_lock: web::Data<RwLock<DatabaseState>>, string_set: web::
         last_error: db.last_error.as_ref().map(|e| format!("{e:?}")),
         string_count: strings,
     }))
+}
+
+#[derive(Deserialize, Debug)]
+struct Auth {
+    auth: Option<String>
+}
+
+fn do_reload(db_lock: web::Data<RwLock<DatabaseState>>, string_set_lock: web::Data<RwLock<StringSet>>, config: web::Data<AppConfig>) -> anyhow::Result<()> {
+    {
+        let mut db_state = db_lock.write().map_err(|_| anyhow!("Failed to acquire DatabaseState for writing"))?;
+        if db_state.updating_now {
+            bail!("Already updating!");
+        }
+        db_state.updating_now = true;
+    }
+    let mut string_set_clone = string_set_lock.read().map_err(|_| anyhow!("Failed to acquire StringSet for reading"))?.clone();
+    let (new_db, errors) = DearrowDB::load_dir(config.mirror_path.as_path(), &mut string_set_clone)?;
+    let last_updated = Utc::now().timestamp_millis();
+    let last_modified = utils::get_mtime(&config.mirror_path.join("titles.csv"));
+    {
+        let mut string_set = string_set_lock.write().map_err(|_| anyhow!("Failed to acquire StringSet for writing"))?;
+        let mut db_state = db_lock.write().map_err(|_| anyhow!("Failed to acquire DatabaseState for writing"))?;
+        *string_set = string_set_clone;
+        db_state.db = new_db;
+        db_state.errors = errors.into();
+        db_state.last_updated = last_updated;
+        db_state.last_modified = last_modified;
+        db_state.updating_now = false;
+        string_set.clean();
+    }
+    Ok(())
+}
+
+#[post("/reload")]
+async fn request_reload(db_lock: web::Data<RwLock<DatabaseState>>, string_set_lock: web::Data<RwLock<StringSet>>, config: web::Data<AppConfig>, auth: web::Query<Auth>) -> HttpResponse {
+    let provided_hash = match auth.auth.as_deref() {
+        None => { return HttpResponse::NotFound().finish(); },
+        Some(s) => utils::sha256(s),
+    };
+    let actual_hash = utils::sha256(config.auth_secret.as_str());
+
+    if provided_hash != actual_hash {
+        return HttpResponse::Forbidden().finish();
+    }
+    match spawn_blocking(move || do_reload(db_lock, string_set_lock, config)).await {
+        Ok(..) => HttpResponse::Ok().finish(),
+        Err(e) => HttpResponse::InternalServerError().body(format!("{e:?}")),
+    }
 }
 
 #[get("/errors")]

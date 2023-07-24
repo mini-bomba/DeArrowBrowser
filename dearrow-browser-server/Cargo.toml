@@ -17,3 +17,4 @@ dearrow-browser-api = { path = "../dearrow-browser-api", features = [ "dearrow-p
 getrandom = "0.2.10"
 serde.workspace = true
 toml = "0.7.6"
+sha2 = "0.10.7"

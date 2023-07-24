@@ -1,6 +1,9 @@
-use std::fmt::{Debug, Display};
+use std::{fmt::{Debug, Display}, path::Path, fs, time::UNIX_EPOCH};
 
 use actix_web::{ResponseError, http::{StatusCode, header::ContentType}, HttpResponse};
+use sha2::{Sha256, Digest, digest::{typenum::U32, generic_array::GenericArray}};
+
+
 pub enum Error {
     Anyhow(anyhow::Error),
     AnyhowStatus {status: StatusCode, error: anyhow::Error},
@@ -71,5 +74,19 @@ where U: Into<T>
     fn map_into(self) -> Option<T> {
         self.map(Into::into)
     }
+}
+
+pub fn sha256(s: &str) -> GenericArray<u8, U32> {
+    let mut hasher = Sha256::new();
+    hasher.update(s);
+    hasher.finalize()
+}
+
+pub fn get_mtime(p: &Path) -> i64 {
+    fs::metadata(p).ok()
+        .and_then(|m| m.modified().ok())
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .and_then(|d| d.as_millis().try_into().ok())
+        .unwrap_or(0)
 }
 

@@ -48,6 +48,7 @@ pub struct DatabaseState {
     pub last_error: Option<Error>,
     pub errors: Box<[Error]>,
     pub last_updated: i64,
+    pub last_modified: i64,
     pub updating_now: bool,
 }
 

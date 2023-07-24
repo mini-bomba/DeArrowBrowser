@@ -9,12 +9,19 @@ pub struct StatusResponse {
     pub updating_now: bool,
     pub titles: usize,
     pub thumbnails: usize,
+    pub vip_users: usize,
+    pub usernames: usize,
     pub errors: usize,
     pub last_error: Option<String>,
     pub string_count: Option<usize>,
 }
 
 pub type ErrorList = Vec<String>;
+
+#[cfg(feature = "dearrow-parser")]
+pub trait IntoWithDatabase<T> {
+    fn into_with_db(self, db: &dearrow_parser::DearrowDB) -> T;
+}
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ApiTitle {
@@ -29,6 +36,8 @@ pub struct ApiTitle {
     pub shadow_hidden: bool,
     pub unverified: bool,
     pub score: i8,
+    pub username: Option<Arc<str>>,
+    pub vip: bool,
 }
 #[cfg(feature = "dearrow-parser")]
 impl From<&dearrow_parser::Title> for ApiTitle {
@@ -51,7 +60,18 @@ impl From<&dearrow_parser::Title> for ApiTitle {
             } else {
                 value.votes
             },
+            username: None,
+            vip: false,
         }
+    }
+}
+#[cfg(feature = "dearrow-parser")]
+impl IntoWithDatabase<ApiTitle> for &dearrow_parser::Title {
+    fn into_with_db(self, db: &dearrow_parser::DearrowDB) -> ApiTitle {
+        let mut res: ApiTitle = self.into();
+        res.username = db.usernames.get(&res.user_id).map(|u| u.username.clone());
+        res.vip = db.vip_users.contains(&res.user_id);
+        res
     }
 }
 
@@ -66,6 +86,8 @@ pub struct ApiThumbnail {
     pub original: bool,
     pub locked: bool,
     pub shadow_hidden: bool,
+    pub username: Option<Arc<str>>,
+    pub vip: bool,
 }
 #[cfg(feature = "dearrow-parser")]
 impl From<&dearrow_parser::Thumbnail> for ApiThumbnail {
@@ -81,7 +103,18 @@ impl From<&dearrow_parser::Thumbnail> for ApiThumbnail {
             original: value.flags.contains(ThumbnailFlags::Original),
             locked: value.flags.contains(ThumbnailFlags::Locked),
             shadow_hidden: value.flags.contains(ThumbnailFlags::ShadowHidden),
+            username: None,
+            vip: false,
         }
+    }
+}
+#[cfg(feature = "dearrow-parser")]
+impl IntoWithDatabase<ApiThumbnail> for &dearrow_parser::Thumbnail {
+    fn into_with_db(self, db: &dearrow_parser::DearrowDB) -> ApiThumbnail {
+        let mut res: ApiThumbnail = self.into();
+        res.username = db.usernames.get(&res.user_id).map(|u| u.username.clone());
+        res.vip = db.vip_users.contains(&res.user_id);
+        res
     }
 }
 

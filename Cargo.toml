@@ -1,6 +1,13 @@
 [workspace]
 members = ["dearrow-browser-server", "dearrow-browser-api", "dearrow-parser", "dearrow-browser-frontend"]
 
+[workspace.package]
+version = "1.1.0"
+homepage = "https://dearrow.minibomba.pro"
+repository = "https://github.com/mini-bomba/DeArrowBrowser"
+license = "AGPL-3.0-only"
+edition = "2021"
+
 [workspace.dependencies]
 serde = { version = "1.0.173", features = ["derive", "rc"] }
 anyhow = "1.0.72"

@@ -1,5 +1,5 @@
 use std::rc::Rc;
-use chrono::{NaiveDateTime, Utc};
+use chrono::NaiveDateTime;
 use dearrow_browser_api::{StatusResponse, ApiThumbnail, ApiTitle};
 use reqwest::Url;
 use strum::IntoStaticStr;
@@ -291,6 +291,7 @@ struct DetailTableRendererProps {
     url: Rc<Url>,
     mode: DetailType,
     hide_userid: Option<()>,
+    hide_username: Option<()>,
     hide_videoid: Option<()>,
 }
 
@@ -311,6 +312,9 @@ fn title_flags(title: &ApiTitle) -> Html {
             if title.locked {
                 <span title="This title was locked by a VIP">{"🔒"}</span>
             }
+            if title.vip {
+                <span title="This title was submitted by a VIP">{"👑"}</span>
+            }
             if title.shadow_hidden {
                 <span title="This title is shadowhidden">{"🚫"}</span>
             }
@@ -326,6 +330,9 @@ fn thumbnail_flags(thumb: &ApiThumbnail) -> Html {
             }
             if thumb.locked {
                 <span title="This thumbnail was locked by a VIP">{"🔒"}</span>
+            }
+            if thumb.vip {
+                <span title="This thumbnail was submitted by a VIP">{"👑"}</span>
             }
             if thumb.shadow_hidden {
                 <span title="This thumbnail is shadowhidden">{"🚫"}</span>
@@ -372,6 +379,16 @@ macro_rules! user_link {
     };
 }
 
+macro_rules! username_link {
+    ($username:expr) => {
+        if let Some(ref name) = $username {
+            html! {<textarea readonly=true ~value={name.to_string()} />}
+        } else {
+            html! {{"-"}}
+        }
+    };
+}
+
 #[function_component]
 fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
     let app_context: Rc<AppContext> = use_context().expect("AppContext should be defined");
@@ -397,6 +414,9 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
                     <th class="title-col">{"Title"}</th>
                     <th>{"Score/Votes"}</th>
                     <th>{"UUID"}</th>
+                    if props.hide_username.is_none() {
+                        <th>{"Username"}</th>
+                    }
                     if props.hide_userid.is_none() {
                         <th>{"User ID"}</th>
                     }
@@ -410,6 +430,9 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
                         <td class="title-col">{t.title.clone()}<br />{original_indicator!(t.original, title)}</td>
                         <td>{format!("{}/{}", t.score, t.votes)}<br />{title_flags(t)}</td>
                         <td>{t.uuid.clone()}</td>
+                        if props.hide_username.is_none() {
+                            <td>{username_link!(t.username)}</td>
+                        }
                         if props.hide_userid.is_none() {
                             <td>{user_link!(t.user_id)}</td>
                         }
@@ -427,6 +450,9 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
                     <th>{"Timestamp"}</th>
                     <th>{"Score/Votes"}</th>
                     <th>{"UUID"}</th>
+                    if props.hide_username.is_none() {
+                        <th>{"Username"}</th>
+                    }
                     if props.hide_userid.is_none() {
                         <th>{"User ID"}</th>
                     }
@@ -440,6 +466,9 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
                         <td>{t.timestamp.map_or(original_indicator!(t.original, thumbnail), |ts| html! {{ts.to_string()}})}</td>
                         <td>{t.votes}<br />{thumbnail_flags(t)}</td>
                         <td>{t.uuid.clone()}</td>
+                        if props.hide_username.is_none() {
+                            <td>{username_link!(t.username)}</td>
+                        }
                         if props.hide_userid.is_none() {
                             <td>{user_link!(t.user_id)}</td>
                         }
@@ -526,7 +555,7 @@ fn UserPage(props: &UserPageProps) -> Html {
         <>
             <TableModeSwitch state={table_mode.clone()} />
             <Suspense {fallback}>
-                <DetailTableRenderer mode={*table_mode} url={Rc::new(url)} hide_userid={()} />
+                <DetailTableRenderer mode={*table_mode} url={Rc::new(url)} hide_userid={()} hide_username={()} />
             </Suspense>
         </>
     }

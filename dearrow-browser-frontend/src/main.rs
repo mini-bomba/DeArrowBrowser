@@ -41,6 +41,7 @@ struct WindowContext {
 #[derive(Clone, PartialEq)]
 struct AppContext {
     last_updated: Option<i64>,
+    last_modified: Option<i64>,
 }
 
 #[function_component]
@@ -73,9 +74,13 @@ fn App() -> Html {
             status.run();
         }, 60*1000);
     }
-    let app_context = use_memo(|&last_updated| AppContext {
-        last_updated,
-    }, status.data.as_ref().map(|d| d.last_updated));
+    let app_context = use_memo(|&data|{ 
+        let (last_updated, last_modified) = data;
+        AppContext {
+            last_updated,
+            last_modified,
+        }
+    }, status.data.as_ref().map(|d| (d.last_updated, d.last_modified)).unzip());
 
     html! {
         <ContextProvider<Rc<WindowContext>> context={window_context}>
@@ -176,19 +181,37 @@ fn Header() -> Html {
 fn Footer() -> Html {
     let app_context: Rc<AppContext> = use_context().expect("AppContext should be defined");
     let last_updated = match app_context.last_updated.and_then(NaiveDateTime::from_timestamp_millis).map(|dt| dt.and_utc()) {
-        None => AttrValue::from("Last update: ..."),
-        Some(time) => AttrValue::from(format!("Last update: {} UTC ({} minutes ago)", time.format(TIME_FORMAT), (Utc::now()-time).num_minutes())),
+        None => AttrValue::from("..."),
+        Some(time) => AttrValue::from(format!("{} UTC ({} minutes ago)", time.format(TIME_FORMAT), (Utc::now()-time).num_minutes())),
+    };
+    let last_modified = match app_context.last_modified.and_then(NaiveDateTime::from_timestamp_millis).map(|dt| dt.and_utc()) {
+        None => AttrValue::from("..."),
+        Some(time) => AttrValue::from(format!("{} UTC ({} minutes ago)", time.format(TIME_FORMAT), (Utc::now()-time).num_minutes())),
     };
 
     html! {
         <div id="footer">
-            <span>{last_updated}</span>
+            <table>
+                <tr>
+                    <td>{"Last update:"}</td>
+                    <td>{last_updated}</td>
+                </tr>
+                <tr>
+                    <td>{"Database snapshot taken at:"}</td>
+                    <td>{last_modified}</td>
+                </tr>
+            </table>
             <span>
-                {"DeArrow Browser © mini_bomba 2023. Uses DeArrow data licensed under "}
-                <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">{"CC BY-NC-SA 4.0"}</a>
-                {" from "}
-                <a href="https://dearrow.ajay.app/">{"https://dearrow.ajay.app/"}</a>
-                {"."}
+                <table>
+                    <tr><td>{"DeArrow Browser © mini_bomba 2023"}</td></tr>
+                    <tr><td>
+                        {"Uses DeArrow data licensed under "}
+                        <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">{"CC BY-NC-SA 4.0"}</a>
+                        {" from "}
+                        <a href="https://dearrow.ajay.app/">{"https://dearrow.ajay.app/"}</a>
+                        {"."}
+                    </td></tr>
+                </table>
             </span>
         </div>
     }

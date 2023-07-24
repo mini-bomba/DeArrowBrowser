@@ -92,11 +92,24 @@ body {
     }
   }
 
-  &[data-route="Home"], &[data-route="Video"] {
+  &[data-route="Home"], &[data-route="Video"], &[data-route="User"] {
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
     align-items: stretch;
+
+    table {
+      border-collapse: collapse;
+    }
+
+    td {
+      text-align: center;
+    }
+
+    tr {
+      border-top: 1px solid gray;
+      border-bottom: 1px solid gray;
+    }
   }
 }
 
@@ -110,7 +123,7 @@ body {
   flex-direction: row;
   justify-content: flex-start;
 
-  > span {
+  .table-mode {
     padding: 0.5rem;
     border: 1px solid gray;
     border-radius: 0.25rem 0.25rem 0 0;

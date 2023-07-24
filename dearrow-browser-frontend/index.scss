@@ -1,6 +1,13 @@
 $gray: #333;
 $white: #eee;
 
+@font-face {
+  font-family: "Roboto";
+  src: 
+    local("Roboto"),
+    url("/fonts/Roboto-Regular.ttf") format("opentype");
+}
+
 %headercolors {
   background-color: #222;
 }
@@ -12,6 +19,7 @@ body {
   flex-direction: column;
   color: $white;
   background: #000;
+  font-family: "Roboto";
 
   > * {
     padding: 1rem;
@@ -104,6 +112,10 @@ body {
 
     td {
       text-align: center;
+      
+      &.title-col {
+        max-width: 40vw;
+      }
     }
 
     tr {

@@ -356,7 +356,7 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
                     if props.hide_videoid.is_none() {
                         <th>{"Video ID"}</th>
                     }
-                    <th>{"Title"}</th>
+                    <th class="title-col">{"Title"}</th>
                     <th>{"Score/Votes"}</th>
                     <th>{"UUID"}</th>
                     if props.hide_userid.is_none() {
@@ -369,7 +369,7 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
                         if props.hide_videoid.is_none() {
                             <td>{video_link!(t.video_id)}</td>
                         }
-                        <td>{t.title.clone()}<br />{original_indicator!(t.original, title)}</td>
+                        <td class="title-col">{t.title.clone()}<br />{original_indicator!(t.original, title)}</td>
                         <td>{format!("{}/{}", t.score, t.votes)}<br />{title_flags(t)}</td>
                         <td>{t.uuid.clone()}</td>
                         if props.hide_userid.is_none() {

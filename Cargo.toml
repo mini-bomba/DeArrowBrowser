@@ -4,3 +4,7 @@ members = ["dearrow-browser-server", "dearrow-browser-api", "dearrow-parser", "d
 [workspace.dependencies]
 serde = { version = "1.0.173", features = ["derive", "rc"] }
 anyhow = "1.0.72"
+
+[profile.release]
+strip = true
+lto = true

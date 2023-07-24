@@ -11,3 +11,17 @@ This is repository is split into 4 crates:
 - dearrow-browser-frontend - the frontend, uses Yew, functions as a single page application
 
 The logo is a combination of the DeArrow logo and the magnifying glass emoji from [twemoji](https://github.com/twitter/twemoji)
+
+## Running an instance
+1. Build the image
+```sh
+docker buid -t dearrow-browser .
+```
+2. Create a config.toml file. Static content (frontend) is available at /static in the container.
+3. Run the container
+```sh
+docker run -h dearrow-browser --name dearrow-browser -v <path to mirror>:/mirror -v <path to config.toml>:/config.toml:ro -p 9292 dearrow-browser
+```
+
+If you've got a proper mirror set up (instead of manually sourced .csv files), make it make a POST request to `/api/reload` with the auth secret as the `auth` URL parameter to reload the database.
+DeArrow Browser should remain usable while the database is reloaded. (assuming we don't run out of RAM)

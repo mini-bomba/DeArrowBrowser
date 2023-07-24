@@ -1,0 +1,8 @@
+mirror_path = "./mirror"  # path to mirror with csv files
+static_content_path = "./static"  # path to compiled dearrow-browser-frontend
+auth_secret = "set this to something random"  # secret for authenticated enpoints (such as reload)
+
+[listen]  # either tcp or unix has to be set
+tcp = ["0.0.0.0", 9292]  # IP and port to bind to
+#unix = "/tmp/dearrow-browser.sock"  # path to the unix socket
+#unix_mode = 0o777  # optional - permissions of the created unix socket

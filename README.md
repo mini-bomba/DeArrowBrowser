@@ -4,7 +4,7 @@ Inspired by [Lartza's SBbrowser](https://github.com/Lartza/SBbrowser).
 
 Public instance available at [dearrow.minibomba.pro](https://dearrow.minibomba.pro/).
 
-This is repository is split into 4 crates:
+This repository is split into 4 crates:
 - dearrow-parser - definitions of structures in source .csv files, reading & merging those into a single structure per detail
 - dearrow-browser-server - the backend, keeps the database loaded in memory, provides data for the backend
 - dearrow-browser-api - definitions of API structures

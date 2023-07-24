@@ -421,8 +421,11 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
     };
 
     Ok(match *details {
-        Err(..) => html! {
-            <center><b>{"Failed to fetch details from the API :/"}</b></center>
+        Err(ref e) => html! {
+            <center>
+                <b>{"Failed to fetch details from the API :/"}</b>
+                <pre>{format!("{e:?}")}</pre>
+            </center>
         },
         Ok(DetailList::Titles(ref list)) => html! {
             <table class="detail-table titles">

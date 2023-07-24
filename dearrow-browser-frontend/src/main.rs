@@ -241,8 +241,8 @@ fn TableModeSwitch(props: &TableModeSwitchProps) -> Html {
 
     html! {
         <div class="table-mode-switch">
-            <span onclick={set_titles_mode} selected={*props.state == DetailType::Title}>{"Titles"}</span>
-            <span onclick={set_thumbs_mode} selected={*props.state == DetailType::Thumbnail}>{"Thumbnails"}</span>
+            <span class="table-mode" onclick={set_titles_mode} selected={*props.state == DetailType::Title}>{"Titles"}</span>
+            <span class="table-mode" onclick={set_thumbs_mode} selected={*props.state == DetailType::Thumbnail}>{"Thumbnails"}</span>
         </div>
     }
     
@@ -261,10 +261,9 @@ enum DetailList {
     Titles(Vec<ApiTitle>),
 }
 
-fn title_score(title: &ApiTitle) -> Html {
+fn title_flags(title: &ApiTitle) -> Html {
     html! {
         <>
-            {title.score}
             if title.score < 0 {
                 <span title="This title's score is too low to be displayed">{"❌"}</span>
             }
@@ -281,10 +280,9 @@ fn title_score(title: &ApiTitle) -> Html {
     }
 }
 
-fn thumbnail_score(thumb: &ApiThumbnail) -> Html {
+fn thumbnail_flags(thumb: &ApiThumbnail) -> Html {
     html! {
         <>
-            {thumb.votes}
             if thumb.votes < 0 {
                 <span title="This thumbnail's score is too low to be displayed">{"❌"}</span>
             }
@@ -314,8 +312,7 @@ macro_rules! video_link {
     ($videoid:expr) => {
         html! {
             <>
-                <a href={format!("https://youtu.be/{}", $videoid)} title="View this video on YouTube" target="_blank">{$videoid.clone()}</a>
-                {" "}
+                <a href={format!("https://youtu.be/{}", $videoid)} title="View this video on YouTube" target="_blank">{$videoid.clone()}</a><br />
                 <span class="icon-link" title="View this video in DeArrow Browser">
                     <Link<Route> to={Route::Video { id: $videoid.to_string() }}>{"🔍"}</Link<Route>>
                 </span>
@@ -328,7 +325,7 @@ macro_rules! user_link {
     ($userid:expr) => {
         html! {
             <>
-                {$userid.clone()}{" "}
+                <textarea readonly=true ~value={$userid.to_string()} /><br />
                 <span class="icon-link" title="View this user in DeArrow Browser">
                     <Link<Route> to={Route::User { id: $userid.to_string() }}>{"🔍"}</Link<Route>>
                 </span>
@@ -360,8 +357,7 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
                         <th>{"Video ID"}</th>
                     }
                     <th>{"Title"}</th>
-                    <th>{"Score"}</th>
-                    <th>{"Votes"}</th>
+                    <th>{"Score/Votes"}</th>
                     <th>{"UUID"}</th>
                     if props.hide_userid.is_none() {
                         <th>{"User ID"}</th>
@@ -373,9 +369,8 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
                         if props.hide_videoid.is_none() {
                             <td>{video_link!(t.video_id)}</td>
                         }
-                        <td>{t.title.clone()}{original_indicator!(t.original, title)}</td>
-                        <td>{title_score(t)}</td>
-                        <td>{t.votes}</td>
+                        <td>{t.title.clone()}<br />{original_indicator!(t.original, title)}</td>
+                        <td>{format!("{}/{}", t.score, t.votes)}<br />{title_flags(t)}</td>
                         <td>{t.uuid.clone()}</td>
                         if props.hide_userid.is_none() {
                             <td>{user_link!(t.user_id)}</td>
@@ -405,7 +400,7 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
                             <td>{video_link!(t.video_id)}</td>
                         }
                         <td>{t.timestamp.map_or(original_indicator!(t.original, thumbnail), |ts| html! {{ts.to_string()}})}</td>
-                        <td>{thumbnail_score(t)}</td>
+                        <td>{t.votes}<br />{thumbnail_flags(t)}</td>
                         <td>{t.uuid.clone()}</td>
                         if props.hide_userid.is_none() {
                             <td>{user_link!(t.user_id)}</td>

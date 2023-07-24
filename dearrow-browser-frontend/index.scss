@@ -1,7 +1,8 @@
-$hue: 205.5;
+$gray: #333;
+$white: #eee;
 
 %headercolors {
-  background-color: hwb($hue 54.5% 0%);
+  background-color: #222;
 }
 
 body {
@@ -9,6 +10,8 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  color: $white;
+  background: #000;
 
   > * {
     padding: 1rem;
@@ -35,7 +38,7 @@ body {
 }
 
 #searchbar {
-  background-color: hwb($hue 47% 0%);
+  background-color: #111;
   display: flex;
   flex-direction: row;
   justify-content: space-evenly;
@@ -48,10 +51,7 @@ body {
 
     input {
       font-size: 1rem;
-      appearance: none;
       padding: .375rem .75rem;
-      border: 1px solid gray;
-      border-radius: .25rem;
     }
   }
 }
@@ -65,7 +65,6 @@ body {
 }
 
 #content {
-  background-color: hwb($hue 63% 0%);
   flex-grow: 1;
 
   &[data-route="NotFound"] {
@@ -100,6 +99,7 @@ body {
 
     table {
       border-collapse: collapse;
+      border: 1px solid $gray;
     }
 
     td {
@@ -107,8 +107,13 @@ body {
     }
 
     tr {
-      border-top: 1px solid gray;
-      border-bottom: 1px solid gray;
+      border-top: 1px solid $gray;
+      border-bottom: 1px solid $gray;
+
+      &.header {
+        border-bottom: 2px solid $gray;
+        border-top: none;
+      }
     }
   }
 }
@@ -118,24 +123,40 @@ body {
 }
 
 .table-mode-switch {
-  border-bottom: 1px solid gray;
   display: flex;
   flex-direction: row;
   justify-content: flex-start;
 
   .table-mode {
     padding: 0.5rem;
-    border: 1px solid gray;
+    border: 1px solid $gray;
+    border-bottom: none;
     border-radius: 0.25rem 0.25rem 0 0;
     @extend .clickable;
 
     &[selected] {
-      background-color: gray;
+      background-color: $gray;
     }
   }
 }
 
 .icon-link, .icon-link a {
   text-decoration: none;
-  color: black;
+  color: inherit;
+}
+
+a {
+  color: lightblue;
+
+  &:visited {
+    color: lightpink;
+  }
+}
+
+input, textarea {
+  color: $white;
+  background-color: $gray;
+  appearance: none;
+  border: 1px solid $gray;
+  border-radius: .25rem;
 }

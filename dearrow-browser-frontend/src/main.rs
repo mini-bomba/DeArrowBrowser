@@ -351,7 +351,7 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
         },
         Ok(DetailList::Titles(ref list)) => html! {
             <table class="detail-table titles">
-                <tr>
+                <tr class="header">
                     <th>{"Submitted"}</th>
                     if props.hide_videoid.is_none() {
                         <th>{"Video ID"}</th>
@@ -381,7 +381,7 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
         },
         Ok(DetailList::Thumbnails(ref list)) => html! {
             <table class="detail-table thumbnails">
-                <tr>
+                <tr class="header">
                     <th>{"Submitted"}</th>
                     if props.hide_videoid.is_none() {
                         <th>{"Video ID"}</th>

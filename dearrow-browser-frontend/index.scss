@@ -142,16 +142,19 @@ body {
   display: flex;
   flex-direction: row;
   justify-content: flex-start;
-
-  .table-mode {
+  
+  > span {
     padding: 0.5rem;
-    border: 1px solid $gray;
-    border-bottom: none;
-    border-radius: 0.25rem 0.25rem 0 0;
-    @extend .clickable;
 
-    &[selected] {
-      background-color: $gray;
+    &.table-mode {
+      border: 1px solid $gray;
+      border-bottom: none;
+      border-radius: 0.25rem 0.25rem 0 0;
+      @extend .clickable;
+
+      &[selected] {
+        background-color: $gray;
+      }
     }
   }
 }

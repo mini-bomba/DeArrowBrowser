@@ -406,10 +406,16 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
     let details = { 
         let result: SuspensionResult<Rc<Result<DetailList, anyhow::Error>>> = use_async_suspension(|(mode, url, _)| async move {
             let request = reqwest::get((*url).clone()).await?;
-            match mode {
-                DetailType::Thumbnail => Ok(DetailList::Thumbnails(request.json().await?)),
-                DetailType::Title => Ok(DetailList::Titles(request.json().await?)),
-            }
+            let mut result = match mode {
+                DetailType::Thumbnail => DetailList::Thumbnails(request.json().await?),
+                DetailType::Title => DetailList::Titles(request.json().await?),
+            };
+            // Sort by time submited, most to least recent
+            match result {
+                DetailList::Thumbnails(ref mut list) => list.sort_unstable_by(|a, b| b.time_submitted.cmp(&a.time_submitted)),
+                DetailList::Titles(ref mut list) => list.sort_unstable_by(|a, b| b.time_submitted.cmp(&a.time_submitted)),
+            };
+            Ok(result)
         }, (props.mode, props.url.clone(), app_context.last_updated));
         if let Some(count) = &props.entry_count {
             count.set(result.as_ref().ok().and_then(|r| r.as_ref().as_ref().ok()).map(|l| match l {

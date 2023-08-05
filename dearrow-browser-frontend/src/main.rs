@@ -116,46 +116,31 @@ macro_rules! search_block {
 }
 
 #[function_component]
-fn Header() -> Html {
+fn Searchbar() -> Html {
     let navigator = use_navigator().expect("navigator should exist");
-    let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
-    let searchbar_visible = use_state_eq(|| true);
 
-    let toggle_searchbar = { 
-        let searchbar_visible = searchbar_visible.clone();
-        Callback::from(move |_| {
-            searchbar_visible.set(!*searchbar_visible);
-        })
-    };
     let uuid_search = {
         let navigator = navigator.clone();
-        let searchbar_visible = searchbar_visible.clone();
         Callback::from(move |e: KeyboardEvent| {
             if e.key() == "Enter" {
-                searchbar_visible.set(false);
                 navigator.push(&Route::NotImplemented);
             }
         })
     };
     let uid_search = {
         let navigator = navigator.clone();
-        let searchbar_visible = searchbar_visible.clone();
         Callback::from(move |e: KeyboardEvent| {
             if e.key() == "Enter" {
                 let input: HtmlInputElement = e.target_unchecked_into();
-                searchbar_visible.set(false);
                 navigator.push(&Route::User {id: input.value()});
             }
         })
     };
     let vid_search = { 
-        let navigator = navigator.clone();
-        let searchbar_visible = searchbar_visible.clone();
         Callback::from(move |e: KeyboardEvent| {
             if e.key() == "Enter" {
                 let input: HtmlInputElement = e.target_unchecked_into();
                 let value = input.value();
-                searchbar_visible.set(false);
                 navigator.push(&Route::Video {
                     id: if let Ok(url) = Url::parse(&value) {
                         if url.host_str() == Some("youtu.be") {
@@ -170,32 +155,36 @@ fn Header() -> Html {
             }
         })
     };
+
+    html! {
+        <div id="searchbar">
+            {search_block!("uuid_search", "UUID", uuid_search)}
+            {search_block!("vid_search", "Video ID", vid_search)}
+            {search_block!("uid_search", "User ID", uid_search)}
+        </div>
+    }
+}
+
+#[function_component]
+fn Header() -> Html {
+    let navigator = use_navigator().expect("navigator should exist");
+    let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
+
     let go_home = {
-        let searchbar_visible = searchbar_visible.clone();
         Callback::from(move |_| {
-            searchbar_visible.set(true);
             navigator.push(&Route::Home);
         })
     };
 
     html! {
-        <>
-            <div id="header">
-                if let Some(url) = &window_context.logo_url {
-                    <img src={url} class="clickable" onclick={toggle_searchbar.clone()} ondblclick={go_home.clone()} />
-                }
-                <div>
-                    <h1 class="clickable" onclick={toggle_searchbar} ondblclick={go_home.clone()}>{"DeArrow Browser"}</h1>
-                </div>
-            </div>
-            if *searchbar_visible {
-                <div id="searchbar">
-                    {search_block!("uuid_search", "UUID", uuid_search)}
-                    {search_block!("vid_search", "Video ID", vid_search)}
-                    {search_block!("uid_search", "User ID", uid_search)}
-                </div>
+        <div id="header">
+            if let Some(url) = &window_context.logo_url {
+                <img src={url} class="clickable" onclick={go_home.clone()} />
             }
-        </>
+            <div>
+                <h1 class="clickable" onclick={go_home}>{"DeArrow Browser"}</h1>
+            </div>
+        </div>
     }
 }
 
@@ -248,8 +237,8 @@ fn Footer() -> Html {
 fn render_route(route: Route) -> Html {
     let route_html = match route {
         Route::Home => html! {<HomePage></HomePage>},
-        Route::Video { ref id } => html! {<VideoPage videoid={id.clone()}></VideoPage>},
-        Route::User { ref id } => html! {<UserPage userid={id.clone()}></UserPage>},
+        Route::Video { ref id } => html! {<VideoPage videoid={id.clone()} />},
+        Route::User { ref id } => html! {<UserPage userid={id.clone()} />},
         Route::NotFound => html! {
             <>
                 <h2>{"404 - Not found"}</h2>
@@ -265,7 +254,7 @@ fn render_route(route: Route) -> Html {
             </>
         },
     };
-    let route_name: &'static str = route.into();
+    let route_name: &'static str = (&route).into();
     html! {
         <>
             <Header />
@@ -545,6 +534,9 @@ fn HomePage() -> Html {
     
     html! {
         <>
+            <div id="page-details">
+                <Searchbar />
+            </div>
             <TableModeSwitch state={table_mode.clone()} entry_count={*entry_count} />
             <Suspense {fallback}>
                 <DetailTableRenderer mode={*table_mode} url={Rc::new(url)} {entry_count} />

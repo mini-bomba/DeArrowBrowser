@@ -1,13 +1,6 @@
 $gray: #333;
 $white: #eee;
 
-@font-face {
-  font-family: "Roboto";
-  src: 
-    local("Roboto"),
-    url("/fonts/Roboto-Regular.ttf") format("opentype");
-}
-
 %headercolors {
   background-color: #222;
 }
@@ -18,8 +11,8 @@ body {
   display: flex;
   flex-direction: column;
   color: $white;
-  background: #000;
-  font-family: "Roboto";
+  background: #111;
+  font-family: sans-serif;
 
   > * {
     padding: 1rem;
@@ -27,7 +20,7 @@ body {
 }
 
 #header {
-  height: min(10vh, 5rem);
+  height: min(10vh, 3rem);
   @extend %headercolors;
   display: flex;
   flex-direction: row;
@@ -40,16 +33,15 @@ body {
   }
   
   h1 {
-    font-size: 3rem;
+    font-size: 2rem;
     margin: 0;
   }
 }
 
 #searchbar {
-  background-color: #111;
   display: flex;
   flex-direction: row;
-  justify-content: space-evenly;
+  gap: 1rem;
   
   > div {
     display: flex;
@@ -134,6 +126,10 @@ body {
   }
 }
 
+#page-details {
+  padding-bottom: 2rem;
+}
+
 .clickable {
   cursor: pointer;
 }
@@ -166,16 +162,17 @@ body {
 
 a {
   color: lightblue;
-
-  &:visited {
-    color: lightpink;
-  }
 }
 
 input, textarea {
   color: $white;
-  background-color: $gray;
+  background-color: #111;
+  border-color: #888;
   appearance: none;
   border: 1px solid $gray;
   border-radius: .25rem;
+
+  &::placeholder {
+    color: #888;
+  }
 }

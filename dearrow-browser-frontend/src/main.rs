@@ -154,8 +154,19 @@ fn Header() -> Html {
         Callback::from(move |e: KeyboardEvent| {
             if e.key() == "Enter" {
                 let input: HtmlInputElement = e.target_unchecked_into();
+                let value = input.value();
                 searchbar_visible.set(false);
-                navigator.push(&Route::Video { id: input.value() });
+                navigator.push(&Route::Video {
+                    id: if let Ok(url) = Url::parse(&value) {
+                        if url.host_str() == Some("youtu.be") {
+                            url.path_segments().and_then(|mut s| s.next()).unwrap_or(value.as_str()).to_string()
+                        } else {
+                            url.query_pairs().find(|(ref k, _)| k == "v").map(|(_, v)| v.to_string()).unwrap_or(value)
+                        }
+                    } else {
+                        value
+                    }
+                });
             }
         })
     };

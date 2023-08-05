@@ -22,6 +22,8 @@ enum Route {
     Video { id: String },
     #[at("/user_id/:id")]
     User { id: String },
+    #[at("/wip")]
+    NotImplemented,
     #[not_found]
     #[at("/404")]
     NotFound,
@@ -131,7 +133,7 @@ fn Header() -> Html {
         Callback::from(move |e: KeyboardEvent| {
             if e.key() == "Enter" {
                 searchbar_visible.set(false);
-                navigator.push(&Route::NotFound);
+                navigator.push(&Route::NotImplemented);
             }
         })
     };
@@ -241,6 +243,13 @@ fn render_route(route: Route) -> Html {
             <>
                 <h2>{"404 - Not found"}</h2>
                 <h3>{"Looks like you've entered an invalid URL"}</h3>
+                <Link<Route> to={Route::Home}>{"Return to home page"}</Link<Route>>
+            </>
+        },
+        Route::NotImplemented => html! {
+            <>
+                <h2>{"Not implemented"}</h2>
+                <h3>{"This feature is not implemented yet"}</h3>
                 <Link<Route> to={Route::Home}>{"Return to home page"}</Link<Route>>
             </>
         },

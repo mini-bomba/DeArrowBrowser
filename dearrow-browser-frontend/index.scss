@@ -79,7 +79,7 @@ body {
 #content {
   flex-grow: 1;
 
-  &[data-route="NotFound"] {
+  &[data-route="NotFound"], &[data-route="NotImplemented"] {
     display: flex;
     flex-direction: column;
     justify-content: center;

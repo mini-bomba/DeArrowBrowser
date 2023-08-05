@@ -581,12 +581,10 @@ fn VideoDetailsTable(props: &VideoDetailsTableProps) -> Html {
     html! {
         <div id="details-table">
             <div>{format!("Video ID: {}", props.videoid)}</div>
-            if props.mode == DetailType::Title {
-                <div>
-                    {"Original title: "}
-                    <Suspense {fallback}><OriginalTitle videoid={props.videoid.clone()} /></Suspense>
-                </div>
-            }
+            <div hidden={props.mode != DetailType::Title}>
+                {"Original title: "}
+                <Suspense {fallback}><OriginalTitle videoid={props.videoid.clone()} /></Suspense>
+            </div>
             <div><a href={format!("https://youtu.be/{}", props.videoid)}>{"View on YouTube"}</a></div>
         </div>
     }

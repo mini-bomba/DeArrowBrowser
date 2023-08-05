@@ -7,6 +7,7 @@ use yew::{prelude::*, suspense::SuspensionResult};
 use yew_hooks::{use_async_with_options, UseAsyncOptions, use_interval};
 use yew_router::prelude::*;
 use web_sys::{window, HtmlInputElement};
+use gloo_console::error;
 
 mod hooks;
 mod utils;
@@ -546,6 +547,27 @@ fn HomePage() -> Html {
 }
 
 #[derive(Properties, PartialEq)]
+struct OriginalTitleProps {
+    videoid: AttrValue,
+}
+
+#[function_component]
+fn OriginalTitle(props: &OriginalTitleProps) -> HtmlResult {
+    let title = use_async_suspension(|vid| async move {
+        let result = utils::get_original_title(vid.to_string()).await;
+        if let Err(ref e) = result {
+            error!(format!("Failed to fetch original title for video {vid}: {e:?}"));
+        }
+        result
+    }, props.videoid.clone())?;
+    if let Ok(ref t) = *title {
+        Ok(html!{<span>{t.as_str()}</span>})
+    } else {
+        Ok(html!{<span><em>{"Failed to fetch original title"}</em></span>})
+    }
+}
+
+#[derive(Properties, PartialEq)]
 struct VideoDetailsTableProps {
     videoid: AttrValue,
     mode: DetailType,
@@ -553,10 +575,18 @@ struct VideoDetailsTableProps {
 
 #[function_component]
 fn VideoDetailsTable(props: &VideoDetailsTableProps) -> Html {
-
+    let fallback = html!{
+        <span><em>{"Loading..."}</em></span>
+    };
     html! {
         <div id="details-table">
             <div>{format!("Video ID: {}", props.videoid)}</div>
+            if props.mode == DetailType::Title {
+                <div>
+                    {"Original title: "}
+                    <Suspense {fallback}><OriginalTitle videoid={props.videoid.clone()} /></Suspense>
+                </div>
+            }
             <div><a href={format!("https://youtu.be/{}", props.videoid)}>{"View on YouTube"}</a></div>
         </div>
     }

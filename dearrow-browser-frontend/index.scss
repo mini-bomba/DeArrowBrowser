@@ -128,6 +128,33 @@ body {
 
 #page-details {
   padding-bottom: 2rem;
+  display: flex;
+  gap: 1rem;
+  flex-direction: row;
+  align-items: flex-start;
+
+  iframe {
+    border: none;
+    $max-height: 20vh;
+    $max-width: 25vw;
+    height: min($max-height, calc($max-width / 16 * 9));
+    width: min($max-width, calc($max-height / 9 * 16));
+  }
+
+  #details-table {
+    border: 1px solid $gray;
+    border-radius: 0.25rem;
+    display: flex;
+    flex-direction: column;
+
+    > * {
+      padding: 0.5rem;
+
+      &:not(:last-child) {
+        border-bottom: 1px solid $gray;
+      }
+    }
+  }
 }
 
 .clickable {

@@ -546,6 +546,23 @@ fn HomePage() -> Html {
 }
 
 #[derive(Properties, PartialEq)]
+struct VideoDetailsTableProps {
+    videoid: AttrValue,
+    mode: DetailType,
+}
+
+#[function_component]
+fn VideoDetailsTable(props: &VideoDetailsTableProps) -> Html {
+
+    html! {
+        <div id="details-table">
+            <div>{format!("Video ID: {}", props.videoid)}</div>
+            <div><a href={format!("https://youtu.be/{}", props.videoid)}>{"View on YouTube"}</a></div>
+        </div>
+    }
+}
+
+#[derive(Properties, PartialEq)]
 struct VideoPageProps {
     videoid: AttrValue,
 }
@@ -567,6 +584,10 @@ fn VideoPage(props: &VideoPageProps) -> Html {
     
     html! {
         <>
+            <div id="page-details">
+                <iframe src={format!("https://youtube.com/embed/{}", props.videoid)} allowfullscreen=true />
+                <VideoDetailsTable videoid={props.videoid.clone()} mode={*table_mode} />
+            </div>
             <TableModeSwitch state={table_mode.clone()} entry_count={*entry_count} />
             <Suspense {fallback}>
                 <DetailTableRenderer mode={*table_mode} url={Rc::new(url)} {entry_count} hide_videoid={()} />

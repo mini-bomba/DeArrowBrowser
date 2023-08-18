@@ -19,6 +19,8 @@ use utils::*;
 enum Route {
     #[at("/")]
     Home,
+    #[at("/unverified")]
+    Unverified,
     #[at("/video_id/:id")]
     Video { id: String },
     #[at("/user_id/:id")]
@@ -237,7 +239,8 @@ fn Footer() -> Html {
 
 fn render_route(route: Route) -> Html {
     let route_html = match route {
-        Route::Home => html! {<HomePage></HomePage>},
+        Route::Home => html! {<HomePage/>},
+        Route::Unverified => html! {<UnverifiedPage/>},
         Route::Video { ref id } => html! {<VideoPage videoid={id.clone()} />},
         Route::User { ref id } => html! {<UserPage userid={id.clone()} />},
         Route::NotFound => html! {
@@ -541,6 +544,35 @@ fn HomePage() -> Html {
             <TableModeSwitch state={table_mode.clone()} entry_count={*entry_count} />
             <Suspense {fallback}>
                 <DetailTableRenderer mode={*table_mode} url={Rc::new(url)} {entry_count} />
+            </Suspense>
+        </>
+    }
+}
+
+#[function_component]
+fn UnverifiedPage() -> Html {
+    let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
+    let entry_count = use_state_eq(|| None);
+
+    let url = window_context.origin.join("/api/titles/unverified").expect("Should be able to create an API url");
+
+    let fallback = html! {
+        <center><b>{"Loading..."}</b></center>
+    };
+    
+    html! {
+        <>
+            if let Some(count) = *entry_count {
+                <span>
+                    if count == 1 {
+                        {"1 entry"}
+                    } else {
+                        {format!("{count} entries")}
+                    }
+                </span>
+            }
+            <Suspense {fallback}>
+                <DetailTableRenderer mode={DetailType::Title} url={Rc::new(url)} {entry_count} />
             </Suspense>
         </>
     }

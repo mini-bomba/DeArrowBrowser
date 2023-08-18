@@ -2,7 +2,7 @@ use std::sync::{RwLock, Arc};
 use actix_web::{Responder, get, post, web, http::StatusCode, CustomizeResponder, HttpResponse, rt::task::spawn_blocking};
 use anyhow::{anyhow, bail};
 use chrono::Utc;
-use dearrow_parser::{StringSet, DearrowDB};
+use dearrow_parser::{StringSet, DearrowDB, TitleFlags};
 use dearrow_browser_api::*;
 use serde::Deserialize;
 
@@ -11,6 +11,7 @@ use crate::{utils, state::*};
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(helo)
        .service(get_random_titles)
+       .service(get_unverified_titles)
        .service(get_title_by_uuid)
        .service(get_titles_by_video_id)
        .service(get_titles_by_user_id)
@@ -111,6 +112,16 @@ async fn get_random_titles(db_lock: web::Data<RwLock<DatabaseState>>) -> JsonRes
     let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
     Ok(web::Json(
         db.db.titles.values().take(20)
+            .map(|t| t.into_with_db(&db.db)).collect()
+    ))
+}
+
+#[get("/titles/unverified")]
+async fn get_unverified_titles(db_lock: web::Data<RwLock<DatabaseState>>) -> JsonResult<Vec<ApiTitle>> {
+    let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
+    Ok(web::Json(
+        db.db.titles.values()
+            .filter(|t| t.flags.contains(TitleFlags::Unverified) && !t.flags.intersects(TitleFlags::Locked | TitleFlags::ShadowHidden))
             .map(|t| t.into_with_db(&db.db)).collect()
     ))
 }

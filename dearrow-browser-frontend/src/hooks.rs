@@ -21,7 +21,7 @@ where
     D:  'static + PartialEq + Clone,
     R:  'static,
 {
-    let state_ref: Rc<RefCell<UseAsyncSuspensionState<R>>> = use_memo(|_| RefCell::new(UseAsyncSuspensionState::Reset), deps.clone());
+    let state_ref: Rc<RefCell<UseAsyncSuspensionState<R>>> = use_memo(deps.clone(), |_| RefCell::new(UseAsyncSuspensionState::Reset));
     let mut state = state_ref.borrow_mut();
     match *state {
         UseAsyncSuspensionState::Running(ref sus) => Err(sus.clone()),

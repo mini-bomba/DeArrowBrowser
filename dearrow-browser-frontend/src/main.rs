@@ -55,7 +55,7 @@ struct UpdateClock(bool);
 
 #[function_component]
 fn App() -> Html {
-    let window_context = use_memo(|_| {
+    let window_context = use_memo((), |_| {
         let window = window().expect("window should exist");
         WindowContext {
             origin: Url::parse(
@@ -66,7 +66,7 @@ fn App() -> Html {
                 .and_then(|el| el.get_attribute("href"))
                 .map(AttrValue::from),
         }
-    }, ());
+    });
     let update_clock = use_state(|| UpdateClock(false));
 
     let status = {
@@ -86,13 +86,16 @@ fn App() -> Html {
             status.run();
         }, 60*1000);
     }
-    let app_context = use_memo(|&data|{
-        let (last_updated, last_modified) = data;
-        AppContext {
-            last_updated,
-            last_modified,
+    let app_context = use_memo(
+        status.data.as_ref().map(|d| (d.last_updated, d.last_modified)).unzip(),
+        |&data| {
+            let (last_updated, last_modified) = data;
+            AppContext {
+                last_updated,
+                last_modified,
+            }
         }
-    }, status.data.as_ref().map(|d| (d.last_updated, d.last_modified)).unzip());
+    );
 
     html! {
         <ContextProvider<Rc<WindowContext>> context={window_context}>

@@ -16,9 +16,7 @@ reqwest = { version = "0.11.18", features = ["json"] }
 strum = { version = "0.25.0", features = ["derive"] }
 serde.workspace = true
 web-sys = { version = "0.3.64", features = ["KeyboardEvent", "HtmlInputElement", "Window", "Document", "Element", "Location"] }
-# yew = { version = "0.20.0", features = ["csr"] }
-# yew-router = "0.17.0"
-yew = { git = "https://github.com/yewstack/yew.git", rev = "7ef8e0da18808e9e4ef3e7ff36a1d6a20019d087", features = ["csr"] }
-yew-router = { git = "https://github.com/yewstack/yew.git" , rev = "7ef8e0da18808e9e4ef3e7ff36a1d6a20019d087" }
-yew-hooks = { git = "https://github.com/mini-bomba/yew-hooks.git", rev = "034de0118daeaafca2fa1efb2dab726af70ce4a6" }
+yew = { version = "0.21.0", features = ["csr"] }
+yew-router = "0.18.0"
+yew-hooks = "0.3.0"
 gloo-console = "0.2.3"

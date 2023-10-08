@@ -317,9 +317,12 @@ struct DetailTableRendererProps {
     url: Rc<Url>,
     mode: DetailType,
     entry_count: Option<UseStateHandle<Option<usize>>>,
-    hide_userid: Option<()>,
-    hide_username: Option<()>,
-    hide_videoid: Option<()>,
+    #[prop_or_default]
+    hide_userid: bool,
+    #[prop_or_default]
+    hide_username: bool,
+    #[prop_or_default]
+    hide_videoid: bool,
 }
 
 enum DetailList {
@@ -453,32 +456,32 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
             <table class="detail-table titles">
                 <tr class="header">
                     <th>{"Submitted"}</th>
-                    if props.hide_videoid.is_none() {
+                    if !props.hide_videoid {
                         <th>{"Video ID"}</th>
                     }
                     <th class="title-col">{"Title"}</th>
                     <th>{"Score/Votes"}</th>
                     <th>{"UUID"}</th>
-                    if props.hide_username.is_none() {
+                    if !props.hide_username {
                         <th>{"Username"}</th>
                     }
-                    if props.hide_userid.is_none() {
+                    if !props.hide_userid {
                         <th>{"User ID"}</th>
                     }
                 </tr>
                 { for list.iter().map(|t| html! {
                     <tr key={&*t.uuid}>
                         <td>{NaiveDateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), render_naive_datetime)}</td>
-                        if props.hide_videoid.is_none() {
+                        if !props.hide_videoid {
                             <td>{video_link!(t.video_id)}</td>
                         }
                         <td class="title-col">{t.title.clone()}<br />{original_indicator!(t.original, title)}</td>
                         <td>{format!("{}/{}", t.score, t.votes)}<br />{title_flags(t)}</td>
                         <td>{t.uuid.clone()}</td>
-                        if props.hide_username.is_none() {
+                        if !props.hide_username {
                             <td>{username_link!(t.username)}</td>
                         }
-                        if props.hide_userid.is_none() {
+                        if !props.hide_userid {
                             <td>{user_link!(t.user_id)}</td>
                         }
                     </tr>
@@ -489,32 +492,32 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
             <table class="detail-table thumbnails">
                 <tr class="header">
                     <th>{"Submitted"}</th>
-                    if props.hide_videoid.is_none() {
+                    if !props.hide_videoid {
                         <th>{"Video ID"}</th>
                     }
                     <th>{"Timestamp"}</th>
                     <th>{"Score/Votes"}</th>
                     <th>{"UUID"}</th>
-                    if props.hide_username.is_none() {
+                    if !props.hide_username {
                         <th>{"Username"}</th>
                     }
-                    if props.hide_userid.is_none() {
+                    if !props.hide_userid {
                         <th>{"User ID"}</th>
                     }
                 </tr>
                 { for list.iter().map(|t| html! {
                     <tr key={&*t.uuid}>
                         <td>{NaiveDateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), render_naive_datetime)}</td>
-                        if props.hide_videoid.is_none() {
+                        if !props.hide_videoid {
                             <td>{video_link!(t.video_id)}</td>
                         }
                         <td>{t.timestamp.map_or(original_indicator!(t.original, thumbnail), |ts| html! {{ts.to_string()}})}</td>
                         <td>{t.votes}<br />{thumbnail_flags(t)}</td>
                         <td>{t.uuid.clone()}</td>
-                        if props.hide_username.is_none() {
+                        if !props.hide_username {
                             <td>{username_link!(t.username)}</td>
                         }
-                        if props.hide_userid.is_none() {
+                        if !props.hide_userid {
                             <td>{user_link!(t.user_id)}</td>
                         }
                     </tr>
@@ -653,7 +656,7 @@ fn VideoPage(props: &VideoPageProps) -> Html {
             </div>
             <TableModeSwitch state={table_mode.clone()} entry_count={*entry_count} />
             <Suspense {fallback}>
-                <DetailTableRenderer mode={*table_mode} url={Rc::new(url)} {entry_count} hide_videoid={()} />
+                <DetailTableRenderer mode={*table_mode} url={Rc::new(url)} {entry_count} hide_videoid=true />
             </Suspense>
         </>
     }
@@ -683,7 +686,7 @@ fn UserPage(props: &UserPageProps) -> Html {
         <>
             <TableModeSwitch state={table_mode.clone()} entry_count={*entry_count} />
             <Suspense {fallback}>
-                <DetailTableRenderer mode={*table_mode} url={Rc::new(url)} {entry_count} hide_userid={()} hide_username={()} />
+                <DetailTableRenderer mode={*table_mode} url={Rc::new(url)} {entry_count} hide_userid=true hide_username=true />
             </Suspense>
         </>
     }

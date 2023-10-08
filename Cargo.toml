@@ -2,7 +2,7 @@
 members = ["dearrow-browser-server", "dearrow-browser-api", "dearrow-parser", "dearrow-browser-frontend"]
 
 [workspace.package]
-version = "1.1.0"
+version = "1.2.0"
 homepage = "https://dearrow.minibomba.pro"
 repository = "https://github.com/mini-bomba/DeArrowBrowser"
 license = "AGPL-3.0-only"

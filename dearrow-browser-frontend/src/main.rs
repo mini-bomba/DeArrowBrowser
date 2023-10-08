@@ -4,7 +4,7 @@ use dearrow_browser_api::{StatusResponse, ApiThumbnail, ApiTitle, User};
 use reqwest::Url;
 use strum::IntoStaticStr;
 use yew::{prelude::*, suspense::SuspensionResult};
-use yew_hooks::{use_async_with_options, UseAsyncOptions, use_interval};
+use yew_hooks::{use_async_with_options, UseAsyncOptions, use_interval, use_title};
 use yew_router::prelude::*;
 use web_sys::{window, HtmlInputElement};
 use gloo_console::error;
@@ -241,6 +241,16 @@ fn Footer() -> Html {
 }
 
 fn render_route(route: Route) -> Html {
+    let document = window().expect("window should exist")
+        .document().expect("document should exist");
+    document.set_title(match &route {
+        Route::Home => "DeArrow Browser".to_string(),
+        Route::Unverified => "Unverified titles - DeArrow Browser".to_string(),
+        Route::NotFound => "Page not found - DeArrow Browser".to_string(),
+        Route::NotImplemented => "Not implemented - DeArrow Browser".to_string(),
+        Route::Video { ref id } => format!("VideoID {id} - DeArrow Browser"),
+        Route::User { ref id } => format!("UserID {id} - Dearrow Browser"),
+    }.as_str());
     let route_html = match route {
         Route::Home => html! {<HomePage/>},
         Route::Unverified => html! {<UnverifiedPage/>},

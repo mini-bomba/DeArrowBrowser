@@ -1,6 +1,6 @@
 use std::{sync::RwLock, fs::{File, Permissions, set_permissions}, io::{Read, Write, self}, os::unix::prelude::PermissionsExt};
 use actix_files::{Files, NamedFile};
-use actix_web::{HttpServer, App, web, dev::{ServiceResponse, fn_service, ServiceRequest}};
+use actix_web::{HttpServer, App, web, dev::{ServiceResponse, fn_service, ServiceRequest}, middleware::NormalizePath};
 use anyhow::{Context, anyhow, bail};
 use chrono::Utc;
 use dearrow_parser::{DearrowDB, StringSet};
@@ -57,6 +57,7 @@ async fn main() -> anyhow::Result<()> {
         HttpServer::new(move || {
             let config2 = config.clone();
             App::new()
+                .wrap(NormalizePath::trim())
                 .service(web::scope("/api")
                     .configure(routes::configure_routes)
                     .app_data(config.clone())

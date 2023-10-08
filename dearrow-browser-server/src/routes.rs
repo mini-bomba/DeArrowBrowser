@@ -19,6 +19,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
        .service(get_thumbnail_by_uuid)
        .service(get_thumbnails_by_video_id)
        .service(get_thumbnails_by_user_id)
+       .service(get_user_by_userid)
        .service(get_status)
        .service(get_errors)
        .service(request_reload);
@@ -265,3 +266,33 @@ async fn get_thumbnails_by_user_id(db_lock: DBLock, string_set: StringSetLock, p
     };
     Ok(etagged_json!(db, titles).with_status(status))
 }
+
+#[get("/users/user_id/{user_id}")]
+async fn get_user_by_userid(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>, inm: IfNoneMatch) -> CustomizedJsonResult<User> {
+    etag_shortcircuit!(db_lock, inm);
+    let user_id = string_set.read().map_err(|_| anyhow!("Failed to acquire StringSet for reading"))?
+        .set.get(path.as_str()).cloned();
+    let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
+    Ok(etagged_json!(db, match user_id {
+        None => User {
+            user_id: path.into_inner().into(),
+            username: None, 
+            username_locked: false,
+            vip: false, 
+            title_count: 0,
+            thumbnail_count: 0
+        },
+        Some(user_id) => {
+            let username = db.db.usernames.get(&user_id);
+            User {
+                user_id: user_id.clone(),
+                username: username.map(|u| u.username.clone()),
+                username_locked: username.map_or(false, |u| u.locked),
+                vip: db.db.vip_users.contains(&user_id),
+                title_count: db.db.titles.values().filter(|t| Arc::ptr_eq(&t.user_id, &user_id)).count() as u64,
+                thumbnail_count: db.db.thumbnails.values().filter(|t| Arc::ptr_eq(&t.user_id, &user_id)).count() as u64,
+            }
+        }
+    }))
+}
+

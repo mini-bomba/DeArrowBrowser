@@ -1,6 +1,6 @@
 use std::rc::Rc;
 use chrono::NaiveDateTime;
-use dearrow_browser_api::{StatusResponse, ApiThumbnail, ApiTitle};
+use dearrow_browser_api::{StatusResponse, ApiThumbnail, ApiTitle, User};
 use reqwest::Url;
 use strum::IntoStaticStr;
 use yew::{prelude::*, suspense::SuspensionResult};
@@ -663,6 +663,48 @@ fn VideoPage(props: &VideoPageProps) -> Html {
 }
 
 #[derive(Properties, PartialEq)]
+struct UserDetailsProps {
+    userid: AttrValue,
+}
+
+#[function_component]
+fn UserDetails(props: &UserDetailsProps) -> HtmlResult {
+    let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
+    let app_context: Rc<AppContext> = use_context().expect("AppContext should be defined");
+    let url = window_context.origin.join(format!("/api/users/user_id/{}", props.userid).as_str()).expect("Should be able to create an API url");
+    let result: Rc<Result<User, anyhow::Error>> = use_async_suspension(|(url, _)| async move {
+        Ok(reqwest::get((url).clone()).await?.json().await?)
+    }, (url, app_context.last_updated))?;
+
+    Ok(match *result {
+        Ok(ref user) => html! {
+            <>
+                <div>{format!("UserID: {}", props.userid.clone())}
+                if user.vip {
+                   <span title="This user is a VIP">{"👑"}</span> 
+                }
+                </div> 
+                <div>
+                if let Some(username) = &user.username {
+                    {format!("Username: {username}")}
+                } else {
+                    {"Username: "}<em>{"No username set"}</em>
+                }
+                if user.username_locked {
+                    <span title="This user's username is locked">{"🔒"}</span>
+                }
+                </div>
+                <div>{format!("Titles: {}", user.title_count)}</div>
+                <div>{format!("Thumbnails: {}", user.thumbnail_count)}</div>
+            </>
+        },
+        Err(ref e) => html! {
+            <div>{"Failed to fetch user data"}<br/><pre>{format!("{e:?}")}</pre></div>
+        }
+    })
+}
+
+#[derive(Properties, PartialEq)]
 struct UserPageProps {
     userid: AttrValue,
 }
@@ -678,14 +720,22 @@ fn UserPage(props: &UserPageProps) -> Html {
         DetailType::Thumbnail => window_context.origin.join(format!("/api/thumbnails/user_id/{}", props.userid).as_str()),
     }.expect("Should be able to create an API url");
 
-    let fallback = html! {
+    let details_fallback = html! {
+        <div><b>{"Loading..."}</b></div>
+    };
+    let table_fallback = html! {
         <center><b>{"Loading..."}</b></center>
     };
     
     html! {
         <>
+            <div id="page-details">
+                <div id="details-table">
+                    <Suspense fallback={details_fallback}><UserDetails userid={props.userid.clone()} /></Suspense>
+                </div>
+            </div>
             <TableModeSwitch state={table_mode.clone()} entry_count={*entry_count} />
-            <Suspense {fallback}>
+            <Suspense fallback={table_fallback}>
                 <DetailTableRenderer mode={*table_mode} url={Rc::new(url)} {entry_count} hide_userid=true hide_username=true />
             </Suspense>
         </>

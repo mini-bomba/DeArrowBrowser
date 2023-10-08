@@ -117,3 +117,12 @@ impl IntoWithDatabase<ApiThumbnail> for &dearrow_parser::Thumbnail {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct User {
+    pub user_id: Arc<str>,
+    pub username: Option<Arc<str>>,
+    pub username_locked: bool,
+    pub vip: bool,
+    pub title_count: u64,
+    pub thumbnail_count: u64,
+}

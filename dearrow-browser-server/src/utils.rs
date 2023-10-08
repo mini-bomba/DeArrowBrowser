@@ -1,6 +1,6 @@
-use std::{fmt::{Debug, Display}, path::Path, fs, time::UNIX_EPOCH};
+use std::{fmt::{Debug, Display}, path::Path, fs, time::UNIX_EPOCH, future::{Ready, ready}};
 
-use actix_web::{ResponseError, http::{StatusCode, header::ContentType}, HttpResponse};
+use actix_web::{ResponseError, http::{StatusCode, header::{ContentType, self, Header, EntityTag}}, HttpResponse, FromRequest};
 use sha2::{Sha256, Digest, digest::{typenum::U32, generic_array::GenericArray}};
 
 
@@ -64,3 +64,31 @@ pub fn get_mtime(p: &Path) -> i64 {
         .unwrap_or(0)
 }
 
+#[derive(Debug)]
+pub struct IfNoneMatch(Vec<EntityTag>);
+
+impl FromRequest for IfNoneMatch {
+    type Error = actix_web::error::ParseError;
+    type Future = Ready<std::result::Result<Self, Self::Error>>;
+
+    fn from_request(req: &actix_web::HttpRequest, _: &mut actix_web::dev::Payload) -> Self::Future {
+        ready(header::IfNoneMatch::parse(req).map(|h| match h {
+            header::IfNoneMatch::Any => IfNoneMatch(vec![]),
+            header::IfNoneMatch::Items(v) => IfNoneMatch(v),
+        }))
+    }    
+}
+
+impl IfNoneMatch {
+    pub fn any_match(&self, other: &EntityTag) -> bool {
+        self.0.iter().any(|etag| etag.weak_eq(other))
+    }
+
+    pub fn shortcircuit(&self, other: &EntityTag) -> Result<()> {
+        if self.any_match(other) {
+            Err(Error::EmptyStatus(StatusCode::NOT_MODIFIED))
+        } else {
+            Ok(())
+        }
+    }
+}

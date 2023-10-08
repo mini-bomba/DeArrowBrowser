@@ -12,7 +12,6 @@ pub struct StatusResponse {
     pub vip_users: usize,
     pub usernames: usize,
     pub errors: usize,
-    pub last_error: Option<String>,
     pub string_count: Option<usize>,
 }
 

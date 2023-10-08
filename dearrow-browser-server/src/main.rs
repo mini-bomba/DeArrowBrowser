@@ -42,14 +42,16 @@ async fn main() -> anyhow::Result<()> {
         let (db, errors) = DearrowDB::load_dir(&config.mirror_path, &mut string_set).context("Initial DearrowDB load failed")?;
         string_set.clean();
 
-        web::Data::new(RwLock::new(DatabaseState {
+        let mut db_state = DatabaseState {
             db,
-            last_error: None,
             errors: errors.into(),
             last_updated: Utc::now().timestamp_millis(),
             last_modified: utils::get_mtime(&config.mirror_path.join("titles.csv")),
-            updating_now: false
-        }))
+            updating_now: false,
+            etag: None,
+        };
+        db_state.etag = Some(db_state.generate_etag());
+        web::Data::new(RwLock::new(db_state))
     };
 
     let mut server = {

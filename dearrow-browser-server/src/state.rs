@@ -1,3 +1,4 @@
+use actix_web::http::header::EntityTag;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use dearrow_parser::DearrowDB;
 use anyhow::Error;
@@ -45,10 +46,22 @@ impl Default for ListenConfig {
 
 pub struct DatabaseState {
     pub db: DearrowDB,
-    pub last_error: Option<Error>,
     pub errors: Box<[Error]>,
     pub last_updated: i64,
     pub last_modified: i64,
     pub updating_now: bool,
+    pub etag: Option<EntityTag>
 }
 
+impl DatabaseState {
+    pub fn get_etag(&self) -> EntityTag {
+        match &self.etag {
+            None => self.generate_etag(),
+            Some(ref t) => t.clone(),
+        }
+    }
+
+    pub fn generate_etag(&self) -> EntityTag {
+        EntityTag::new_weak(format!("{}:{}:{}+{}+{}+{}", self.last_updated, self.last_modified, self.db.titles.len(), self.db.thumbnails.len(), self.db.usernames.len(), self.db.vip_users.len()))
+    }
+}

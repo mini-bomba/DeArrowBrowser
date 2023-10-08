@@ -553,6 +553,7 @@ dependencies = [
  "chrono",
  "dearrow-browser-api",
  "dearrow-parser",
+ "futures-util",
  "getrandom",
  "serde",
  "sha2",

@@ -26,6 +26,8 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
 
 type JsonResult<T> = utils::Result<web::Json<T>>;
 type CustomizedJsonResult<T> = utils::Result<CustomizeResponder<web::Json<T>>>;
+type DBLock = web::Data<RwLock<DatabaseState>>;
+type StringSetLock = web::Data<RwLock<StringSet>>;
 
 macro_rules! etag_shortcircuit {
     ($db_lock: expr, $inm: expr) => {
@@ -48,7 +50,7 @@ async fn helo() -> impl Responder {
 }
 
 #[get("/status")]
-async fn get_status(db_lock: web::Data<RwLock<DatabaseState>>, string_set: web::Data<RwLock<StringSet>>) -> JsonResult<StatusResponse> {
+async fn get_status(db_lock: DBLock, string_set: StringSetLock) -> JsonResult<StatusResponse> {
     let strings = match string_set.try_read() {
         Err(_) => None,
         Ok(set) => Some(set.set.len()),
@@ -72,7 +74,7 @@ struct Auth {
     auth: Option<String>
 }
 
-fn do_reload(db_lock: web::Data<RwLock<DatabaseState>>, string_set_lock: web::Data<RwLock<StringSet>>, config: web::Data<AppConfig>) -> anyhow::Result<()> {
+fn do_reload(db_lock: DBLock, string_set_lock: StringSetLock, config: web::Data<AppConfig>) -> anyhow::Result<()> {
     {
         let mut db_state = db_lock.write().map_err(|_| anyhow!("Failed to acquire DatabaseState for writing"))?;
         if db_state.updating_now {
@@ -103,7 +105,7 @@ fn do_reload(db_lock: web::Data<RwLock<DatabaseState>>, string_set_lock: web::Da
 }
 
 #[post("/reload")]
-async fn request_reload(db_lock: web::Data<RwLock<DatabaseState>>, string_set_lock: web::Data<RwLock<StringSet>>, config: web::Data<AppConfig>, auth: web::Query<Auth>) -> HttpResponse {
+async fn request_reload(db_lock: DBLock, string_set_lock: StringSetLock, config: web::Data<AppConfig>, auth: web::Query<Auth>) -> HttpResponse {
     let provided_hash = match auth.auth.as_deref() {
         None => { return HttpResponse::NotFound().finish(); },
         Some(s) => utils::sha256(s),
@@ -120,13 +122,13 @@ async fn request_reload(db_lock: web::Data<RwLock<DatabaseState>>, string_set_lo
 }
 
 #[get("/errors")]
-async fn get_errors(db_lock: web::Data<RwLock<DatabaseState>>) -> JsonResult<ErrorList> {
+async fn get_errors(db_lock: DBLock) -> JsonResult<ErrorList> {
     let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
     Ok(web::Json(db.errors.iter().map(|e| format!("{e:?}")).collect()))
 }
 
 #[get("/titles")]
-async fn get_random_titles(db_lock: web::Data<RwLock<DatabaseState>>, inm: IfNoneMatch) -> CustomizedJsonResult<Vec<ApiTitle>> {
+async fn get_random_titles(db_lock: DBLock, inm: IfNoneMatch) -> CustomizedJsonResult<Vec<ApiTitle>> {
     etag_shortcircuit!(db_lock, inm);
     let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
     Ok(etagged_json!(db,
@@ -136,7 +138,7 @@ async fn get_random_titles(db_lock: web::Data<RwLock<DatabaseState>>, inm: IfNon
 }
 
 #[get("/titles/unverified")]
-async fn get_unverified_titles(db_lock: web::Data<RwLock<DatabaseState>>, inm: IfNoneMatch) -> CustomizedJsonResult<Vec<ApiTitle>> {
+async fn get_unverified_titles(db_lock: DBLock, inm: IfNoneMatch) -> CustomizedJsonResult<Vec<ApiTitle>> {
     etag_shortcircuit!(db_lock, inm);
     let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
     Ok(etagged_json!(db, 
@@ -147,7 +149,7 @@ async fn get_unverified_titles(db_lock: web::Data<RwLock<DatabaseState>>, inm: I
 }
 
 #[get("/titles/uuid/{uuid}")]
-async fn get_title_by_uuid(db_lock: web::Data<RwLock<DatabaseState>>, path: web::Path<String>, inm: IfNoneMatch) -> CustomizedJsonResult<ApiTitle> {
+async fn get_title_by_uuid(db_lock: DBLock, path: web::Path<String>, inm: IfNoneMatch) -> CustomizedJsonResult<ApiTitle> {
     etag_shortcircuit!(db_lock, inm);
     let uuid = path.into_inner();
     let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
@@ -159,7 +161,7 @@ async fn get_title_by_uuid(db_lock: web::Data<RwLock<DatabaseState>>, path: web:
 }
 
 #[get("/titles/video_id/{video_id}")]
-async fn get_titles_by_video_id(db_lock: web::Data<RwLock<DatabaseState>>, string_set: web::Data<RwLock<StringSet>>, path: web::Path<String>, inm: IfNoneMatch) -> CustomizedJsonResult<Vec<ApiTitle>> {
+async fn get_titles_by_video_id(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>, inm: IfNoneMatch) -> CustomizedJsonResult<Vec<ApiTitle>> {
     etag_shortcircuit!(db_lock, inm);
     let video_id = string_set.read().map_err(|_| anyhow!("Failed to acquire StringSet for reading"))?
         .set.get(path.into_inner().as_str()).cloned();
@@ -180,7 +182,7 @@ async fn get_titles_by_video_id(db_lock: web::Data<RwLock<DatabaseState>>, strin
 }
 
 #[get("/titles/user_id/{user_id}")]
-async fn get_titles_by_user_id(db_lock: web::Data<RwLock<DatabaseState>>, string_set: web::Data<RwLock<StringSet>>, path: web::Path<String>, inm: IfNoneMatch) -> CustomizedJsonResult<Vec<ApiTitle>> {
+async fn get_titles_by_user_id(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>, inm: IfNoneMatch) -> CustomizedJsonResult<Vec<ApiTitle>> {
     etag_shortcircuit!(db_lock, inm);
     let user_id = string_set.read().map_err(|_| anyhow!("Failed to acquire StringSet for reading"))?
         .set.get(path.into_inner().as_str()).cloned();
@@ -201,7 +203,7 @@ async fn get_titles_by_user_id(db_lock: web::Data<RwLock<DatabaseState>>, string
 }
 
 #[get("/thumbnails")]
-async fn get_random_thumbnails(db_lock: web::Data<RwLock<DatabaseState>>, inm: IfNoneMatch) -> CustomizedJsonResult<Vec<ApiThumbnail>> {
+async fn get_random_thumbnails(db_lock: DBLock, inm: IfNoneMatch) -> CustomizedJsonResult<Vec<ApiThumbnail>> {
     etag_shortcircuit!(db_lock, inm);
     let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
     Ok(etagged_json!(db,
@@ -211,7 +213,7 @@ async fn get_random_thumbnails(db_lock: web::Data<RwLock<DatabaseState>>, inm: I
 }
 
 #[get("/thumbnails/uuid/{uuid}")]
-async fn get_thumbnail_by_uuid(db_lock: web::Data<RwLock<DatabaseState>>, path: web::Path<String>, inm: IfNoneMatch) -> CustomizedJsonResult<ApiThumbnail> {
+async fn get_thumbnail_by_uuid(db_lock: DBLock, path: web::Path<String>, inm: IfNoneMatch) -> CustomizedJsonResult<ApiThumbnail> {
     etag_shortcircuit!(db_lock, inm);
     let uuid = path.into_inner();
     let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
@@ -223,7 +225,7 @@ async fn get_thumbnail_by_uuid(db_lock: web::Data<RwLock<DatabaseState>>, path: 
 }
 
 #[get("/thumbnails/video_id/{video_id}")]
-async fn get_thumbnails_by_video_id(db_lock: web::Data<RwLock<DatabaseState>>, string_set: web::Data<RwLock<StringSet>>, path: web::Path<String>, inm: IfNoneMatch) -> CustomizedJsonResult<Vec<ApiThumbnail>> {
+async fn get_thumbnails_by_video_id(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>, inm: IfNoneMatch) -> CustomizedJsonResult<Vec<ApiThumbnail>> {
     etag_shortcircuit!(db_lock, inm);
     let video_id = string_set.read().map_err(|_| anyhow!("Failed to acquire StringSet for reading"))?
         .set.get(path.into_inner().as_str()).cloned();
@@ -244,7 +246,7 @@ async fn get_thumbnails_by_video_id(db_lock: web::Data<RwLock<DatabaseState>>, s
 }
 
 #[get("/thumbnails/user_id/{video_id}")]
-async fn get_thumbnails_by_user_id(db_lock: web::Data<RwLock<DatabaseState>>, string_set: web::Data<RwLock<StringSet>>, path: web::Path<String>, inm: IfNoneMatch) -> CustomizedJsonResult<Vec<ApiThumbnail>> {
+async fn get_thumbnails_by_user_id(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>, inm: IfNoneMatch) -> CustomizedJsonResult<Vec<ApiThumbnail>> {
     etag_shortcircuit!(db_lock, inm);
     let user_id = string_set.read().map_err(|_| anyhow!("Failed to acquire StringSet for reading"))?
         .set.get(path.into_inner().as_str()).cloned();

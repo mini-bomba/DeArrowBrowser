@@ -148,14 +148,12 @@ fn Searchbar() -> Html {
                 let input: HtmlInputElement = e.target_unchecked_into();
                 let value = input.value();
                 navigator.push(&Route::Video {
-                    id: if let Ok(url) = Url::parse(&value) {
-                        if url.host_str() == Some("youtu.be") {
-                            url.path_segments().and_then(|mut s| s.next()).unwrap_or(value.as_str()).to_string()
-                        } else {
-                            url.query_pairs().find(|(ref k, _)| k == "v").map(|(_, v)| v.to_string()).unwrap_or(value)
-                        }
+                    id: if let Ok(url) = Url::parse(&value) {  // Try to parse as URL
+                        url.query_pairs().find(|(ref k, _)| k == "v").map(|(_, v)| v.to_string()).or_else(||  // Try to find a "v" query param
+                            url.path_segments().and_then(|it| it.filter(|s| !s.is_empty()).last()).map(ToString::to_string)  // Fall back to last non-empty path segment if none found
+                        ).unwrap_or(value)  // Fall back to original value
                     } else {
-                        value
+                        value  // Fall back to original value
                     }
                 });
             }

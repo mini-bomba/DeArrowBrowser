@@ -518,7 +518,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-browser-api"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "dearrow-parser",
  "serde",
@@ -526,7 +526,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-browser-frontend"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -543,7 +543,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-browser-server"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "actix-files",
  "actix-web",
@@ -562,7 +562,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-parser"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "bitflags 2.4.0",

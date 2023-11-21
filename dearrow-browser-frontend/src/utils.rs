@@ -25,7 +25,7 @@ struct OEmbedResponse {
 
 pub async fn get_original_title(vid: String) -> Result<String, anyhow::Error> {
     let url = Url::parse_with_params(
-        "https://youtube.com/oembed", 
+        "https://www.youtube-nocookie.com/oembed", 
         &[("url", format!("https://youtu.be/{vid}"))]
     ).context("Failed to construct an oembed request URL")?;
     let resp: OEmbedResponse = reqwest::get(url).await.context("Failed to send oembed request")?

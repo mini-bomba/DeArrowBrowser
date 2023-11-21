@@ -659,7 +659,7 @@ fn VideoPage(props: &VideoPageProps) -> Html {
     html! {
         <>
             <div id="page-details">
-                <iframe src={format!("https://youtube.com/embed/{}", props.videoid)} allowfullscreen=true />
+                <iframe src={format!("https://www.youtube-nocookie.com/embed/{}", props.videoid)} allowfullscreen=true />
                 <VideoDetailsTable videoid={props.videoid.clone()} mode={*table_mode} />
             </div>
             <TableModeSwitch state={table_mode.clone()} entry_count={*entry_count} />

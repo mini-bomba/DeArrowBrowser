@@ -15,7 +15,7 @@ The logo is a combination of the DeArrow logo and the magnifying glass emoji fro
 ## Running an instance
 1. Build the image
 ```sh
-docker buid -t dearrow-browser .
+docker build -t dearrow-browser .
 ```
 2. Create a config.toml file. Static content (frontend) is available at /static in the container.
 3. Run the container

@@ -12,6 +12,27 @@ This repository is split into 4 crates:
 
 The logo is a combination of the DeArrow logo and the magnifying glass emoji from [twemoji](https://github.com/twitter/twemoji)
 
+## Starting a development server
+To run a local development server without docker, you'll need:
+- cargo
+- trunk (cargo install trunk)
+
+1. Grab a copy of the DeArrow database from a mirror of choice. Required files:
+  - `thumbnails.csv`
+  - `thumbnailTimestamps.csv`
+  - `thumbnailVotes.csv`
+  - `titles.csv`
+  - `titleVotes.csv`
+  - `userNames.csv`
+  - `vipUsers.csv`
+2. Build the frontend:
+  - `trunk build` in the `dearrow-browser-frontend` directory to make a one-time build
+  - `trunk watch` in the `dearrow-browser-frontend` directory to rebuild every time source files are updated
+3. Build & start the server
+  - `cargo run --bin dearrow-browser-server` in the root project dir, or
+  - `cargo run` in the `dearrow-browser-server` directory
+  - optionally use something like `cargo-watch` to rebuild on source file changes
+
 ## Running an instance
 1. Build the image
 ```sh

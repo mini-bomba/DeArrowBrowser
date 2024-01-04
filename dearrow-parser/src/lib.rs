@@ -154,8 +154,8 @@ impl Display for ParseError {
 }
 
 pub struct DearrowDB {
-    pub titles: HashMap<Arc<str>, Title>,
-    pub thumbnails: HashMap<Arc<str>, Thumbnail>,
+    pub titles: Vec<Title>,
+    pub thumbnails: Vec<Thumbnail>,
     pub usernames: HashMap<Arc<str>, Username>,
     pub vip_users: HashSet<Arc<str>>,
 }
@@ -235,7 +235,7 @@ impl DearrowDB {
             .collect();
 
         // Load the Thumbnail objects while deduplicating strings and merging them with other Thumbnail* objects
-        let thumbnails: HashMap<Arc<str>, Thumbnail> = csv::Reader::from_path(&paths.thumbnails)
+        let thumbnails: Vec<Thumbnail> = csv::Reader::from_path(&paths.thumbnails)
             .context("Could not initialize csv reader for thumbnails")?
             .into_deserialize::<csv_data::Thumbnail>()
             .filter_map(|result| match result.context("Error while deserializing thumbnails") {
@@ -262,7 +262,6 @@ impl DearrowDB {
                     None
                 }
             })
-            .map(|thumb| (thumb.uuid.clone(), thumb))
             .collect();
 
         drop(thumbnail_timestamps);
@@ -284,7 +283,7 @@ impl DearrowDB {
             })
             .map(|title| (title.uuid.clone(), title))
             .collect();
-        let titles: HashMap<Arc<str>, Title> = csv::Reader::from_path(&paths.titles)
+        let titles: Vec<Title> = csv::Reader::from_path(&paths.titles)
             .context("Could not initialize csv reader for titles")?
             .into_deserialize::<csv_data::Title>()
             .filter_map(|result| match result.context("Error while deserializing titles") {
@@ -310,7 +309,6 @@ impl DearrowDB {
                     None
                 }
             })
-            .map(|title| (title.uuid.clone(), title))
             .collect();
 
         drop(title_votes);

@@ -30,10 +30,12 @@ pub struct ApiTitle {
     pub user_id: Arc<str>,
     pub time_submitted: i64,
     pub votes: i8,
+    pub downvotes: i8,
     pub original: bool,
     pub locked: bool,
     pub shadow_hidden: bool,
     pub unverified: bool,
+    pub removed: bool,
     pub score: i8,
     pub username: Option<Arc<str>>,
     pub vip: bool,
@@ -50,15 +52,13 @@ impl From<&dearrow_parser::Title> for ApiTitle {
             user_id: value.user_id.clone(),
             time_submitted: value.time_submitted,
             votes: value.votes,
+            downvotes: value.downvotes,
             original: value.flags.contains(TitleFlags::Original),
             locked: value.flags.contains(TitleFlags::Locked),
             shadow_hidden: value.flags.contains(TitleFlags::ShadowHidden),
             unverified,
-            score: if unverified {
-                value.votes - 1
-            } else {
-                value.votes
-            },
+            removed: value.flags.contains(TitleFlags::Removed),
+            score: value.votes - value.downvotes - if unverified { 1 } else { 0 },
             username: None,
             vip: false,
         }
@@ -82,9 +82,12 @@ pub struct ApiThumbnail {
     pub time_submitted: i64,
     pub timestamp: Option<f64>,
     pub votes: i8,
+    pub downvotes: i8,
     pub original: bool,
     pub locked: bool,
     pub shadow_hidden: bool,
+    pub removed: bool,
+    pub score: i8,
     pub username: Option<Arc<str>>,
     pub vip: bool,
 }
@@ -99,9 +102,12 @@ impl From<&dearrow_parser::Thumbnail> for ApiThumbnail {
             time_submitted: value.time_submitted,
             timestamp: value.timestamp,
             votes: value.votes,
+            downvotes: value.downvotes,
             original: value.flags.contains(ThumbnailFlags::Original),
             locked: value.flags.contains(ThumbnailFlags::Locked),
             shadow_hidden: value.flags.contains(ThumbnailFlags::ShadowHidden),
+            removed: value.flags.contains(ThumbnailFlags::Removed),
+            score: value.votes - value.downvotes,
             username: None,
             vip: false,
         }

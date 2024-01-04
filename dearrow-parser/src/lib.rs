@@ -9,6 +9,7 @@ pub enum ThumbnailFlags {
     Original,
     Locked,
     ShadowHidden,
+    Removed,
 }
 
 #[bitflags]
@@ -19,6 +20,7 @@ pub enum TitleFlags {
     Locked,
     ShadowHidden,
     Unverified,
+    Removed,
 }
 
 #[derive(Clone)]
@@ -29,6 +31,7 @@ pub struct Thumbnail {
     pub time_submitted: i64,
     pub timestamp: Option<f64>,
     pub votes: i8,
+    pub downvotes: i8,
     pub flags: BitFlags<ThumbnailFlags>,
 }
 
@@ -40,6 +43,7 @@ pub struct Title {
     pub user_id: Arc<str>,
     pub time_submitted: i64,
     pub votes: i8,
+    pub downvotes: i8,
     pub flags: BitFlags<TitleFlags>,
 }
 
@@ -391,6 +395,8 @@ mod csv_data {
         locked: i8,
         #[serde(rename="shadowHidden")]
         shadow_hidden: i8,
+        downvotes: i8,
+        removed: i8,
     }
 
     #[derive(Deserialize)]
@@ -416,6 +422,8 @@ mod csv_data {
         #[serde(rename="shadowHidden")]
         shadow_hidden: i8,
         verification: i8,
+        downvotes: i8,
+        removed: i8,
     }
 
     #[derive(Deserialize)]
@@ -477,6 +485,7 @@ mod csv_data {
             flags.set(ThumbnailFlags::Original, intbool!(thumb self, original));
             flags.set(ThumbnailFlags::Locked, intbool!(thumb votes, locked));
             flags.set(ThumbnailFlags::ShadowHidden, intbool!(thumb votes, shadow_hidden));
+            flags.set(ThumbnailFlags::Removed, intbool!(thumb votes, removed));
             if !flags.contains(ThumbnailFlags::Original) && timestamps.is_none() {
                 return Err(ParseError(ObjectKind::Thumbnail, Box::new(ParseErrorKind::MissingSubobject { struct_name: "ThumbnailTimestamps", uuid: self.uuid })));
             }
@@ -487,6 +496,7 @@ mod csv_data {
                 time_submitted: self.time_submitted,
                 timestamp: timestamps.map(|t| t.timestamp),
                 votes: votes.votes,
+                downvotes: votes.downvotes,
                 flags,
             })
         }
@@ -502,6 +512,7 @@ mod csv_data {
             flags.set(TitleFlags::Locked, intbool!(title votes, locked));
             flags.set(TitleFlags::ShadowHidden, intbool!(title votes, shadow_hidden));
             flags.set(TitleFlags::Unverified, intbool!(title votes, verification, 0, -1));
+            flags.set(TitleFlags::Removed, intbool!(title votes, removed));
             Ok(super::Title{
                 uuid: self.uuid,
                 video_id: self.video_id,
@@ -509,6 +520,7 @@ mod csv_data {
                 user_id: self.user_id,
                 time_submitted: self.time_submitted,
                 votes: votes.votes,
+                downvotes: votes.downvotes,
                 flags,
             })
         }

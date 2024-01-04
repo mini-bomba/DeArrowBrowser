@@ -342,13 +342,16 @@ fn title_flags(title: &ApiTitle) -> Html {
     html! {
         <>
             if title.score < 0 {
-                <span title="This title's score is too low to be displayed">{"❌"}</span>
+                <span title="This title's score is too low to be displayed">{"👎"}</span>
             }
             if title.unverified {
-                <span title="This title was submitted by an unverified user">{"❓"}</span>
+                <span title="This title was submitted by an unverified user (-1 score)">{"❓"}</span>
             }
             if title.locked {
                 <span title="This title was locked by a VIP">{"🔒"}</span>
+            }
+            if title.removed {
+                <span title="This title was removed by a VIP">{"❌"}</span>
             }
             if title.vip {
                 <span title="This title was submitted by a VIP">{"👑"}</span>
@@ -364,10 +367,13 @@ fn thumbnail_flags(thumb: &ApiThumbnail) -> Html {
     html! {
         <>
             if thumb.votes < 0 {
-                <span title="This thumbnail's score is too low to be displayed">{"❌"}</span>
+                <span title="This thumbnail's score is too low to be displayed">{"👎"}</span>
             }
             if thumb.locked {
                 <span title="This thumbnail was locked by a VIP">{"🔒"}</span>
+            }
+            if thumb.removed {
+                <span title="This thumbnail was removed by a VIP">{"❌"}</span>
             }
             if thumb.vip {
                 <span title="This thumbnail was submitted by a VIP">{"👑"}</span>
@@ -376,6 +382,23 @@ fn thumbnail_flags(thumb: &ApiThumbnail) -> Html {
                 <span title="This thumbnail is shadowhidden">{"🚫"}</span>
             }
         </>
+    }
+}
+
+fn title_score(title: &ApiTitle) -> Html {
+    html! {
+        <span class="hoverswitch">
+            <span>{title.score}</span>
+            <span>{format!("👍 {} | {} 👎", title.votes, title.downvotes)}</span>
+        </span>
+    }
+}
+fn thumb_score(thumb: &ApiThumbnail) -> Html {
+    html! {
+        <span class="hoverswitch">
+            <span>{thumb.score}</span>
+            <span>{format!("👍 {} | {} 👎", thumb.votes, thumb.downvotes)}</span>
+        </span>
     }
 }
 
@@ -468,7 +491,7 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
                         <th>{"Video ID"}</th>
                     }
                     <th class="title-col">{"Title"}</th>
-                    <th>{"Score/Votes"}</th>
+                    <th class="score-col">{"Score"}</th>
                     <th>{"UUID"}</th>
                     if !props.hide_username {
                         <th>{"Username"}</th>
@@ -484,7 +507,7 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
                             <td>{video_link!(t.video_id)}</td>
                         }
                         <td class="title-col">{t.title.clone()}<br />{original_indicator!(t.original, title)}</td>
-                        <td>{format!("{}/{}", t.score, t.votes)}<br />{title_flags(t)}</td>
+                        <td class="score-col">{title_score(t)}<br />{title_flags(t)}</td>
                         <td>{t.uuid.clone()}</td>
                         if !props.hide_username {
                             <td>{username_link!(t.username)}</td>
@@ -504,7 +527,7 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
                         <th>{"Video ID"}</th>
                     }
                     <th>{"Timestamp"}</th>
-                    <th>{"Score/Votes"}</th>
+                    <th class="score-col">{"Score"}</th>
                     <th>{"UUID"}</th>
                     if !props.hide_username {
                         <th>{"Username"}</th>
@@ -520,7 +543,7 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
                             <td>{video_link!(t.video_id)}</td>
                         }
                         <td>{t.timestamp.map_or(original_indicator!(t.original, thumbnail), |ts| html! {{ts.to_string()}})}</td>
-                        <td>{t.votes}<br />{thumbnail_flags(t)}</td>
+                        <td class="score-col">{thumb_score(t)}<br />{thumbnail_flags(t)}</td>
                         <td>{t.uuid.clone()}</td>
                         if !props.hide_username {
                             <td>{username_link!(t.username)}</td>

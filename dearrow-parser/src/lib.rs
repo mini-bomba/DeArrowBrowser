@@ -1,24 +1,24 @@
 use std::{sync::Arc, fmt::Display, collections::{HashSet, HashMap}, path::{Path, PathBuf}, fs::File};
-use bitflags::bitflags;
+use enumflags2::{bitflags, BitFlags};
 use anyhow::{Result, Context, Error};
 
-bitflags! {
-    #[derive(Clone, Copy)]
-    pub struct ThumbnailFlags: u8 {
-        const Original     = 0b00000001;
-        const Locked       = 0b00000010;
-        const ShadowHidden = 0b00000100;
-    }
+#[bitflags]
+#[repr(u8)]
+#[derive(Clone, Copy)]
+pub enum ThumbnailFlags {
+    Original,
+    Locked,
+    ShadowHidden,
 }
 
-bitflags! {
-    #[derive(Clone, Copy)]
-    pub struct TitleFlags: u8 {
-        const Original     = 0b00000001;
-        const Locked       = 0b00000010;
-        const ShadowHidden = 0b00000100;
-        const Unverified   = 0b00001000;
-    }
+#[bitflags]
+#[repr(u8)]
+#[derive(Clone, Copy)]
+pub enum TitleFlags {
+    Original,
+    Locked,
+    ShadowHidden,
+    Unverified,
 }
 
 #[derive(Clone)]
@@ -29,7 +29,7 @@ pub struct Thumbnail {
     pub time_submitted: i64,
     pub timestamp: Option<f64>,
     pub votes: i8,
-    pub flags: ThumbnailFlags,
+    pub flags: BitFlags<ThumbnailFlags>,
 }
 
 #[derive(Clone)]
@@ -40,7 +40,7 @@ pub struct Title {
     pub user_id: Arc<str>,
     pub time_submitted: i64,
     pub votes: i8,
-    pub flags: TitleFlags,
+    pub flags: BitFlags<TitleFlags>,
 }
 
 #[derive(Clone)]
@@ -358,6 +358,7 @@ impl DearrowDB {
 mod csv_data {
     use std::sync::Arc;
     use serde::Deserialize;
+    use enumflags2::BitFlag;
     use super::{ParseError, ObjectKind, ParseErrorKind, ThumbnailFlags, TitleFlags, StringSet, Dedupe};
 
     type Result<T> = std::result::Result<T, ParseError>;

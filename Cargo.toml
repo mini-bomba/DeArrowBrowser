@@ -1,5 +1,6 @@
 [workspace]
 members = ["dearrow-browser-server", "dearrow-browser-api", "dearrow-parser", "dearrow-browser-frontend"]
+resolver = "2"
 
 [workspace.package]
 version = "1.2.0"

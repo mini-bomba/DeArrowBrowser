@@ -10,8 +10,8 @@ license = "AGPL-3.0-only"
 edition = "2021"
 
 [workspace.dependencies]
-serde = { version = "1.0.173", features = ["derive", "rc"] }
-anyhow = "1.0.72"
+serde = { version = "1.0.194", features = ["derive", "rc"] }
+anyhow = "1.0.79"
 
 [profile.release]
 strip = true

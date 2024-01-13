@@ -341,8 +341,10 @@ enum DetailList {
 fn title_flags(title: &ApiTitle) -> Html {
     html! {
         <>
-            if title.score < 0 {
-                <span title="This title's score is too low to be displayed">{"👎"}</span>
+            if title.votes - title.downvotes < -1 {
+                <span title="This title was removed by the downvotes">{"👎"}</span>
+            } else if title.score < 0 {
+                <span title="This title should only appear in submission menus (score below 0)" class="grayscale">{"👎"}</span>
             }
             if title.unverified {
                 <span title="This title was submitted by an unverified user (-1 score)">{"❓"}</span>
@@ -366,8 +368,10 @@ fn title_flags(title: &ApiTitle) -> Html {
 fn thumbnail_flags(thumb: &ApiThumbnail) -> Html {
     html! {
         <>
-            if thumb.votes < 0 {
-                <span title="This thumbnail's score is too low to be displayed">{"👎"}</span>
+            if thumb.votes - thumb.downvotes < -1 {
+                <span title="This thumbnail was removed by the downvotes">{"👎"}</span>
+            } else if thumb.score < 0 {
+                <span title="This thumbnail should only appear in submission menus (score below 0)" class="grayscale">{"👎"}</span>
             }
             if thumb.locked {
                 <span title="This thumbnail was locked by a VIP">{"🔒"}</span>

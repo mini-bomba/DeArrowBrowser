@@ -219,6 +219,10 @@ body {
   }
 }
 
+.grayscale {
+  filter: grayscale(1);
+}
+
 a {
   color: lightblue;
 }

@@ -343,6 +343,8 @@ fn title_flags(title: &ApiTitle) -> Html {
         <>
             if title.votes - title.downvotes < -1 {
                 <span title="This title was removed by the downvotes">{"👎"}</span>
+            } else if title.votes < 0 {
+                <span title="This title was replaced by the submitter">{"👎"}</span>
             } else if title.score < 0 {
                 <span title="This title should only appear in submission menus (score below 0)" class="grayscale">{"👎"}</span>
             }

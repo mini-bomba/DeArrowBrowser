@@ -222,7 +222,7 @@ fn Footer() -> Html {
                 <table>
                     <tr><td>
                         <a href="https://github.com/mini-bomba/DeArrowBrowser">{"DeArrow Browser"}</a>
-                        {" © mini_bomba 2023, licensed under "}
+                        {" © mini_bomba 2024, licensed under "}
                         <a href="https://www.gnu.org/licenses/agpl-3.0.en.html">{"AGPL v3"}</a>
                     </td></tr>
                     <tr><td>

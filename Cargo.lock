@@ -373,6 +373,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "built"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38d17f4d6e4dc36d1a02fbedc2753a096848e7c1b0772f7654eab8e2c927dd53"
+dependencies = [
+ "chrono",
+ "git2",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -517,7 +527,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-browser-api"
-version = "1.3.0"
+version = "1.4.0"
 dependencies = [
  "dearrow-parser",
  "serde",
@@ -525,9 +535,10 @@ dependencies = [
 
 [[package]]
 name = "dearrow-browser-frontend"
-version = "1.3.0"
+version = "1.4.0"
 dependencies = [
  "anyhow",
+ "built",
  "chrono",
  "dearrow-browser-api",
  "gloo-console 0.3.0",
@@ -542,12 +553,13 @@ dependencies = [
 
 [[package]]
 name = "dearrow-browser-server"
-version = "1.3.0"
+version = "1.4.0"
 dependencies = [
  "actix-files",
  "actix-web",
  "anyhow",
  "base64",
+ "built",
  "chrono",
  "dearrow-browser-api",
  "dearrow-parser",
@@ -560,7 +572,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-parser"
-version = "1.3.0"
+version = "1.4.0"
 dependencies = [
  "anyhow",
  "csv",
@@ -802,6 +814,19 @@ name = "gimli"
 version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6fb8d784f27acf97159b40fc4db5ecd8aa23b9ad5ef69cdd136d3bc80665f0c0"
+
+[[package]]
+name = "git2"
+version = "0.18.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fbf97ba92db08df386e10c8ede66a2a0369bd277090afd8710e19e38de9ec0cd"
+dependencies = [
+ "bitflags 2.4.1",
+ "libc",
+ "libgit2-sys",
+ "log",
+ "url",
+]
 
 [[package]]
 name = "gloo"
@@ -1381,6 +1406,30 @@ name = "libc"
 version = "0.2.151"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "302d7ab3130588088d277783b1e2d2e10c9e9e4a16dd9050e6ec93fb3e7048f4"
+
+[[package]]
+name = "libgit2-sys"
+version = "0.16.1+1.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2a2bb3680b094add03bb3732ec520ece34da31a8cd2d633d1389d0f0fb60d0c"
+dependencies = [
+ "cc",
+ "libc",
+ "libz-sys",
+ "pkg-config",
+]
+
+[[package]]
+name = "libz-sys"
+version = "1.1.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "295c17e837573c8c821dbaeb3cceb3d745ad082f7572191409e69cbc1b3fd050"
+dependencies = [
+ "cc",
+ "libc",
+ "pkg-config",
+ "vcpkg",
+]
 
 [[package]]
 name = "linux-raw-sys"

@@ -173,6 +173,77 @@ body {
   }
 }
 
+.modal-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  padding: 10vh 20vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  > .modal-background {
+    z-index: 0;
+    background-color: #0009;
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+  }
+
+  > .modal-content {
+    z-index: 1;
+    position: relative;
+    max-width: 60vw;
+    max-height: 80vh;
+    background-color: #222;
+    border-radius: 0.5rem;
+    overflow: auto;
+    padding: 1.5rem;
+  }
+
+}
+
+#status-modal {
+  display: grid;
+  gap: 2em;
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas:
+    "header header"
+    "client server";
+
+  h2 {
+    grid-area: header;
+    margin-bottom: 0;
+  }
+
+  #status-modal-client {
+    grid-area: client;
+  }
+
+  #status-modal-server {
+    grid-area: server;
+  }
+
+  h2, h3 {
+    text-align: center;
+  }
+
+  h3, h4 {
+    margin: 0.25em 0;
+  }
+
+  th {
+    text-align: left;
+    padding-right: 1em;
+    padding-left: 0.25em;
+  }
+}
+
 .clickable {
   cursor: pointer;
 }

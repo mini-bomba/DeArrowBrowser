@@ -5,6 +5,7 @@ homepage.workspace = true
 license.workspace = true
 repository.workspace = true
 edition.workspace = true
+build = "../add_metadata.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -13,7 +14,7 @@ actix-files = "0.6.2"
 actix-web = "4.4.1"
 anyhow.workspace = true
 base64 = "0.21.5"
-chrono = "0.4.31"
+chrono = { version = "0.4.31", default-features = false, features = [ "clock" ] }
 dearrow-parser = { path = "../dearrow-parser" }
 dearrow-browser-api = { path = "../dearrow-browser-api", features = [ "dearrow-parser" ] }
 getrandom = "0.2.11"
@@ -21,3 +22,6 @@ serde.workspace = true
 toml = "0.8.8"
 sha2 = "0.10.8"
 futures-util = { version = "0.3.30", default-features = false }
+
+[build-dependencies]
+built.workspace = true

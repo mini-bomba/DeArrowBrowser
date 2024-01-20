@@ -5,6 +5,7 @@ homepage.workspace = true
 license.workspace = true
 repository.workspace = true
 edition.workspace = true
+build = "../add_metadata.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -20,3 +21,6 @@ yew = { version = "0.21.0", features = ["csr"] }
 yew-router = "0.18.0"
 yew-hooks = "0.3.0"
 gloo-console = "0.3.0"
+
+[build-dependencies]
+built.workspace = true

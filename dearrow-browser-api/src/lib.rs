@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use serde::{Serialize, Deserialize};
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct StatusResponse {
     pub last_updated: i64,
     pub last_modified: i64,
@@ -13,6 +13,11 @@ pub struct StatusResponse {
     pub usernames: usize,
     pub errors: usize,
     pub string_count: Option<usize>,
+    pub server_version: Arc<str>,
+    pub server_git_hash: Option<Arc<str>>,
+    pub server_git_dirty: Option<bool>,
+    pub server_build_timestamp: Option<i64>,
+    pub server_startup_timestamp: i64,
 }
 
 pub type ErrorList = Vec<String>;
@@ -22,7 +27,7 @@ pub trait IntoWithDatabase<T> {
     fn into_with_db(self, db: &dearrow_parser::DearrowDB) -> T;
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ApiTitle {
     pub uuid: Arc<str>,
     pub video_id: Arc<str>,
@@ -74,7 +79,7 @@ impl IntoWithDatabase<ApiTitle> for &dearrow_parser::Title {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct ApiThumbnail {
     pub uuid: Arc<str>,
     pub video_id: Arc<str>,
@@ -123,7 +128,7 @@ impl IntoWithDatabase<ApiThumbnail> for &dearrow_parser::Thumbnail {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct User {
     pub user_id: Arc<str>,
     pub username: Option<Arc<str>>,

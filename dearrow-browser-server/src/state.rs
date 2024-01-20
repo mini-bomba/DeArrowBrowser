@@ -1,5 +1,6 @@
 use actix_web::http::header::EntityTag;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use chrono::{DateTime, Utc};
 use dearrow_parser::DearrowDB;
 use anyhow::Error;
 use getrandom::getrandom;
@@ -12,6 +13,8 @@ pub struct AppConfig {
     pub static_content_path: PathBuf,
     pub listen: ListenConfig,
     pub auth_secret: String,
+    #[serde(skip, default="Utc::now")]
+    pub startup_timestamp: DateTime<Utc>
 }
 
 impl Default for AppConfig {
@@ -23,6 +26,7 @@ impl Default for AppConfig {
             static_content_path: PathBuf::from("./static"),
             listen: ListenConfig::default(),
             auth_secret: URL_SAFE_NO_PAD.encode(buffer),
+            startup_timestamp: Utc::now(),
         }
     }
 }

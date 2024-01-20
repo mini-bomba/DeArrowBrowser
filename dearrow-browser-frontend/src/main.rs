@@ -4,15 +4,20 @@ use dearrow_browser_api::{StatusResponse, ApiThumbnail, ApiTitle, User};
 use reqwest::Url;
 use strum::IntoStaticStr;
 use yew::{prelude::*, suspense::SuspensionResult};
-use yew_hooks::{use_async_with_options, UseAsyncOptions, use_interval, use_title};
+use yew_hooks::{use_async_with_options, UseAsyncOptions, use_interval};
 use yew_router::prelude::*;
 use web_sys::{window, HtmlInputElement};
 use gloo_console::error;
 
 mod hooks;
 mod utils;
+mod modals;
+mod contexts;
+mod modal_renderer;
 use hooks::use_async_suspension;
 use utils::*;
+use modal_renderer::{ModalRenderer, ModalMessage};
+use contexts::*;
 
 
 #[derive(Clone, Routable, PartialEq, IntoStaticStr)]
@@ -38,21 +43,6 @@ enum DetailType {
     Thumbnail,
 }
 
-#[derive(Clone, PartialEq)]
-struct WindowContext {
-    origin: Url,
-    logo_url: Option<AttrValue>,
-}
-
-#[derive(Clone, PartialEq)]
-struct AppContext {
-    last_updated: Option<i64>,
-    last_modified: Option<i64>,
-}
-
-#[derive(Clone, Copy, PartialEq)]
-struct UpdateClock(bool);
-
 #[function_component]
 fn App() -> Html {
     let window_context = use_memo((), |_| {
@@ -71,11 +61,11 @@ fn App() -> Html {
 
     let status = {
         let window_context = window_context.clone();
-        use_async_with_options::<_, StatusResponse, Rc<anyhow::Error>>(async move { 
+        use_async_with_options::<_, Rc<StatusResponse>, Rc<anyhow::Error>>(async move { 
             async { Ok(
                 reqwest::get(window_context.origin.join("/api/status")?).await?
                     .json().await?
-            )}.await.map_err(Rc::new)
+            )}.await.map(Rc::new).map_err(Rc::new)
         }, UseAsyncOptions::enable_auto())
     };
     {
@@ -86,26 +76,16 @@ fn App() -> Html {
             status.run();
         }, 60*1000);
     }
-    let app_context = use_memo(
-        status.data.as_ref().map(|d| (d.last_updated, d.last_modified)).unzip(),
-        |&data| {
-            let (last_updated, last_modified) = data;
-            AppContext {
-                last_updated,
-                last_modified,
-            }
-        }
-    );
 
     html! {
         <ContextProvider<Rc<WindowContext>> context={window_context}>
-        <ContextProvider<Rc<AppContext>> context={app_context}>
+        <ContextProvider<StatusContext> context={status.data.clone()}>
         <ContextProvider<UpdateClock> context={*update_clock}>
             <BrowserRouter>
                 <Switch<Route> render={render_route} />
             </BrowserRouter>
         </ContextProvider<UpdateClock>>
-        </ContextProvider<Rc<AppContext>>>
+        </ContextProvider<StatusContext>>
         </ContextProvider<Rc<WindowContext>>>
     }
 }
@@ -194,21 +174,25 @@ fn Header() -> Html {
 
 #[function_component]
 fn Footer() -> Html {
-    let app_context: Rc<AppContext> = use_context().expect("AppContext should be defined");
+    let status: StatusContext = use_context().expect("StatusResponse should be defined");
     let _ = use_context::<UpdateClock>();
+    let modal_controls: ModalRendererControls = use_context().expect("Footer should be placed inside a ModalRenderer");
+    let open_version_modal = use_callback(modal_controls, |_, modal_controls| {
+        modal_controls.emit(ModalMessage::Open(html! {<modals::StatusModal />}));
+    });
 
-    let last_updated = match app_context.last_updated.and_then(NaiveDateTime::from_timestamp_millis).map(|dt| dt.and_utc()) {
+    let last_updated = match status.as_ref().and_then(|status| NaiveDateTime::from_timestamp_millis(status.last_updated)).map(|dt| dt.and_utc()) {
         None => AttrValue::from("..."),
         Some(time) => AttrValue::from(render_datetime_with_delta(time)),
     };
-    let last_modified = match app_context.last_modified.and_then(NaiveDateTime::from_timestamp_millis).map(|dt| dt.and_utc()) {
+    let last_modified = match status.as_ref().and_then(|status| NaiveDateTime::from_timestamp_millis(status.last_modified)).map(|dt| dt.and_utc()) {
         None => AttrValue::from("..."),
         Some(time) => AttrValue::from(render_datetime_with_delta(time)),
     };
 
     html! {
         <div id="footer">
-            <table>
+            <table class="clickable" onclick={open_version_modal}>
                 <tr>
                     <td>{"Last update:"}</td>
                     <td>{last_updated}</td>
@@ -271,13 +255,13 @@ fn render_route(route: Route) -> Html {
     };
     let route_name: &'static str = (&route).into();
     html! {
-        <>
+        <ModalRenderer>
             <Header />
             <div id="content" data-route={route_name}>
                 {route_html}
             </div>
             <Footer />
-        </>
+        </ModalRenderer>
     }
 }
 
@@ -458,7 +442,7 @@ macro_rules! username_link {
 
 #[function_component]
 fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
-    let app_context: Rc<AppContext> = use_context().expect("AppContext should be defined");
+    let status: StatusContext = use_context().expect("StatusResponse should be defined");
     let details = { 
         let result: SuspensionResult<Rc<Result<DetailList, anyhow::Error>>> = use_async_suspension(|(mode, url, _)| async move {
             let request = reqwest::get((*url).clone()).await?;
@@ -472,7 +456,7 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
                 DetailList::Titles(ref mut list) => list.sort_unstable_by(|a, b| b.time_submitted.cmp(&a.time_submitted)),
             };
             Ok(result)
-        }, (props.mode, props.url.clone(), app_context.last_updated));
+        }, (props.mode, props.url.clone(), status.map(|s| s.last_updated)));
         if let Some(count) = &props.entry_count {
             count.set(result.as_ref().ok().and_then(|r| r.as_ref().as_ref().ok()).map(|l| match l {
                 DetailList::Thumbnails(list) => list.len(),
@@ -707,11 +691,11 @@ struct UserDetailsProps {
 #[function_component]
 fn UserDetails(props: &UserDetailsProps) -> HtmlResult {
     let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
-    let app_context: Rc<AppContext> = use_context().expect("AppContext should be defined");
+    let status: StatusContext = use_context().expect("StatusResponse should be defined");
     let url = window_context.origin.join(format!("/api/users/user_id/{}", props.userid).as_str()).expect("Should be able to create an API url");
     let result: Rc<Result<User, anyhow::Error>> = use_async_suspension(|(url, _)| async move {
         Ok(reqwest::get((url).clone()).await?.json().await?)
-    }, (url, app_context.last_updated))?;
+    }, (url, status.map(|s| s.last_updated)))?;
 
     Ok(match *result {
         Ok(ref user) => html! {
@@ -782,4 +766,9 @@ fn UserPage(props: &UserPageProps) -> Html {
 
 fn main() {
     yew::Renderer::<App>::new().render();
+}
+
+pub mod built_info {
+    // Contents generated by buildscript, using built
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }

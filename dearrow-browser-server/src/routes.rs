@@ -1,12 +1,12 @@
 use std::sync::{RwLock, Arc};
 use actix_web::{Responder, get, post, web, http::{StatusCode, header::{ETag, CacheControl, CacheDirective}}, CustomizeResponder, HttpResponse, rt::task::spawn_blocking};
 use anyhow::{anyhow, bail};
-use chrono::Utc;
+use chrono::{Utc, DateTime};
 use dearrow_parser::{StringSet, DearrowDB, TitleFlags};
 use dearrow_browser_api::*;
 use serde::Deserialize;
 
-use crate::{utils::{self, IfNoneMatch}, state::*};
+use crate::{utils::{self, IfNoneMatch}, state::*, built_info};
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(helo)
@@ -51,7 +51,7 @@ async fn helo() -> impl Responder {
 }
 
 #[get("/status")]
-async fn get_status(db_lock: DBLock, string_set: StringSetLock) -> JsonResult<StatusResponse> {
+async fn get_status(db_lock: DBLock, string_set: StringSetLock, config: web::Data<AppConfig>) -> JsonResult<StatusResponse> {
     let strings = match string_set.try_read() {
         Err(_) => None,
         Ok(set) => Some(set.set.len()),
@@ -67,6 +67,11 @@ async fn get_status(db_lock: DBLock, string_set: StringSetLock) -> JsonResult<St
         usernames: db.db.usernames.len(),
         errors: db.errors.len(),
         string_count: strings,
+        server_version: built_info::PKG_VERSION.into(),
+        server_git_hash: built_info::GIT_COMMIT_HASH.map(|s| s.into()),
+        server_git_dirty: built_info::GIT_DIRTY,
+        server_build_timestamp: DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC).ok().map(|t| t.timestamp()),
+        server_startup_timestamp: config.startup_timestamp.timestamp(),
     }))
 }
 

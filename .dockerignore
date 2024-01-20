@@ -1,4 +1,9 @@
 target/
 dist/
-.git
+config.toml
+config.toml.example
 Dockerfile
+LICENSE
+README.md
+.dockerignore
+.gitignore

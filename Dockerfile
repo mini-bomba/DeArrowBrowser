@@ -7,14 +7,14 @@ ADD . /source
 WORKDIR /source
 # Bring back .dockerignored files to avoid triggering "uncommited changes" labels in info menus
 RUN git restore config.toml.example Dockerfile LICENSE README.md .dockerignore .gitignore
-RUN cargo build --release --bin dearrow-browser-server
+RUN --mount=type=cache,target=/root/.cargo,id=alpine_cargo_dir --mount=type=cache,target=/source/target,id=dearrow_browser_target touch /source/add_metadata.rs && cargo build --release --bin dearrow-browser-server && cp /source/target/release/dearrow-browser-server /
 WORKDIR /source/dearrow-browser-frontend
-RUN trunk build --release
+RUN --mount=type=cache,target=/root/.cargo,id=alpine_cargo_dir --mount=type=cache,target=/source/target,id=dearrow_browser_target touch /source/add_metadata.rs && trunk build --release
 
 
 FROM docker.io/library/alpine:latest
 RUN apk --no-cache add libgcc
 COPY --from=alpine-builder /source/dearrow-browser-frontend/dist/ /static/
-COPY --from=alpine-builder /source/target/release/dearrow-browser-server /usr/bin/dearrow-browser-server
+COPY --from=alpine-builder /dearrow-browser-server /usr/bin/dearrow-browser-server
 WORKDIR /
 CMD ["/usr/bin/dearrow-browser-server"]

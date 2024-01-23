@@ -497,7 +497,7 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
                             <td>{video_link!(t.video_id)}</td>
                         }
                         <td class="title-col">{t.title.clone()}<br />{original_indicator!(t.original, title)}</td>
-                        <td class="score-col">{title_score(t)}<br />{title_flags(t)}</td>
+                        <td class="score-col hoverswitch-trigger">{title_score(t)}<br />{title_flags(t)}</td>
                         <td>{t.uuid.clone()}</td>
                         if !props.hide_username {
                             <td>{username_link!(t.username)}</td>
@@ -533,7 +533,7 @@ fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
                             <td>{video_link!(t.video_id)}</td>
                         }
                         <td>{t.timestamp.map_or(original_indicator!(t.original, thumbnail), |ts| html! {{ts.to_string()}})}</td>
-                        <td class="score-col">{thumb_score(t)}<br />{thumbnail_flags(t)}</td>
+                        <td class="score-col hoverswitch-trigger">{thumb_score(t)}<br />{thumbnail_flags(t)}</td>
                         <td>{t.uuid.clone()}</td>
                         if !props.hide_username {
                             <td>{username_link!(t.username)}</td>

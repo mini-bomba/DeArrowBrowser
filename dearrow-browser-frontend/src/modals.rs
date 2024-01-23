@@ -4,8 +4,25 @@ use yew::prelude::*;
 use chrono::{NaiveDateTime, DateTime};
 
 use crate::contexts::{StatusContext, WindowContext};
-use crate::utils::render_datetime;
+use crate::utils::{render_datetime, RenderNumber};
 use crate::built_info;
+
+macro_rules! number_hoverswitch {
+    ($switch_element: tt, $n: expr) => {
+        if $n >= 1000 {
+            html!{
+                <$switch_element class="hoverswitch">
+                    <span>{$n.abbreviate_int()}</span>
+                    <span>{$n.render_int()}</span>
+                </$switch_element>
+            }
+        } else {
+            html!{
+                <$switch_element>{$n}</$switch_element>
+            }
+        }
+    };
+}
 
 
 #[function_component]
@@ -119,36 +136,34 @@ pub fn StatusModal() -> Html {
                                 }
                             </td>
                         </tr>
-                        <tr>
+                        <tr class="hoverswitch-trigger">
                             <th>{"Title count"}</th>
-                            <td>{status.titles}</td>
+                            {number_hoverswitch!(td, status.titles)}
                         </tr>
-                        <tr>
+                        <tr class="hoverswitch-trigger">
                             <th>{"Thumbnail count"}</th>
-                            <td>{status.thumbnails}</td>
+                            {number_hoverswitch!(td, status.thumbnails)}
                         </tr>
-                        <tr>
+                        <tr class="hoverswitch-trigger">
                             <th>{"Username count"}</th>
-                            <td>{status.usernames}</td>
+                            {number_hoverswitch!(td, status.usernames)}
                         </tr>
-                        <tr>
+                        <tr class="hoverswitch-trigger">
                             <th>{"VIPs"}</th>
-                            <td>{status.vip_users}</td>
+                            {number_hoverswitch!(td, status.vip_users)}
                         </tr>
-                        <tr>
+                        <tr class="hoverswitch-trigger">
                             <th>{"Unique strings"}</th>
-                            <td>
-                                if let Some(count) = status.string_count {
-                                    {count}
-                                } else {
-                                    <em>{"Unknown"}</em>
-                                }
-                            </td>
+                            if let Some(count) = status.string_count {
+                                {number_hoverswitch!(td, count)}
+                            } else {
+                                <td><em>{"Unknown"}</em></td>
+                            }
                         </tr>
-                        <tr>
+                        <tr class="hoverswitch-trigger">
                             <th>{"Parse errors"}</th>
                             <td>
-                                {status.errors}{" "}
+                                {number_hoverswitch!(span, status.errors)}{" "}
                                 <a href={(*errors_url).clone()} target="_blank">{"(view)"}</a>
                             </td>
                         </tr>

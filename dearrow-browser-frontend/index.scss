@@ -279,7 +279,7 @@ body {
     display: none;
   }
 
-  &:hover, td:hover & {
+  &:hover, .hoverswitch-trigger:hover & {
     :first-child {
       display: none;
     }

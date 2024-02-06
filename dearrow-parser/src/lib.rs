@@ -177,6 +177,11 @@ pub struct DBPaths {
 pub type LoadResult = (DearrowDB, Vec<Error>);
 
 impl DearrowDB {
+    pub fn sort(&mut self) {
+        self.titles.sort_unstable_by(|a, b| a.time_submitted.cmp(&b.time_submitted));
+        self.thumbnails.sort_unstable_by(|a, b| a.time_submitted.cmp(&b.time_submitted));
+    }
+
     pub fn load_dir(dir: &Path, string_set: &mut StringSet) -> Result<LoadResult> {
         DearrowDB::load(
             DBPaths {

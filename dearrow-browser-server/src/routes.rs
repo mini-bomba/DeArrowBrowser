@@ -89,7 +89,8 @@ fn do_reload(db_lock: DBLock, string_set_lock: StringSetLock, config: web::Data<
         db_state.updating_now = true;
     }
     let mut string_set_clone = string_set_lock.read().map_err(|_| anyhow!("Failed to acquire StringSet for reading"))?.clone();
-    let (new_db, errors) = DearrowDB::load_dir(config.mirror_path.as_path(), &mut string_set_clone)?;
+    let (mut new_db, errors) = DearrowDB::load_dir(config.mirror_path.as_path(), &mut string_set_clone)?;
+    new_db.sort();
     let last_updated = Utc::now().timestamp_millis();
     let last_modified = utils::get_mtime(&config.mirror_path.join("titles.csv"));
     {
@@ -148,7 +149,7 @@ async fn get_unverified_titles(db_lock: DBLock, inm: IfNoneMatch) -> CustomizedJ
     etag_shortcircuit!(db_lock, inm);
     let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
     Ok(etagged_json!(db, 
-        db.db.titles.iter()
+        db.db.titles.iter().rev()
             .filter(|t| t.flags.contains(TitleFlags::Unverified) && !t.flags.intersects(TitleFlags::Locked | TitleFlags::ShadowHidden))
             .map(|t| t.into_with_db(&db.db)).collect::<Vec<_>>()
     ))
@@ -177,7 +178,7 @@ async fn get_titles_by_video_id(db_lock: DBLock, string_set: StringSetLock, path
     let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
     let titles = match video_id {
         None => vec![],
-        Some(id) => db.db.titles.iter()
+        Some(id) => db.db.titles.iter().rev()
             .filter(|title| Arc::ptr_eq(&title.video_id, &id))
             .map(|t| t.into_with_db(&db.db))
             .collect(),
@@ -198,7 +199,7 @@ async fn get_titles_by_user_id(db_lock: DBLock, string_set: StringSetLock, path:
     let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
     let titles = match user_id {
         None => vec![],
-        Some(id) => db.db.titles.iter()
+        Some(id) => db.db.titles.iter().rev()
             .filter(|title| Arc::ptr_eq(&title.user_id, &id))
             .map(|t| t.into_with_db(&db.db))
             .collect(),
@@ -244,7 +245,7 @@ async fn get_thumbnails_by_video_id(db_lock: DBLock, string_set: StringSetLock, 
     let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
     let titles = match video_id {
         None => vec![],
-        Some(id) => db.db.thumbnails.iter()
+        Some(id) => db.db.thumbnails.iter().rev()
             .filter(|thumb| Arc::ptr_eq(&thumb.video_id, &id))
             .map(|t| t.into_with_db(&db.db))
             .collect(),
@@ -265,7 +266,7 @@ async fn get_thumbnails_by_user_id(db_lock: DBLock, string_set: StringSetLock, p
     let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
     let titles = match user_id {
         None => vec![],
-        Some(id) => db.db.thumbnails.iter()
+        Some(id) => db.db.thumbnails.iter().rev()
             .filter(|thumb| Arc::ptr_eq(&thumb.user_id, &id))
             .map(|t| t.into_with_db(&db.db))
             .collect(),

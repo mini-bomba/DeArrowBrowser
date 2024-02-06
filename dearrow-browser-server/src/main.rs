@@ -50,6 +50,7 @@ async fn main() -> anyhow::Result<()> {
             updating_now: false,
             etag: None,
         };
+        db_state.db.sort();
         db_state.etag = Some(db_state.generate_etag());
         web::Data::new(RwLock::new(db_state))
     };

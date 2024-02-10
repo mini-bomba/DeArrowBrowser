@@ -7,9 +7,9 @@ ADD . /source
 WORKDIR /source
 # Bring back .dockerignored files to avoid triggering "uncommited changes" labels in info menus
 RUN git restore config.toml.example Dockerfile LICENSE README.md .dockerignore .gitignore
-RUN --mount=type=cache,target=/root/.cargo,id=alpine_cargo_dir --mount=type=cache,target=/source/target,id=dearrow_browser_target touch /source/add_metadata.rs && cargo build --release --bin dearrow-browser-server && cp /source/target/release/dearrow-browser-server /
+RUN --mount=type=cache,target=/root/.cargo,id=alpine_cargo_dir --mount=type=cache,target=/source/target,id=dearrow_browser_target touch /source/add_metadata.rs && cargo build --release --frozen --bin dearrow-browser-server && cp /source/target/release/dearrow-browser-server /
 WORKDIR /source/dearrow-browser-frontend
-RUN --mount=type=cache,target=/root/.cargo,id=alpine_cargo_dir --mount=type=cache,target=/source/target,id=dearrow_browser_target touch /source/add_metadata.rs && trunk build --release
+RUN --mount=type=cache,target=/root/.cargo,id=alpine_cargo_dir --mount=type=cache,target=/source/target,id=dearrow_browser_target touch /source/add_metadata.rs && trunk build --release --frozen --offline
 
 
 FROM docker.io/library/alpine:latest

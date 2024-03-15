@@ -4,7 +4,7 @@ use dearrow_browser_api::StatusResponse;
 use reqwest::Url;
 use yew::AttrValue;
 
-pub use crate::modal_renderer::ModalRendererControls;
+pub use crate::components::modal_renderer::ModalRendererControls;
 
 #[derive(Clone, PartialEq)]
 pub struct WindowContext {

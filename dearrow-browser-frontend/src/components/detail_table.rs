@@ -6,7 +6,7 @@ use yew::{prelude::*, suspense::SuspensionResult};
 use yew_router::prelude::*;
 use dearrow_browser_api::*;
 
-use crate::{Route, contexts::StatusContext, hooks::use_async_suspension, utils::render_naive_datetime};
+use crate::{pages::MainRoute, contexts::StatusContext, hooks::use_async_suspension, utils::render_naive_datetime};
 
 #[derive(PartialEq, Clone, Copy)]
 pub enum DetailType {
@@ -159,7 +159,7 @@ macro_rules! video_link {
             <>
                 <a href={format!("https://youtu.be/{}", $videoid)} title="View this video on YouTube" target="_blank">{$videoid.clone()}</a><br />
                 <span class="icon-link" title="View this video in DeArrow Browser">
-                    <Link<Route> to={Route::Video { id: $videoid.to_string() }}>{"🔍"}</Link<Route>>
+                    <Link<MainRoute> to={MainRoute::Video { id: $videoid.to_string() }}>{"🔍"}</Link<MainRoute>>
                 </span>
             </>
         }
@@ -172,7 +172,7 @@ macro_rules! user_link {
             <>
                 <textarea readonly=true ~value={$userid.to_string()} /><br />
                 <span class="icon-link" title="View this user in DeArrow Browser">
-                    <Link<Route> to={Route::User { id: $userid.to_string() }}>{"🔍"}</Link<Route>>
+                    <Link<MainRoute> to={MainRoute::User { id: $userid.to_string() }}>{"🔍"}</Link<MainRoute>>
                 </span>
             </>
         }

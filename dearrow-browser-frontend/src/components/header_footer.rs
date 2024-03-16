@@ -4,7 +4,7 @@ use chrono::NaiveDateTime;
 use yew::prelude::*;
 use yew_router::hooks::use_navigator;
 
-use crate::{contexts::*, Route, components::modals::{ModalMessage, StatusModal}, utils::render_datetime_with_delta};
+use crate::{contexts::*, pages::MainRoute, components::modals::{ModalMessage, StatusModal}, utils::render_datetime_with_delta};
 
 #[function_component]
 pub fn Header() -> Html {
@@ -13,7 +13,7 @@ pub fn Header() -> Html {
 
     let go_home = {
         Callback::from(move |_| {
-            navigator.push(&Route::Home);
+            navigator.push(&MainRoute::Home);
         })
     };
 

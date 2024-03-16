@@ -1,7 +1,6 @@
 use std::rc::Rc;
 use dearrow_browser_api::StatusResponse;
 use reqwest::Url;
-use strum::IntoStaticStr;
 use yew::prelude::*;
 use yew_hooks::{use_async_with_options, UseAsyncOptions, use_interval};
 use yew_router::prelude::*;
@@ -11,29 +10,9 @@ pub mod hooks;
 pub mod utils;
 pub mod components;
 pub mod contexts;
-mod pages;
-use components::modal_renderer::ModalRenderer;
+pub mod pages;
 use contexts::*;
-
-use crate::components::header_footer::*;
-use crate::pages::*;
-
-#[derive(Clone, Routable, PartialEq, IntoStaticStr)]
-enum Route {
-    #[at("/")]
-    Home,
-    #[at("/unverified")]
-    Unverified,
-    #[at("/video_id/:id")]
-    Video { id: String },
-    #[at("/user_id/:id")]
-    User { id: String },
-    #[at("/wip")]
-    NotImplemented,
-    #[not_found]
-    #[at("/404")]
-    NotFound,
-}
+use pages::*;
 
 #[function_component]
 fn App() -> Html {
@@ -74,54 +53,11 @@ fn App() -> Html {
         <ContextProvider<StatusContext> context={status.data.clone()}>
         <ContextProvider<UpdateClock> context={*update_clock}>
             <BrowserRouter>
-                <Switch<Route> render={render_route} />
+                <Switch<MainRoute> render={render_main_route} />
             </BrowserRouter>
         </ContextProvider<UpdateClock>>
         </ContextProvider<StatusContext>>
         </ContextProvider<Rc<WindowContext>>>
-    }
-}
-
-fn render_route(route: Route) -> Html {
-    let document = window().expect("window should exist")
-        .document().expect("document should exist");
-    document.set_title(match &route {
-        Route::Home => "DeArrow Browser".to_string(),
-        Route::Unverified => "Unverified titles - DeArrow Browser".to_string(),
-        Route::NotFound => "Page not found - DeArrow Browser".to_string(),
-        Route::NotImplemented => "Not implemented - DeArrow Browser".to_string(),
-        Route::Video { ref id } => format!("VideoID {id} - DeArrow Browser"),
-        Route::User { ref id } => format!("UserID {id} - Dearrow Browser"),
-    }.as_str());
-    let route_html = match route {
-        Route::Home => html! {<HomePage/>},
-        Route::Unverified => html! {<UnverifiedPage/>},
-        Route::Video { ref id } => html! {<VideoPage videoid={id.clone()} />},
-        Route::User { ref id } => html! {<UserPage userid={id.clone()} />},
-        Route::NotFound => html! {
-            <>
-                <h2>{"404 - Not found"}</h2>
-                <h3>{"Looks like you've entered an invalid URL"}</h3>
-                <Link<Route> to={Route::Home}>{"Return to home page"}</Link<Route>>
-            </>
-        },
-        Route::NotImplemented => html! {
-            <>
-                <h2>{"Not implemented"}</h2>
-                <h3>{"This feature is not implemented yet"}</h3>
-                <Link<Route> to={Route::Home}>{"Return to home page"}</Link<Route>>
-            </>
-        },
-    };
-    let route_name: &'static str = (&route).into();
-    html! {
-        <ModalRenderer>
-            <Header />
-            <div id="content" data-route={route_name}>
-                {route_html}
-            </div>
-            <Footer />
-        </ModalRenderer>
     }
 }
 

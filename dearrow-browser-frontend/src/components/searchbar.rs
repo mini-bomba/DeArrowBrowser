@@ -3,7 +3,7 @@ use web_sys::HtmlInputElement;
 use yew::prelude::*;
 use yew_router::hooks::use_navigator;
 
-use crate::Route;
+use crate::pages::MainRoute;
 
 macro_rules! search_block {
     ($id:expr, $name:expr, $callback:expr) => {
@@ -24,7 +24,7 @@ pub fn Searchbar() -> Html {
         let navigator = navigator.clone();
         Callback::from(move |e: KeyboardEvent| {
             if e.key() == "Enter" {
-                navigator.push(&Route::NotImplemented);
+                navigator.push(&MainRoute::NotImplemented);
             }
         })
     };
@@ -33,7 +33,7 @@ pub fn Searchbar() -> Html {
         Callback::from(move |e: KeyboardEvent| {
             if e.key() == "Enter" {
                 let input: HtmlInputElement = e.target_unchecked_into();
-                navigator.push(&Route::User {id: input.value()});
+                navigator.push(&MainRoute::User {id: input.value()});
             }
         })
     };
@@ -42,7 +42,7 @@ pub fn Searchbar() -> Html {
             if e.key() == "Enter" {
                 let input: HtmlInputElement = e.target_unchecked_into();
                 let value = input.value();
-                navigator.push(&Route::Video {
+                navigator.push(&MainRoute::Video {
                     id: if let Ok(url) = Url::parse(&value) {  // Try to parse as URL
                         url.query_pairs().find(|(ref k, _)| k == "v").map(|(_, v)| v.to_string()).or_else(||  // Try to find a "v" query param
                             url.path_segments().and_then(|it| it.filter(|s| !s.is_empty()).last()).map(ToString::to_string)  // Fall back to last non-empty path segment if none found

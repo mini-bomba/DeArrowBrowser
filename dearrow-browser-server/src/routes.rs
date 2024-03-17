@@ -150,7 +150,7 @@ async fn get_unverified_titles(db_lock: DBLock, inm: IfNoneMatch) -> CustomizedJ
     let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
     Ok(etagged_json!(db, 
         db.db.titles.iter().rev()
-            .filter(|t| t.flags.contains(TitleFlags::Unverified) && !t.flags.intersects(TitleFlags::Locked | TitleFlags::ShadowHidden))
+            .filter(|t| t.flags.contains(TitleFlags::Unverified) && !t.flags.intersects(TitleFlags::Locked | TitleFlags::ShadowHidden | TitleFlags::Removed) && t.votes-t.downvotes > -1)
             .map(|t| t.into_with_db(&db.db)).collect::<Vec<_>>()
     ))
 }

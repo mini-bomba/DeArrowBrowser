@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use yew::prelude::*;
-use chrono::{NaiveDateTime, DateTime};
+use chrono::DateTime;
 
 use crate::contexts::{StatusContext, WindowContext};
 use crate::utils::{render_datetime, RenderNumber};
@@ -96,8 +96,8 @@ pub fn StatusModal() -> Html {
                         <tr>
                             <th>{"Build date"}</th>
                             <td>
-                                if let Some(dt) = status.server_build_timestamp.and_then(|t| NaiveDateTime::from_timestamp_opt(t, 0)) {
-                                    {render_datetime(dt.and_utc())}
+                                if let Some(dt) = status.server_build_timestamp.and_then(|t| DateTime::from_timestamp(t, 0)) {
+                                    {render_datetime(dt)}
                                 } else {
                                     <em>{"Unknown"}</em>
                                 }
@@ -109,8 +109,8 @@ pub fn StatusModal() -> Html {
                         <tr>
                             <th>{"Server started at"}</th>
                             <td>
-                                if let Some(dt) = NaiveDateTime::from_timestamp_opt(status.server_startup_timestamp, 0) {
-                                    {render_datetime(dt.and_utc())}
+                                if let Some(dt) = DateTime::from_timestamp(status.server_startup_timestamp, 0) {
+                                    {render_datetime(dt)}
                                 } else {
                                     <em>{"Failed to parse"}</em>
                                 }
@@ -119,8 +119,8 @@ pub fn StatusModal() -> Html {
                         <tr>
                             <th>{"Last update"}</th>
                             <td>
-                                if let Some(dt) = NaiveDateTime::from_timestamp_millis(status.last_updated) {
-                                    {render_datetime(dt.and_utc())}
+                                if let Some(dt) = DateTime::from_timestamp_millis(status.last_updated) {
+                                    {render_datetime(dt)}
                                     if status.updating_now {
                                         <b>{", update in progress"}</b>
                                     }
@@ -132,8 +132,8 @@ pub fn StatusModal() -> Html {
                         <tr>
                             <th>{"DB snapshot taken at"}</th>
                             <td>
-                                if let Some(dt) = NaiveDateTime::from_timestamp_millis(status.last_modified) {
-                                    {render_datetime(dt.and_utc())}
+                                if let Some(dt) = DateTime::from_timestamp_millis(status.last_modified) {
+                                    {render_datetime(dt)}
                                 } else {
                                     <em>{"Failed to parse"}</em>
                                 }

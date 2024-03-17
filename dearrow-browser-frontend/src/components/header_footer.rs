@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use chrono::NaiveDateTime;
+use chrono::DateTime;
 use yew::prelude::*;
 use yew_router::hooks::use_navigator;
 
@@ -38,11 +38,11 @@ pub fn Footer() -> Html {
         modal_controls.emit(ModalMessage::Open(html! {<StatusModal />}));
     });
 
-    let last_updated = match status.as_ref().and_then(|status| NaiveDateTime::from_timestamp_millis(status.last_updated)).map(|dt| dt.and_utc()) {
+    let last_updated = match status.as_ref().and_then(|status| DateTime::from_timestamp_millis(status.last_updated)) {
         None => AttrValue::from("..."),
         Some(time) => AttrValue::from(render_datetime_with_delta(time)),
     };
-    let last_modified = match status.as_ref().and_then(|status| NaiveDateTime::from_timestamp_millis(status.last_modified)).map(|dt| dt.and_utc()) {
+    let last_modified = match status.as_ref().and_then(|status| DateTime::from_timestamp_millis(status.last_modified)) {
         None => AttrValue::from("..."),
         Some(time) => AttrValue::from(render_datetime_with_delta(time)),
     };

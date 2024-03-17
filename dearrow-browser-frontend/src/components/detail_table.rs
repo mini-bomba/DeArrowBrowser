@@ -1,14 +1,14 @@
 use std::rc::Rc;
 use std::str::FromStr;
 
-use chrono::NaiveDateTime;
+use chrono::DateTime;
 use reqwest::Url;
 use web_sys::HtmlInputElement;
 use yew::{prelude::*, suspense::SuspensionResult};
 use yew_router::prelude::*;
 use dearrow_browser_api::*;
 
-use crate::{pages::MainRoute, contexts::StatusContext, hooks::use_async_suspension, utils::{render_naive_datetime, RcEq}};
+use crate::{pages::MainRoute, contexts::StatusContext, hooks::use_async_suspension, utils::{render_datetime, RcEq}};
 
 #[derive(PartialEq, Clone, Copy)]
 pub enum DetailType {
@@ -374,7 +374,7 @@ pub fn BaseDetailTableRenderer(props: &BaseDetailTableRendererProps) -> Html{
                 </tr>
                 { for list.iter().map(|t| html! {
                     <tr key={&*t.uuid}>
-                        <td>{NaiveDateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), render_naive_datetime)}</td>
+                        <td>{DateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), render_datetime)}</td>
                         if !props.hide_videoid {
                             <td>{video_link!(t.video_id)}</td>
                         }
@@ -410,7 +410,7 @@ pub fn BaseDetailTableRenderer(props: &BaseDetailTableRendererProps) -> Html{
                 </tr>
                 { for list.iter().map(|t| html! {
                     <tr key={&*t.uuid}>
-                        <td>{NaiveDateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), render_naive_datetime)}</td>
+                        <td>{DateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), render_datetime)}</td>
                         if !props.hide_videoid {
                             <td>{video_link!(t.video_id)}</td>
                         }

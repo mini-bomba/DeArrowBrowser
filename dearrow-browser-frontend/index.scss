@@ -1,4 +1,5 @@
 $gray: #333;
+$dark-gray: #222;
 $white: #eee;
 
 %headercolors {
@@ -260,11 +261,6 @@ body {
       border: 1px solid $gray;
       border-bottom: none;
       border-radius: 0.25rem 0.25rem 0 0;
-      @extend .clickable;
-
-      &[selected] {
-        background-color: $gray;
-      }
     }
   }
 }
@@ -288,6 +284,45 @@ body {
       display: unset;
     }
   }
+}
+
+.button {
+  @extend .clickable;
+
+  &:hover {
+    background-color: $dark-gray;
+  }
+
+  &[selected], &:active {
+    background-color: $gray;
+  }
+}
+
+.page-select {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+
+  > * {
+    padding: 0.5em 0.75em;
+    border: 1px solid $gray;
+
+    &:first-child {
+      border-top-left-radius: 0.5em;
+      border-bottom-left-radius: 0.5em;
+    }
+
+    &:last-child {
+      border-top-right-radius: 0.5em;
+      border-bottom-right-radius: 0.5em;
+    }
+  }
+
+  input {
+    width: 5em;
+    margin-left: 1em;
+  }
+  
 }
 
 .grayscale {

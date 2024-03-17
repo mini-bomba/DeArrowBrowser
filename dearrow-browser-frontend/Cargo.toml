@@ -16,7 +16,7 @@ dearrow-browser-api = { path = "../dearrow-browser-api" }
 reqwest = { version = "0.11.23", features = ["json"] }
 strum = { version = "0.25.0", features = ["derive"] }
 serde.workspace = true
-web-sys = { version = "0.3.66", features = ["KeyboardEvent", "HtmlInputElement", "Window", "Document", "Element", "Location"] }
+web-sys = { version = "0.3.66", features = ["Event", "KeyboardEvent", "HtmlInputElement", "Window", "Document", "Element", "Location"] }
 yew = { version = "0.21.0", features = ["csr"] }
 yew-router = "0.18.0"
 yew-hooks = "0.3.0"

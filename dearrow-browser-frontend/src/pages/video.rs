@@ -77,7 +77,7 @@ pub fn VideoPage(props: &VideoPageProps) -> Html {
             </div>
             <TableModeSwitch state={table_mode.clone()} entry_count={*entry_count} />
             <Suspense {fallback}>
-                <DetailTableRenderer mode={*table_mode} url={Rc::new(url)} {entry_count} hide_videoid=true />
+                <PaginatedDetailTableRenderer mode={*table_mode} url={Rc::new(url)} {entry_count} hide_videoid=true />
             </Suspense>
         </>
     }

@@ -79,7 +79,7 @@ pub fn UserPage(props: &UserPageProps) -> Html {
             </div>
             <TableModeSwitch state={table_mode.clone()} entry_count={*entry_count} />
             <Suspense fallback={table_fallback}>
-                <DetailTableRenderer mode={*table_mode} url={Rc::new(url)} {entry_count} hide_userid=true hide_username=true />
+                <PaginatedDetailTableRenderer mode={*table_mode} url={Rc::new(url)} {entry_count} hide_userid=true hide_username=true />
             </Suspense>
         </>
     }

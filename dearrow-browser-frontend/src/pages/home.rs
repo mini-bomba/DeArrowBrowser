@@ -26,7 +26,7 @@ pub fn HomePage() -> Html {
             </div>
             <TableModeSwitch state={table_mode.clone()} entry_count={*entry_count} />
             <Suspense {fallback}>
-                <DetailTableRenderer mode={*table_mode} url={Rc::new(url)} {entry_count} />
+                <UnpaginatedDetailTableRenderer mode={*table_mode} url={Rc::new(url)} {entry_count} sort=false />
             </Suspense>
         </>
     }

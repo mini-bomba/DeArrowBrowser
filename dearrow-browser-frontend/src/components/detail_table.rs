@@ -1,12 +1,14 @@
 use std::rc::Rc;
+use std::str::FromStr;
 
 use chrono::NaiveDateTime;
 use reqwest::Url;
+use web_sys::HtmlInputElement;
 use yew::{prelude::*, suspense::SuspensionResult};
 use yew_router::prelude::*;
 use dearrow_browser_api::*;
 
-use crate::{pages::MainRoute, contexts::StatusContext, hooks::use_async_suspension, utils::render_naive_datetime};
+use crate::{pages::MainRoute, contexts::StatusContext, hooks::use_async_suspension, utils::{render_naive_datetime, RcEq}};
 
 #[derive(PartialEq, Clone, Copy)]
 pub enum DetailType {
@@ -17,6 +19,7 @@ pub enum DetailType {
 #[derive(Properties, PartialEq)]
 pub struct TableModeSwitchProps {
     pub state: UseStateHandle<DetailType>,
+    #[prop_or_default]
     pub entry_count: Option<usize>,
 }
 
@@ -37,8 +40,8 @@ pub fn TableModeSwitch(props: &TableModeSwitchProps) -> Html {
 
     html! {
         <div class="table-mode-switch">
-            <span class="table-mode" onclick={set_titles_mode} selected={*props.state == DetailType::Title}>{"Titles"}</span>
-            <span class="table-mode" onclick={set_thumbs_mode} selected={*props.state == DetailType::Thumbnail}>{"Thumbnails"}</span>
+            <span class="table-mode button" onclick={set_titles_mode} selected={*props.state == DetailType::Title}>{"Titles"}</span>
+            <span class="table-mode button" onclick={set_thumbs_mode} selected={*props.state == DetailType::Thumbnail}>{"Thumbnails"}</span>
             if let Some(count) = props.entry_count {
                 <span>
                     if count == 1 {
@@ -53,11 +56,109 @@ pub fn TableModeSwitch(props: &TableModeSwitchProps) -> Html {
     
 }
 
+#[derive(Properties, PartialEq, Clone)]
+pub struct PageSelectProps {
+    pub state: UseStateHandle<usize>,
+    pub page_count: usize,
+}
+
+#[function_component]
+pub fn PageSelect(props: &PageSelectProps) -> Html {
+    let prev_page = {
+        let state = props.state.clone();
+        Callback::from(move |_| {
+            if *state > 0 {
+                state.set(*state-1);
+            }
+        })
+    };
+    let next_page = {
+        let state = props.state.clone();
+        let max_page = props.page_count-1;
+        Callback::from(move |_| {
+            if *state < max_page {
+                state.set(*state+1);
+            }
+        })
+    };
+    let input_changed = {
+        let state = props.state.clone();
+        let page_count = props.page_count;
+        Callback::from(move |e: Event| {
+            let input: HtmlInputElement = e.target_unchecked_into();
+            match usize::from_str(&input.value()) {
+                Err(_) => {},
+                Ok(new_page) => {
+                    if new_page == 0 {
+                        state.set(0);
+                    } else if new_page > page_count {
+                        state.set(page_count-1);
+                    } else {
+                        state.set(new_page-1);
+                    }
+                },
+            };
+            input.set_value(&format!("{}", *state+1));
+        })
+    };
+
+    html! {
+        <div class="page-select">
+            <div class="button" onclick={prev_page}>{"prev"}</div>
+            <div>
+                {"page"}
+                <input type="number" min=1 max={format!("{}", props.page_count)} ~value={format!("{}", *props.state+1)} onchange={input_changed} />
+                {format!("/{}", props.page_count)}
+            </div>
+            <div class="button" onclick={next_page}>{"next"}</div>
+        </div>
+    }
+}
+
+pub enum DetailList {
+    Thumbnails(Vec<ApiThumbnail>),
+    Titles(Vec<ApiTitle>),
+}
+
+impl DetailList {
+    pub fn len(&self) -> usize {
+        match self {
+            DetailList::Thumbnails(ref l) => l.len(),
+            DetailList::Titles(ref l) => l.len(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            DetailList::Thumbnails(ref l) => l.is_empty(),
+            DetailList::Titles(ref l) => l.is_empty(),
+        }
+    }
+}
+
+#[hook]
+pub fn use_detail_download(url: Rc<Url>, mode: DetailType, sort: bool) -> SuspensionResult<Rc<Result<DetailList, anyhow::Error>>> {
+    let status: StatusContext = use_context().expect("StatusResponse should be defined");
+    use_async_suspension(|(mode, url, sort, _)| async move {
+        let request = reqwest::get((*url).clone()).await?;
+        let mut result = match mode {
+            DetailType::Thumbnail => DetailList::Thumbnails(request.json().await?),
+            DetailType::Title => DetailList::Titles(request.json().await?),
+        };
+        if sort {
+        // Sort by time submited, most to least recent
+            match result {
+                DetailList::Thumbnails(ref mut list) => list.sort_unstable_by(|a, b| b.time_submitted.cmp(&a.time_submitted)),
+                DetailList::Titles(ref mut list) => list.sort_unstable_by(|a, b| b.time_submitted.cmp(&a.time_submitted)),
+            }
+        }
+        Ok(result)
+    }, (mode, url, sort, status.map(|s| s.last_updated)))
+}
+
 #[derive(Properties, PartialEq)]
-pub struct DetailTableRendererProps {
-    pub url: Rc<Url>,
-    pub mode: DetailType,
-    pub entry_count: Option<UseStateHandle<Option<usize>>>,
+pub struct BaseDetailTableRendererProps {
+    pub details: DetailSlice,
     #[prop_or_default]
     pub hide_userid: bool,
     #[prop_or_default]
@@ -66,9 +167,71 @@ pub struct DetailTableRendererProps {
     pub hide_videoid: bool,
 }
 
-enum DetailList {
-    Thumbnails(Vec<ApiThumbnail>),
-    Titles(Vec<ApiTitle>),
+#[derive(Properties, PartialEq)]
+pub struct DetailTableRendererProps {
+    pub url: Rc<Url>,
+    pub mode: DetailType,
+    #[prop_or_default]
+    pub entry_count: Option<UseStateHandle<Option<usize>>>,
+    #[prop_or_default]
+    pub hide_userid: bool,
+    #[prop_or_default]
+    pub hide_username: bool,
+    #[prop_or_default]
+    pub hide_videoid: bool,
+    #[prop_or(true)]
+    pub sort: bool,
+}
+
+#[derive(Clone, PartialEq)]
+pub enum DetailSlice {
+    Thumbnails(Rc<[ApiThumbnail]>),
+    Titles(Rc<[ApiTitle]>),
+}
+
+impl DetailSlice {
+    pub fn len(&self) -> usize {
+        match self {
+            DetailSlice::Thumbnails(ref l) => l.len(),
+            DetailSlice::Titles(ref l) => l.len(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            DetailSlice::Thumbnails(ref l) => l.is_empty(),
+            DetailSlice::Titles(ref l) => l.is_empty(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum DetailIndex {
+    Page {
+        size: usize,
+        index: usize,
+    },
+    All,
+}
+
+#[hook]
+pub fn use_detail_slice(details: Rc<Result<DetailList, anyhow::Error>>, index: DetailIndex) -> DetailSlice {
+    (*use_memo((RcEq(details), index), |(details, index)|
+        match (&**details, index) {
+            (Err(_), _)                                                                 
+                => DetailSlice::Thumbnails(Rc::new([])), // dummy slice on error
+
+            (Ok(DetailList::Thumbnails(ref thumbs)), DetailIndex::Page { size, index }) 
+                => DetailSlice::Thumbnails(if size*(index+1) > thumbs.len() {thumbs.get(size*index..)} else {thumbs.get(size*index..size*(index+1))}.unwrap_or(&[]).into()),
+            (Ok(DetailList::Thumbnails(ref thumbs)), DetailIndex::All)                  
+                => DetailSlice::Thumbnails((&**thumbs).into()),
+
+            (Ok(DetailList::Titles(ref titles)), DetailIndex::Page { size, index })     
+                => DetailSlice::Titles(if size*(index+1) > titles.len() {titles.get(size*index..)} else {titles.get(size*index..size*(index+1))}.unwrap_or(&[]).into()),
+            (Ok(DetailList::Titles(ref titles)), DetailIndex::All)                      
+                => DetailSlice::Titles((&**titles).into()),
+        }
+    )).clone()
 }
 
 fn title_flags(title: &ApiTitle) -> Html {
@@ -190,39 +353,9 @@ macro_rules! username_link {
 }
 
 #[function_component]
-pub fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
-    let status: StatusContext = use_context().expect("StatusResponse should be defined");
-    let details = { 
-        let result: SuspensionResult<Rc<Result<DetailList, anyhow::Error>>> = use_async_suspension(|(mode, url, _)| async move {
-            let request = reqwest::get((*url).clone()).await?;
-            let mut result = match mode {
-                DetailType::Thumbnail => DetailList::Thumbnails(request.json().await?),
-                DetailType::Title => DetailList::Titles(request.json().await?),
-            };
-            // Sort by time submited, most to least recent
-            match result {
-                DetailList::Thumbnails(ref mut list) => list.sort_unstable_by(|a, b| b.time_submitted.cmp(&a.time_submitted)),
-                DetailList::Titles(ref mut list) => list.sort_unstable_by(|a, b| b.time_submitted.cmp(&a.time_submitted)),
-            };
-            Ok(result)
-        }, (props.mode, props.url.clone(), status.map(|s| s.last_updated)));
-        if let Some(count) = &props.entry_count {
-            count.set(result.as_ref().ok().and_then(|r| r.as_ref().as_ref().ok()).map(|l| match l {
-                DetailList::Thumbnails(list) => list.len(),
-                DetailList::Titles(list) => list.len(),
-            }));
-        }
-        result?
-    };
-
-    Ok(match *details {
-        Err(ref e) => html! {
-            <center>
-                <b>{"Failed to fetch details from the API :/"}</b>
-                <pre>{format!("{e:?}")}</pre>
-            </center>
-        },
-        Ok(DetailList::Titles(ref list)) => html! {
+pub fn BaseDetailTableRenderer(props: &BaseDetailTableRendererProps) -> Html{
+    match props.details {
+        DetailSlice::Titles(ref list) => html! {
             <table class="detail-table titles">
                 <tr class="header">
                     <th>{"Submitted"}</th>
@@ -258,7 +391,7 @@ pub fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
                 }) }
             </table>
         },
-        Ok(DetailList::Thumbnails(ref list)) => html! {
+        DetailSlice::Thumbnails(ref list) => html! {
             <table class="detail-table thumbnails">
                 <tr class="header">
                     <th>{"Submitted"}</th>
@@ -294,5 +427,75 @@ pub fn DetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
                 }) }
             </table>
         },
+    }
+}
+
+#[function_component]
+pub fn UnpaginatedDetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
+    let details = use_detail_download(props.url.clone(), props.mode, props.sort)?;
+    let detail_slice = use_detail_slice(details.clone(), DetailIndex::All);
+
+    if let Some(entry_count) = &props.entry_count {
+        if let Ok(ref list) = *details {
+            entry_count.set(Some(list.len()));
+        } else {
+            entry_count.set(None);
+        }
+    }
+
+    if let Err(ref e) = *details {
+        return Ok(html!{
+            <center>
+                <b>{"Failed to fetch details from the API :/"}</b>
+                <pre>{format!("{e:?}")}</pre>
+            </center>
+        });
+    }
+    
+    Ok(html! {
+        <BaseDetailTableRenderer details={detail_slice} hide_videoid={props.hide_videoid} hide_userid={props.hide_userid} hide_username={props.hide_username} />
+    })
+}
+
+#[function_component]
+pub fn PaginatedDetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
+    const PAGE_SIZE: usize = 50;
+    let current_page = use_state_eq(|| 0);
+    {
+        // yes, we're using use_memo to reset a state on changes to props
+        let current_page = current_page.clone();
+        use_memo(props.mode, move |_| {
+            current_page.set(0);
+        });
+    }
+    let details = use_detail_download(props.url.clone(), props.mode, props.sort)?;
+    let detail_slice = use_detail_slice(details.clone(), DetailIndex::Page { size: PAGE_SIZE, index: *current_page });
+
+    if let Some(entry_count) = &props.entry_count {
+        if let Ok(ref list) = *details {
+            entry_count.set(Some(list.len()));
+        } else {
+            entry_count.set(None);
+        }
+    }
+
+    if let Err(ref e) = *details {
+        return Ok(html!{
+            <center>
+                <b>{"Failed to fetch details from the API :/"}</b>
+                <pre>{format!("{e:?}")}</pre>
+            </center>
+        });
+    }
+    let detail_count = details.as_ref().as_ref().unwrap().len();
+    let page_count = (detail_count+PAGE_SIZE-1)/PAGE_SIZE;
+    
+    Ok(html! {
+        <>
+            <BaseDetailTableRenderer details={detail_slice} hide_videoid={props.hide_videoid} hide_userid={props.hide_userid} hide_username={props.hide_username} />
+            if page_count > 1 {
+                <PageSelect state={current_page} {page_count} />
+            }
+        </>
     })
 }

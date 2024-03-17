@@ -1,3 +1,5 @@
+use std::{rc::Rc, ops::Deref};
+
 use anyhow::Context;
 use chrono::{DateTime, Utc, NaiveDateTime};
 use reqwest::Url;
@@ -151,4 +153,23 @@ pub async fn get_original_title(vid: String) -> Result<String, anyhow::Error> {
     let resp: OEmbedResponse = reqwest::get(url).await.context("Failed to send oembed request")?
         .json().await.context("Failed to deserialize oembed response")?;
     resp.title.context("oembed response contained no title")
+}
+
+/// Wrapper type for comparing Rc's via their addresses
+#[derive(Clone)]
+pub struct RcEq<T>(pub Rc<T>);
+
+impl<T> PartialEq for RcEq<T> {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl<T> Deref for RcEq<T> {
+    type Target = T;
+
+    #[inline(always)]
+    fn deref(&self) -> &T {
+        &self.0
+    }
 }

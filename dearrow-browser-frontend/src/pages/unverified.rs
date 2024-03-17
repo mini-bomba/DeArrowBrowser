@@ -27,7 +27,7 @@ pub fn UnverifiedPage() -> Html {
                 </span>
             }
             <Suspense {fallback}>
-                <DetailTableRenderer mode={DetailType::Title} url={Rc::new(url)} {entry_count} />
+                <PaginatedDetailTableRenderer mode={DetailType::Title} url={Rc::new(url)} {entry_count} />
             </Suspense>
         </>
     }

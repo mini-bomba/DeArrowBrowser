@@ -8,7 +8,7 @@ use yew::{prelude::*, suspense::SuspensionResult};
 use yew_router::prelude::*;
 use dearrow_browser_api::*;
 
-use crate::{pages::MainRoute, contexts::StatusContext, hooks::use_async_suspension, utils::{render_datetime, RcEq}};
+use crate::{pages::MainRoute, contexts::StatusContext, hooks::{use_async_suspension, use_memo_state_eq}, utils::{render_datetime, RcEq}};
 
 #[derive(PartialEq, Clone, Copy)]
 pub enum DetailType {
@@ -67,18 +67,14 @@ pub fn PageSelect(props: &PageSelectProps) -> Html {
     let prev_page = {
         let state = props.state.clone();
         Callback::from(move |_| {
-            if *state > 0 {
-                state.set(*state-1);
-            }
+            state.set(state.checked_sub(1).unwrap_or(0));
         })
     };
     let next_page = {
         let state = props.state.clone();
         let max_page = props.page_count-1;
         Callback::from(move |_| {
-            if *state < max_page {
-                state.set(*state+1);
-            }
+            state.set(max_page.min(*state+1));
         })
     };
     let input_changed = {
@@ -88,15 +84,7 @@ pub fn PageSelect(props: &PageSelectProps) -> Html {
             let input: HtmlInputElement = e.target_unchecked_into();
             match usize::from_str(&input.value()) {
                 Err(_) => {},
-                Ok(new_page) => {
-                    if new_page == 0 {
-                        state.set(0);
-                    } else if new_page > page_count {
-                        state.set(page_count-1);
-                    } else {
-                        state.set(new_page-1);
-                    }
-                },
+                Ok(new_page) => state.set(new_page.clamp(1,page_count)-1),
             };
             input.set_value(&format!("{}", *state+1));
         })
@@ -460,14 +448,7 @@ pub fn UnpaginatedDetailTableRenderer(props: &DetailTableRendererProps) -> HtmlR
 #[function_component]
 pub fn PaginatedDetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
     const PAGE_SIZE: usize = 50;
-    let current_page = use_state_eq(|| 0);
-    {
-        // yes, we're using use_memo to reset a state on changes to props
-        let current_page = current_page.clone();
-        use_memo(props.mode, move |_| {
-            current_page.set(0);
-        });
-    }
+    let current_page = use_memo_state_eq(props.mode, || 0);
     let details = use_detail_download(props.url.clone(), props.mode, props.sort)?;
     let detail_slice = use_detail_slice(details.clone(), DetailIndex::Page { size: PAGE_SIZE, index: *current_page });
 

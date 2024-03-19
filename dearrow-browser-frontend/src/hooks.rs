@@ -1,7 +1,8 @@
 use std::{future::Future, cell::RefCell};
 use std::rc::Rc;
+use yew::prelude::*;
 use yew::platform::spawn_local;
-use yew::{suspense::{SuspensionResult, Suspension}, hook, use_memo};
+use yew::suspense::{SuspensionResult, Suspension};
 
 
 enum UseAsyncSuspensionState<R>
@@ -38,4 +39,22 @@ where
             Err(sus)
         }
     }
+}
+
+#[hook]
+pub fn use_memo_state_eq<T, F, D>(deps: D, init_fn: F) -> UseStateHandle<T> 
+where
+    T: 'static + PartialEq,
+    F: Fn() -> T,
+    D: 'static + PartialEq + Clone,
+{
+    let state = use_state_eq(&init_fn);
+    {
+        // yes, we're using use_memo to reset a state on changes to props
+        let state = state.clone();
+        use_memo(deps, move |_| {
+            state.set(init_fn());
+        });
+    }
+    state
 }

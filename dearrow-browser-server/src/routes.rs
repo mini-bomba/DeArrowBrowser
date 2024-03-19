@@ -10,12 +10,12 @@ use crate::{utils::{self, IfNoneMatch}, state::*, built_info};
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(helo)
-       .service(get_random_titles)
+       .service(get_titles)
        .service(get_unverified_titles)
        .service(get_title_by_uuid)
        .service(get_titles_by_video_id)
        .service(get_titles_by_user_id)
-       .service(get_random_thumbnails)
+       .service(get_thumbnails)
        .service(get_thumbnail_by_uuid)
        .service(get_thumbnails_by_video_id)
        .service(get_thumbnails_by_user_id)
@@ -43,6 +43,19 @@ macro_rules! etagged_json {
         .append_header(ETag($db.get_etag()))
         .append_header(CacheControl(vec![CacheDirective::NoCache]))
     };
+}
+
+#[derive(Deserialize)]
+pub struct MainEndpointURLParams {
+    #[serde(default)]
+    pub offset: usize,
+    #[serde(default = "default_count")]
+    pub count: usize,
+}
+
+#[inline(always)]
+pub fn default_count() -> usize {
+    50
 }
 
 #[get("/")]
@@ -135,11 +148,11 @@ async fn get_errors(db_lock: DBLock) -> JsonResult<ErrorList> {
 }
 
 #[get("/titles")]
-async fn get_random_titles(db_lock: DBLock, inm: IfNoneMatch) -> CustomizedJsonResult<Vec<ApiTitle>> {
+async fn get_titles(db_lock: DBLock, inm: IfNoneMatch, query: web::Query<MainEndpointURLParams>) -> CustomizedJsonResult<Vec<ApiTitle>> {
     etag_shortcircuit!(db_lock, inm);
     let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
     Ok(etagged_json!(db,
-        db.db.titles.iter().rev().take(20)
+        db.db.titles.iter().rev().skip(query.offset).take(query.count)
             .map(|t| t.into_with_db(&db.db)).collect::<Vec<_>>()
     ))
 }
@@ -213,11 +226,11 @@ async fn get_titles_by_user_id(db_lock: DBLock, string_set: StringSetLock, path:
 }
 
 #[get("/thumbnails")]
-async fn get_random_thumbnails(db_lock: DBLock, inm: IfNoneMatch) -> CustomizedJsonResult<Vec<ApiThumbnail>> {
+async fn get_thumbnails(db_lock: DBLock, inm: IfNoneMatch, query: web::Query<MainEndpointURLParams>) -> CustomizedJsonResult<Vec<ApiThumbnail>> {
     etag_shortcircuit!(db_lock, inm);
     let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
     Ok(etagged_json!(db,
-        db.db.thumbnails.iter().rev().take(20)
+        db.db.thumbnails.iter().rev().skip(query.offset).take(query.count)
             .map(|t| t.into_with_db(&db.db)).collect::<Vec<_>>()
     ))
 }

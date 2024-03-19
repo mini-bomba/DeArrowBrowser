@@ -522,7 +522,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-browser-api"
-version = "1.5.0"
+version = "1.5.1"
 dependencies = [
  "dearrow-parser",
  "serde",
@@ -530,7 +530,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-browser-frontend"
-version = "1.5.0"
+version = "1.5.1"
 dependencies = [
  "anyhow",
  "built",
@@ -549,7 +549,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-browser-server"
-version = "1.5.0"
+version = "1.5.1"
 dependencies = [
  "actix-files",
  "actix-web",
@@ -568,7 +568,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-parser"
-version = "1.5.0"
+version = "1.5.1"
 dependencies = [
  "anyhow",
  "csv",

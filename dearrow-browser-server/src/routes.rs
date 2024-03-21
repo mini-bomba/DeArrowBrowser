@@ -150,6 +150,12 @@ async fn get_errors(db_lock: DBLock) -> JsonResult<ErrorList> {
 #[get("/titles")]
 async fn get_titles(db_lock: DBLock, inm: IfNoneMatch, query: web::Query<MainEndpointURLParams>) -> CustomizedJsonResult<Vec<ApiTitle>> {
     etag_shortcircuit!(db_lock, inm);
+    if query.count > 1024 {
+        return Err(
+            utils::Error::from(anyhow!("Too many requested titles. You requested {} titles, but the configured max is 1024.", query.count))
+                .set_status(StatusCode::BAD_REQUEST)
+        );
+    }
     let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
     Ok(etagged_json!(db,
         db.db.titles.iter().rev().skip(query.offset).take(query.count)
@@ -228,6 +234,12 @@ async fn get_titles_by_user_id(db_lock: DBLock, string_set: StringSetLock, path:
 #[get("/thumbnails")]
 async fn get_thumbnails(db_lock: DBLock, inm: IfNoneMatch, query: web::Query<MainEndpointURLParams>) -> CustomizedJsonResult<Vec<ApiThumbnail>> {
     etag_shortcircuit!(db_lock, inm);
+    if query.count > 1024 {
+        return Err(
+            utils::Error::from(anyhow!("Too many requested thumbnails. You requested {} thumnails, but the configured max is 1024.", query.count))
+                .set_status(StatusCode::BAD_REQUEST)
+        );
+    }
     let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
     Ok(etagged_json!(db,
         db.db.thumbnails.iter().rev().skip(query.offset).take(query.count)

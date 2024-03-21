@@ -3,7 +3,7 @@ use web_sys::window;
 use yew_router::prelude::*;
 use yew::prelude::*;
 
-use crate::components::{header_footer::*, modal_renderer::ModalRenderer};
+use crate::components::{header_footer::*, modal_renderer::ModalRenderer, detail_table::DetailType};
 
 mod home;
 mod unverified;
@@ -30,6 +30,12 @@ pub enum MainRoute {
     #[not_found]
     #[at("/404")]
     NotFound,
+}
+
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+pub struct LocationState {
+    pub detail_table_mode: DetailType,
+    pub detail_table_page: usize,
 }
 
 pub fn render_main_route(route: MainRoute) -> Html {

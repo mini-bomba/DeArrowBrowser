@@ -3,7 +3,7 @@ use std::rc::Rc;
 use gloo_console::error;
 use yew::prelude::*;
 
-use crate::{utils, components::detail_table::*, hooks::use_async_suspension, contexts::WindowContext};
+use crate::{utils, components::detail_table::*, hooks::{use_async_suspension, use_location_state}, contexts::WindowContext};
 
 #[derive(Properties, PartialEq)]
 struct OriginalTitleProps {
@@ -57,10 +57,11 @@ pub struct VideoPageProps {
 #[function_component]
 pub fn VideoPage(props: &VideoPageProps) -> Html {
     let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
-    let table_mode = use_state_eq(|| DetailType::Title);
+    let state = use_location_state().get_state();
+    // let table_mode = use_state_eq(|| DetailType::Title);
     let entry_count = use_state_eq(|| None);
 
-    let url = match *table_mode {
+    let url = match state.detail_table_mode {
         DetailType::Title => window_context.origin.join(format!("/api/titles/video_id/{}", props.videoid).as_str()),
         DetailType::Thumbnail => window_context.origin.join(format!("/api/thumbnails/video_id/{}", props.videoid).as_str()),
     }.expect("Should be able to create an API url");
@@ -73,11 +74,11 @@ pub fn VideoPage(props: &VideoPageProps) -> Html {
         <>
             <div id="page-details">
                 <iframe src={format!("https://www.youtube-nocookie.com/embed/{}", props.videoid)} allowfullscreen=true />
-                <VideoDetailsTable videoid={props.videoid.clone()} mode={*table_mode} />
+                <VideoDetailsTable videoid={props.videoid.clone()} mode={state.detail_table_mode} />
             </div>
-            <TableModeSwitch state={table_mode.clone()} entry_count={*entry_count} />
+            <TableModeSwitch entry_count={*entry_count} />
             <Suspense {fallback}>
-                <PaginatedDetailTableRenderer mode={*table_mode} url={Rc::new(url)} {entry_count} hide_videoid=true />
+                <PaginatedDetailTableRenderer mode={state.detail_table_mode} url={Rc::new(url)} {entry_count} hide_videoid=true />
             </Suspense>
         </>
     }

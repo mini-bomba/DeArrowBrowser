@@ -3,7 +3,7 @@ use std::rc::Rc;
 use dearrow_browser_api::User;
 use yew::prelude::*;
 
-use crate::{contexts::{WindowContext, StatusContext}, hooks::use_async_suspension, components::detail_table::*};
+use crate::{contexts::{WindowContext, StatusContext}, hooks::{use_async_suspension, use_location_state}, components::detail_table::*};
 
 #[derive(Properties, PartialEq)]
 struct UserDetailsProps {
@@ -55,10 +55,11 @@ pub struct UserPageProps {
 #[function_component]
 pub fn UserPage(props: &UserPageProps) -> Html {
     let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
-    let table_mode = use_state_eq(|| DetailType::Title);
+    let state = use_location_state().get_state();
+    // let table_mode = use_state_eq(|| DetailType::Title);
     let entry_count = use_state_eq(|| None);
 
-    let url = match *table_mode {
+    let url = match state.detail_table_mode {
         DetailType::Title => window_context.origin.join(format!("/api/titles/user_id/{}", props.userid).as_str()),
         DetailType::Thumbnail => window_context.origin.join(format!("/api/thumbnails/user_id/{}", props.userid).as_str()),
     }.expect("Should be able to create an API url");
@@ -77,9 +78,9 @@ pub fn UserPage(props: &UserPageProps) -> Html {
                     <Suspense fallback={details_fallback}><UserDetails userid={props.userid.clone()} /></Suspense>
                 </div>
             </div>
-            <TableModeSwitch state={table_mode.clone()} entry_count={*entry_count} />
+            <TableModeSwitch entry_count={*entry_count} />
             <Suspense fallback={table_fallback}>
-                <PaginatedDetailTableRenderer mode={*table_mode} url={Rc::new(url)} {entry_count} hide_userid=true hide_username=true />
+                <PaginatedDetailTableRenderer mode={state.detail_table_mode} url={Rc::new(url)} {entry_count} hide_userid=true hide_username=true />
             </Suspense>
         </>
     }

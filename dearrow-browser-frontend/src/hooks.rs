@@ -3,6 +3,9 @@ use std::rc::Rc;
 use yew::prelude::*;
 use yew::platform::spawn_local;
 use yew::suspense::{SuspensionResult, Suspension};
+use yew_router::prelude::*;
+
+use crate::pages::{LocationState, MainRoute};
 
 
 enum UseAsyncSuspensionState<R>
@@ -57,4 +60,43 @@ where
         });
     }
     state
+}
+
+#[derive(Clone)]
+pub struct LocationStateHandle {
+    navigator: Navigator,
+    route: MainRoute,
+    location: Location,
+}
+
+impl LocationStateHandle {
+    pub fn get_state(&self) -> LocationState {
+        match self.location.state::<LocationState>() {
+            Some(state) => *state,
+            None => {
+                let state = LocationState::default();
+                self.replace_state(state);
+                state
+            }
+        }
+    }
+
+    pub fn push_state(&self, new_state: LocationState) {
+        self.navigator.push_with_state(&self.route, new_state);
+    }
+
+    pub fn replace_state(&self, new_state: LocationState) {
+        self.navigator.replace_with_state(&self.route, new_state);
+    }
+}
+
+#[hook]
+pub fn use_location_state() -> LocationStateHandle {
+    let navigator = use_navigator().expect("Navigator should be present");
+    let route = use_route::<MainRoute>().expect("MainRoute should be present");
+    let location = use_location().expect("Location should be present");
+
+    LocationStateHandle {
+        navigator, route, location
+    }
 }

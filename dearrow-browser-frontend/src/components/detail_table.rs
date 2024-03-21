@@ -8,40 +8,53 @@ use yew::{prelude::*, suspense::SuspensionResult};
 use yew_router::prelude::*;
 use dearrow_browser_api::*;
 
-use crate::{pages::MainRoute, contexts::StatusContext, hooks::{use_async_suspension, use_memo_state_eq}, utils::{render_datetime, RcEq}};
+use crate::{pages::{MainRoute, LocationState}, contexts::StatusContext, hooks::{use_async_suspension, use_location_state}, utils::{render_datetime, RcEq}};
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub enum DetailType {
     Title,
     Thumbnail,
 }
 
+impl Default for DetailType {
+    fn default() -> Self {
+        Self::Title
+    }
+}
+
 #[derive(Properties, PartialEq)]
 pub struct TableModeSwitchProps {
-    pub state: UseStateHandle<DetailType>,
     #[prop_or_default]
     pub entry_count: Option<usize>,
 }
 
 #[function_component]
 pub fn TableModeSwitch(props: &TableModeSwitchProps) -> Html {
+    let state_handle = use_location_state();
+    let state = state_handle.get_state();
+
     let set_titles_mode = {
-        let state = props.state.clone();
+        let state_handle = state_handle.clone();
         Callback::from(move |_| {
-            state.set(DetailType::Title);
+            state_handle.push_state(LocationState {
+                detail_table_mode: DetailType::Title,
+                detail_table_page: 0,
+            });
         })
     };
     let set_thumbs_mode = {
-        let state = props.state.clone();
         Callback::from(move |_| {
-            state.set(DetailType::Thumbnail);
+            state_handle.push_state(LocationState {
+                detail_table_mode: DetailType::Thumbnail,
+                detail_table_page: 0,
+            });
         })
     };
 
     html! {
         <div class="table-mode-switch">
-            <span class="table-mode button" onclick={set_titles_mode} selected={*props.state == DetailType::Title}>{"Titles"}</span>
-            <span class="table-mode button" onclick={set_thumbs_mode} selected={*props.state == DetailType::Thumbnail}>{"Thumbnails"}</span>
+            <span class="table-mode button" onclick={set_titles_mode} selected={state.detail_table_mode == DetailType::Title}>{"Titles"}</span>
+            <span class="table-mode button" onclick={set_thumbs_mode} selected={state.detail_table_mode == DetailType::Thumbnail}>{"Thumbnails"}</span>
             if let Some(count) = props.entry_count {
                 <span>
                     if count == 1 {
@@ -58,35 +71,46 @@ pub fn TableModeSwitch(props: &TableModeSwitchProps) -> Html {
 
 #[derive(Properties, PartialEq, Clone)]
 pub struct PageSelectProps {
-    pub state: UseStateHandle<usize>,
+    // pub state: UseStateHandle<usize>,
     pub page_count: usize,
 }
 
 #[function_component]
 pub fn PageSelect(props: &PageSelectProps) -> Html {
+    let state_handle = use_location_state();
+    let state = state_handle.get_state();
+
     let prev_page = {
-        let state = props.state.clone();
+        let state_handle = state_handle.clone();
         Callback::from(move |_| {
-            state.set(state.checked_sub(1).unwrap_or(0));
+            let mut state = state;
+            state.detail_table_page = state.detail_table_page.saturating_sub(1);
+            state_handle.replace_state(state);
         })
     };
     let next_page = {
-        let state = props.state.clone();
+        let state_handle = state_handle.clone();
         let max_page = props.page_count-1;
         Callback::from(move |_| {
-            state.set(max_page.min(*state+1));
+            let mut state = state;
+            state.detail_table_page = max_page.min(state.detail_table_page+1);
+            state_handle.replace_state(state);
         })
     };
     let input_changed = {
-        let state = props.state.clone();
+        let state_handle = state_handle.clone();
         let page_count = props.page_count;
         Callback::from(move |e: Event| {
             let input: HtmlInputElement = e.target_unchecked_into();
+            let mut state = state;
             match usize::from_str(&input.value()) {
                 Err(_) => {},
-                Ok(new_page) => state.set(new_page.clamp(1,page_count)-1),
+                Ok(new_page) => {
+                    state.detail_table_page = new_page.clamp(1,page_count)-1;
+                    state_handle.replace_state(state);
+                },
             };
-            input.set_value(&format!("{}", *state+1));
+            input.set_value(&format!("{}", state.detail_table_page+1));
         })
     };
 
@@ -95,7 +119,7 @@ pub fn PageSelect(props: &PageSelectProps) -> Html {
             <div class="button" onclick={prev_page}>{"prev"}</div>
             <div>
                 {"page"}
-                <input type="number" min=1 max={format!("{}", props.page_count)} ~value={format!("{}", *props.state+1)} onchange={input_changed} />
+                <input type="number" min=1 max={format!("{}", props.page_count)} ~value={format!("{}", state.detail_table_page+1)} onchange={input_changed} />
                 {format!("/{}", props.page_count)}
             </div>
             <div class="button" onclick={next_page}>{"next"}</div>
@@ -448,9 +472,9 @@ pub fn UnpaginatedDetailTableRenderer(props: &DetailTableRendererProps) -> HtmlR
 #[function_component]
 pub fn PaginatedDetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
     const PAGE_SIZE: usize = 50;
-    let current_page = use_memo_state_eq(props.mode, || 0);
+    let state = use_location_state().get_state();
     let details = use_detail_download(props.url.clone(), props.mode, props.sort)?;
-    let detail_slice = use_detail_slice(details.clone(), DetailIndex::Page { size: PAGE_SIZE, index: *current_page });
+    let detail_slice = use_detail_slice(details.clone(), DetailIndex::Page { size: PAGE_SIZE, index: state.detail_table_page });
 
     if let Some(entry_count) = &props.entry_count {
         if let Ok(ref list) = *details {
@@ -475,7 +499,7 @@ pub fn PaginatedDetailTableRenderer(props: &DetailTableRendererProps) -> HtmlRes
         <>
             <BaseDetailTableRenderer details={detail_slice} hide_videoid={props.hide_videoid} hide_userid={props.hide_userid} hide_username={props.hide_username} />
             if page_count > 1 {
-                <PageSelect state={current_page} {page_count} />
+                <PageSelect {page_count} />
             }
         </>
     })

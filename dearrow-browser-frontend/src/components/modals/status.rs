@@ -7,9 +7,6 @@ use crate::contexts::{StatusContext, WindowContext};
 use crate::utils::{render_datetime, RenderNumber};
 use crate::built_info;
 
-// Reexport for convienience
-pub use crate::components::modal_renderer::ModalMessage;
-
 macro_rules! number_hoverswitch {
     ($switch_element: tt, $n: expr) => {
         if $n >= 1000 {

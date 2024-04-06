@@ -3,7 +3,7 @@ use web_sys::window;
 use yew_router::prelude::*;
 use yew::prelude::*;
 
-use crate::components::{header_footer::*, modal_renderer::ModalRenderer, detail_table::DetailType};
+use crate::components::{header_footer::*, modals::ModalRenderer, detail_table::DetailType};
 
 mod home;
 mod unverified;

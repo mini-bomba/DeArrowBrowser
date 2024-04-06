@@ -1,5 +1,7 @@
 use yew::prelude::*;
 
+pub mod status;
+
 pub enum ModalMessage {
     Open(Html),
     CloseTop,

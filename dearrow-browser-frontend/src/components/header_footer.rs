@@ -4,7 +4,7 @@ use chrono::DateTime;
 use yew::prelude::*;
 use yew_router::hooks::use_navigator;
 
-use crate::{contexts::*, pages::MainRoute, components::modals::{ModalMessage, StatusModal}, utils::render_datetime_with_delta};
+use crate::{contexts::*, pages::MainRoute, components::modals::{ModalMessage, status::StatusModal}, utils::render_datetime_with_delta};
 
 #[function_component]
 pub fn Header() -> Html {

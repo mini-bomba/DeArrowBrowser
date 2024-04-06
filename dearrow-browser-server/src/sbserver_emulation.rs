@@ -238,7 +238,7 @@ async fn get_chunk_branding(db_lock: DBLock, query: web::Query<ChunkBrandingPara
             t.hash_prefix == hash_prefix
             && t.votes > -1 
             && !t.flags.intersects(ThumbnailFlags::Removed | ThumbnailFlags::ShadowHidden)
-            && t.votes.saturating_sub(t.downvotes) > if query.0.fetchAll || t.flags.contains(ThumbnailFlags::Locked) { -2 } else { 0 } 
+            && t.votes.saturating_sub(t.downvotes) >= if query.0.fetchAll || t.flags.contains(ThumbnailFlags::Locked) { -1 } else { 0 } 
         )
         .for_each(|t| match thumbnails.get_mut(&t.video_id) {
             Some(v) => v.push(SBApiThumbnail::from_db(t, query.0.returnUserID)),

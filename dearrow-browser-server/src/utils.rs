@@ -101,3 +101,21 @@ impl IfNoneMatch {
         }
     }
 }
+
+#[macro_export]
+macro_rules! etag_shortcircuit {
+    ($db_lock: expr, $inm: expr) => {
+        let db = $db_lock.read().map_err(|_| anyhow::anyhow!("Failed to acquire DatabaseState for reading"))?;
+        $inm.shortcircuit(&db.get_etag())?
+    };
+}
+
+#[macro_export]
+macro_rules! etagged_json {
+    ($db: expr, $struct: expr) => {{
+        use actix_web::Responder;
+        actix_web::web::Json($struct).customize()
+        .append_header(actix_web::http::header::ETag($db.get_etag()))
+        .append_header(actix_web::http::header::CacheControl(vec![actix_web::http::header::CacheDirective::NoCache]))
+    }};
+}

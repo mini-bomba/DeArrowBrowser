@@ -13,6 +13,8 @@ pub struct AppConfig {
     pub static_content_path: PathBuf,
     pub listen: ListenConfig,
     pub auth_secret: String,
+    #[serde(default)]
+    pub enable_sbserver_emulation: bool,
     #[serde(skip, default="Utc::now")]
     pub startup_timestamp: DateTime<Utc>
 }
@@ -26,6 +28,7 @@ impl Default for AppConfig {
             static_content_path: PathBuf::from("./static"),
             listen: ListenConfig::default(),
             auth_secret: URL_SAFE_NO_PAD.encode(buffer),
+            enable_sbserver_emulation: false,
             startup_timestamp: Utc::now(),
         }
     }

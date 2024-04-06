@@ -1,12 +1,12 @@
 use std::sync::{RwLock, Arc};
-use actix_web::{Responder, get, post, web, http::{StatusCode, header::{ETag, CacheControl, CacheDirective}}, CustomizeResponder, HttpResponse, rt::task::spawn_blocking};
+use actix_web::{Responder, get, post, web, http::StatusCode, CustomizeResponder, HttpResponse, rt::task::spawn_blocking};
 use anyhow::{anyhow, bail};
 use chrono::{Utc, DateTime};
 use dearrow_parser::{StringSet, DearrowDB, TitleFlags};
 use dearrow_browser_api::*;
 use serde::Deserialize;
 
-use crate::{utils::{self, IfNoneMatch}, state::*, built_info};
+use crate::{utils::{self, IfNoneMatch}, state::*, built_info, etag_shortcircuit, etagged_json};
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(helo)
@@ -29,21 +29,6 @@ type JsonResult<T> = utils::Result<web::Json<T>>;
 type CustomizedJsonResult<T> = utils::Result<CustomizeResponder<web::Json<T>>>;
 type DBLock = web::Data<RwLock<DatabaseState>>;
 type StringSetLock = web::Data<RwLock<StringSet>>;
-
-macro_rules! etag_shortcircuit {
-    ($db_lock: expr, $inm: expr) => {
-        let db = $db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
-        $inm.shortcircuit(&db.get_etag())?
-    };
-}
-
-macro_rules! etagged_json {
-    ($db: expr, $struct: expr) => {
-        web::Json($struct).customize()
-        .append_header(ETag($db.get_etag()))
-        .append_header(CacheControl(vec![CacheDirective::NoCache]))
-    };
-}
 
 #[derive(Deserialize)]
 pub struct MainEndpointURLParams {

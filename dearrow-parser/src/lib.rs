@@ -33,6 +33,7 @@ pub struct Thumbnail {
     pub votes: i8,
     pub downvotes: i8,
     pub flags: BitFlags<ThumbnailFlags>,
+    pub hash_prefix: u16,
 }
 
 #[derive(Clone)]
@@ -45,6 +46,7 @@ pub struct Title {
     pub votes: i8,
     pub downvotes: i8,
     pub flags: BitFlags<TitleFlags>,
+    pub hash_prefix: u16,
 }
 
 #[derive(Clone)]
@@ -368,9 +370,16 @@ mod csv_data {
     use std::sync::Arc;
     use serde::Deserialize;
     use enumflags2::BitFlag;
+    use sha2::{Sha256, Digest, digest::{typenum::U32, generic_array::GenericArray}};
     use super::{ParseError, ObjectKind, ParseErrorKind, ThumbnailFlags, TitleFlags, StringSet, Dedupe};
 
     type Result<T> = std::result::Result<T, ParseError>;
+
+    fn sha256(s: &str) -> GenericArray<u8, U32> {
+        let mut hasher = Sha256::new();
+        hasher.update(s);
+        hasher.finalize()
+    }
 
     #[derive(Deserialize)]
     pub struct Thumbnail {
@@ -383,6 +392,8 @@ mod csv_data {
         time_submitted: i64,
         #[serde(rename="UUID")]
         pub uuid: Arc<str>,
+        #[serde(rename="hashedVideoID")]
+        pub hashed_video_id: String,
     }
 
     #[derive(Deserialize)]
@@ -416,6 +427,8 @@ mod csv_data {
         time_submitted: i64,
         #[serde(rename="UUID")]
         pub uuid: Arc<str>,
+        #[serde(rename="hashedVideoID")]
+        pub hashed_video_id: String,
     }
 
     #[derive(Deserialize)]
@@ -496,13 +509,20 @@ mod csv_data {
             }
             Ok(super::Thumbnail{
                 uuid: self.uuid,
-                video_id: self.video_id,
                 user_id: self.user_id,
                 time_submitted: self.time_submitted,
                 timestamp: timestamps.map(|t| t.timestamp),
                 votes: votes.votes,
                 downvotes: votes.downvotes,
                 flags,
+                hash_prefix: match u16::from_str_radix(&self.hashed_video_id[..4], 16) {
+                    Ok(n) => n,
+                    Err(_) => {
+                        let hash = sha256(&self.video_id);
+                        u16::from_be_bytes([hash[0], hash[1]])
+                    },
+                },
+                video_id: self.video_id,
             })
         }
     }
@@ -520,13 +540,20 @@ mod csv_data {
             flags.set(TitleFlags::Removed, intbool!(title votes, removed));
             Ok(super::Title{
                 uuid: self.uuid,
-                video_id: self.video_id,
                 title: self.title,
                 user_id: self.user_id,
                 time_submitted: self.time_submitted,
                 votes: votes.votes,
                 downvotes: votes.downvotes,
                 flags,
+                hash_prefix: match u16::from_str_radix(&self.hashed_video_id[..4], 16) {
+                    Ok(n) => n,
+                    Err(_) => {
+                        let hash = sha256(&self.video_id);
+                        u16::from_be_bytes([hash[0], hash[1]])
+                    },
+                },
+                video_id: self.video_id,
             })
         }
     }

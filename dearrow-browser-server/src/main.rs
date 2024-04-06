@@ -3,11 +3,14 @@ use actix_files::{Files, NamedFile};
 use actix_web::{HttpServer, App, web, dev::{ServiceResponse, fn_service, ServiceRequest}, middleware::NormalizePath};
 use anyhow::{Context, anyhow, bail};
 use chrono::Utc;
+use env_logger::Env;
+use log::info;
 use dearrow_parser::{DearrowDB, StringSet};
 
 mod utils;
 mod routes;
 mod state;
+mod sbserver_emulation;
 use state::*;
 
 const CONFIG_PATH: &str = "config.toml";
@@ -15,6 +18,7 @@ const CONFIG_PATH: &str = "config.toml";
 
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
+    env_logger::init_from_env(Env::default().default_filter_or("info"));
     let config: web::Data<AppConfig> = web::Data::new(match File::open(CONFIG_PATH) {
         Ok(mut file) => {
             let mut contents = String::new();
@@ -36,6 +40,7 @@ async fn main() -> anyhow::Result<()> {
             return Err(e).context(format!("Failed to open {CONFIG_PATH}"));
         }
     });
+    info!("Loading database...");
     let string_set = web::Data::new(RwLock::new(StringSet::with_capacity(16384)));
     let db: web::Data<RwLock<DatabaseState>> = {
         let mut string_set = string_set.write().map_err(|_| anyhow!("Failed to aquire StringSet lock for writing"))?;
@@ -54,33 +59,46 @@ async fn main() -> anyhow::Result<()> {
         db_state.etag = Some(db_state.generate_etag());
         web::Data::new(RwLock::new(db_state))
     };
+    info!("Database ready!");
 
     let mut server = {
         let config = config.clone();
         HttpServer::new(move || {
             let config2 = config.clone();
-            App::new()
+            let mut app = App::new()
                 .wrap(NormalizePath::trim())
                 .service(web::scope("/api")
                     .configure(routes::configure_routes)
                     .app_data(config.clone())
                     .app_data(db.clone())
                     .app_data(string_set.clone())
-                )
-                .service(
-                    Files::new("/", config.static_content_path.as_path())
-                        .index_file("index.html")
-                        .default_handler(fn_service(move |req: ServiceRequest| {
-                            let config = config2.clone();
-                            async move {
-                                let (req, _) = req.into_parts();
-                                let index_file = config.static_content_path.join("index.html");
-                                let file = NamedFile::open_async(index_file.as_path()).await?;
-                                let resp = file.into_response(&req);
-                                Ok(ServiceResponse::new(req, resp))
-                            }
-                        }))
-                )
+                );
+            if config.enable_sbserver_emulation {
+                app = app.service(web::scope("/sbserver")
+                    .configure(sbserver_emulation::configure_routes)
+                    .app_data(config.clone())
+                    .app_data(db.clone())
+                    .app_data(string_set.clone())
+                );
+            } else {
+                app = app.service(web::scope("/sbserver")
+                    .configure(sbserver_emulation::configure_disabled)
+                );
+            }
+            app.service(
+                Files::new("/", config.static_content_path.as_path())
+                    .index_file("index.html")
+                    .default_handler(fn_service(move |req: ServiceRequest| {
+                        let config = config2.clone();
+                        async move {
+                            let (req, _) = req.into_parts();
+                            let index_file = config.static_content_path.join("index.html");
+                            let file = NamedFile::open_async(index_file.as_path()).await?;
+                            let resp = file.into_response(&req);
+                            Ok(ServiceResponse::new(req, resp))
+                        }
+                    }))
+            )
         })
     };
     server = match config.listen.tcp {
@@ -88,7 +106,7 @@ async fn main() -> anyhow::Result<()> {
         Some((ref ip, port)) => {
             let ip_str = ip.as_str();
             let srv = server.bind((ip_str, port)).with_context(|| format!("Failed to bind to tcp port {ip_str}:{port}"))?;
-            println!("Listening on {ip_str}:{port}");
+            info!("Listening on {ip_str}:{port}");
             srv
         }
     };
@@ -104,7 +122,7 @@ async fn main() -> anyhow::Result<()> {
                     set_permissions(path_str, perms).with_context(|| format!("Failed to change mode of unix socket {path_str} to {mode}"))?
                 }
             }
-            println!("Listening on {path_str}");
+            info!("Listening on {path_str}");
             srv
         }
     };

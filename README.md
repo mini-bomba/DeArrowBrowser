@@ -12,6 +12,26 @@ This repository is split into 4 crates:
 
 The logo is a combination of the DeArrow logo and the magnifying glass emoji from [twemoji](https://github.com/twitter/twemoji)
 
+## SponsorBlockServer emulation
+DeArrow Browser can emulate a limited set of SponsorBlockServer endpoints, specifically used by the DeArrow extension, allowing it to be used as an API mirror.
+Emulation must be enabled in `config.toml` by setting `enable_sbserver_emulation` to `true`.
+Emulated endpoints live under the `/sbserver` path. You can use them in the extension by setting the API URL to `https://<your dab domain>/sbserver` (`https://dearrow.minibomba.pro/sbserver` for the main instance)
+**Voting/Submission endpoints are not and will not be supported!** - support for redirecting these needs to be added in the extension itself, **sending votes/submissions to mirrors leaks your private ID**.
+
+Supported endpoints:
+- `GET /api/branding` and `GET /api/branding/:sha256HashPrefix`
+  - `videoDuration` field not implemented (yet)
+  - `randomTime` field might be different than server by the main server if SponsorBlock segments exist (to be fixed)
+- `GET /api/userInfo`
+  - `userID` param (lookup by private id) not supported
+  - `value(s)` params ignored completely
+    - endpoint will always return `userID`, `userName`, `vip`, `titleSubmissionCount` and `thumbnailSubmissionCount` fields.
+
+Unsupported endpoints:
+- `POST /api/branding`
+  - will not be supported, needs a solution in the extension
+  - sending votes/submissions to mirrors leaks your private ID
+
 ## Starting a development server
 To run a local development server without docker, you'll need:
 - cargo

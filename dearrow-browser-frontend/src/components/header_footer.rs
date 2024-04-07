@@ -52,7 +52,7 @@ pub fn Footer() -> Html {
             <table class="clickable" onclick={open_version_modal}>
                 <tr>
                     <td>{"Last update:"}</td>
-                    <td>{last_updated}</td>
+                    <td>{last_updated} if status.map(|s| s.updating_now).unwrap_or_default() { <b>{", update in progress"}</b> }</td>
                 </tr>
                 <tr>
                     <td>{"Database snapshot taken at:"}</td>

@@ -1,9 +1,9 @@
-use std::{sync::{RwLock, Arc}, collections::{HashMap, HashSet}};
+use std::{sync::{RwLock, Arc}, collections::HashMap};
 
 use actix_web::{web, HttpResponse, CustomizeResponder, get, http::StatusCode, post};
 use alea_js::Alea;
 use anyhow::anyhow;
-use dearrow_parser::{StringSet, Title, TitleFlags, Thumbnail, ThumbnailFlags};
+use dearrow_parser::{StringSet, Title, TitleFlags, Thumbnail, ThumbnailFlags, VideoInfo};
 use serde::{Deserialize, Serialize};
 
 use crate::{utils::{self, IfNoneMatch}, state::DatabaseState, etag_shortcircuit, etagged_json};
@@ -106,10 +106,30 @@ struct SBApiVideo {
 }
 
 // https://github.com/ajayyy/SponsorBlockServer/blob/af31f511a53a7e30ad27123656a911393200672b/src/routes/getBranding.ts#L233
-fn get_random_time_for_video(video_id: &str) -> f64 {
+fn get_random_time_for_video(video_id: &str, video_info: Option<&VideoInfo>) -> f64 {
     let random_time = Alea::new(video_id).random();
 
-    if random_time > 0.9 {
+    if let Some(video_info) = video_info {
+        let mut random_time = if !video_info.has_outro && random_time > 0.9 {
+            random_time - 0.9
+        } else {
+            random_time
+        };
+
+        // Scale to the unmarked length of the video
+        random_time *= video_info.uncut_segments.iter().map(|s| s.length).sum::<f64>();
+
+        // Then map it to the unmarked segments
+        for segment in video_info.uncut_segments.iter() {
+            if random_time <= segment.length {
+                random_time += segment.offset;
+                break;
+            }
+            random_time -= segment.length;
+        };
+
+        random_time
+    } else if random_time > 0.9 {
         random_time - 0.9
     } else {
         random_time
@@ -120,7 +140,7 @@ fn unknown_video(video_id: &str) -> SBApiVideo {
     SBApiVideo {
         titles: vec![],
         thumbnails: vec![],
-        randomTime: get_random_time_for_video(video_id),
+        randomTime: get_random_time_for_video(video_id, None),
         videoDuration: None,
     }
 }
@@ -144,6 +164,7 @@ async fn get_video_branding(db_lock: DBLock, string_set: StringSetLock, query: w
     match video_id {
         None => Ok(etagged_json!(db, unknown_video(&query.0.videoID)).with_status(StatusCode::NOT_FOUND)),
         Some(video_id) => {
+            let video_info = db.db.get_video_info(&video_id);
             Ok(etagged_json!(db, SBApiVideo {
                 titles: {
                     let mut titles: Vec<SBApiTitle> = db.db.titles.iter()
@@ -173,8 +194,8 @@ async fn get_video_branding(db_lock: DBLock, string_set: StringSetLock, query: w
                     thumbs.sort_unstable_by(|a, b| a.locked.cmp(&b.locked).then(a.votes.cmp(&b.votes).then(a.original.cmp(&b.original).reverse())).reverse());
                     thumbs
                 },
-                randomTime: get_random_time_for_video(&video_id),
-                videoDuration: None, // TODO: implement this
+                randomTime: get_random_time_for_video(&video_id, video_info),
+                videoDuration: video_info.map(|v| v.video_duration),
             }))
         }
     }
@@ -215,7 +236,7 @@ async fn get_chunk_branding(db_lock: DBLock, query: web::Query<ChunkBrandingPara
     };
 
     // Find and group details
-    let mut videos: HashSet<Arc<str>> = HashSet::new();
+    let mut videos: HashMap<Arc<str>, Option<&VideoInfo>> = db.db.video_infos[hash_prefix as usize].iter().map(|v| (v.video_id.clone(), Some(v))).collect();
     let mut titles: HashMap<Arc<str>, Vec<SBApiTitle>> = HashMap::new();
     db.db.titles.iter()
         .filter(|t|
@@ -229,7 +250,7 @@ async fn get_chunk_branding(db_lock: DBLock, query: web::Query<ChunkBrandingPara
             Some(v) => v.push(SBApiTitle::from_db(t, query.0.returnUserID)),
             None => {
                 titles.insert(t.video_id.clone(), vec![SBApiTitle::from_db(t, query.0.returnUserID)]);
-                videos.insert(t.video_id.clone());
+                videos.entry(t.video_id.clone()).or_default();
             },
         });
     let mut thumbnails: HashMap<Arc<str>, Vec<SBApiThumbnail>> = HashMap::new();
@@ -244,16 +265,16 @@ async fn get_chunk_branding(db_lock: DBLock, query: web::Query<ChunkBrandingPara
             Some(v) => v.push(SBApiThumbnail::from_db(t, query.0.returnUserID)),
             None => {
                 thumbnails.insert(t.video_id.clone(), vec![SBApiThumbnail::from_db(t, query.0.returnUserID)]);
-                videos.insert(t.video_id.clone());
+                videos.entry(t.video_id.clone()).or_default();
             },
         });
 
     // Construct response
-    Ok(etagged_json!(db, videos.into_iter().map(|v| (v.clone(), SBApiVideo {
+    Ok(etagged_json!(db, videos.into_iter().map(|(v, info)| (v.clone(), SBApiVideo {
         titles: titles.get(&v).cloned().unwrap_or_default(),
         thumbnails: thumbnails.get(&v).cloned().unwrap_or_default(),
-        randomTime: get_random_time_for_video(&v),
-        videoDuration: None // TODO: implement this
+        randomTime: get_random_time_for_video(&v, info),
+        videoDuration: info.map(|info| info.video_duration),
     })).collect::<HashMap<Arc<str>, SBApiVideo>>()))
 }
 

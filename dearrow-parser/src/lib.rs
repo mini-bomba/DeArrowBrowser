@@ -1,10 +1,12 @@
-use std::{sync::Arc, fmt::Display, collections::{HashSet, HashMap}, path::{Path, PathBuf}, fs::File};
+use std::{sync::Arc, fmt::Display, collections::{HashSet, HashMap}, path::{Path, PathBuf}, fs::File, usize};
 use enumflags2::{bitflags, BitFlags};
 use anyhow::{Result, Context, Error};
+use log::info;
+use sha2::{Sha256, Digest};
 
 #[bitflags]
 #[repr(u8)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum ThumbnailFlags {
     Original,
     Locked,
@@ -14,7 +16,7 @@ pub enum ThumbnailFlags {
 
 #[bitflags]
 #[repr(u8)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum TitleFlags {
     Original,
     Locked,
@@ -23,7 +25,7 @@ pub enum TitleFlags {
     Removed,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Thumbnail {
     pub uuid: Arc<str>,
     pub video_id: Arc<str>,
@@ -36,7 +38,7 @@ pub struct Thumbnail {
     pub hash_prefix: u16,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Title {
     pub uuid: Arc<str>,
     pub video_id: Arc<str>,
@@ -49,11 +51,27 @@ pub struct Title {
     pub hash_prefix: u16,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Username {
     pub user_id: Arc<str>,
     pub username: Arc<str>,
     pub locked: bool,
+}
+
+/// All times in this struct are represented as fractions of the video duration
+#[derive(Clone, Copy, Debug)]
+pub struct UncutSegment {
+    pub offset: f64,
+    pub length: f64,
+}
+
+#[derive(Clone, Debug)]
+pub struct VideoInfo {
+    pub video_id: Arc<str>,
+    pub video_duration: f64,
+    /// Sorted slice of UncutSegments
+    pub uncut_segments: Box<[UncutSegment]>,
+    pub has_outro: bool,
 }
 
 #[derive(Default, Clone)]
@@ -164,6 +182,9 @@ pub struct DearrowDB {
     pub thumbnails: Vec<Thumbnail>,
     pub usernames: HashMap<Arc<str>, Username>,
     pub vip_users: HashSet<Arc<str>>,
+    /// VideoInfos are grouped by hashprefix (a u16 value)
+    /// Use .get_video_info() to get a specific VideoInfo object
+    pub video_infos: Box<[Box<[VideoInfo]>]>,
 }
 
 pub struct DBPaths {
@@ -174,6 +195,7 @@ pub struct DBPaths {
     pub title_votes: PathBuf,
     pub usernames: PathBuf,
     pub vip_users: PathBuf,
+    pub sponsor_times: PathBuf,
 }
 
 pub type LoadResult = (DearrowDB, Vec<Error>);
@@ -182,6 +204,10 @@ impl DearrowDB {
     pub fn sort(&mut self) {
         self.titles.sort_unstable_by(|a, b| a.time_submitted.cmp(&b.time_submitted));
         self.thumbnails.sort_unstable_by(|a, b| a.time_submitted.cmp(&b.time_submitted));
+    }
+
+    pub fn get_video_info(&self, video_id: &Arc<str>) -> Option<&VideoInfo> {
+        self.video_infos[compute_hashprefix(video_id) as usize].iter().find(|v| Arc::ptr_eq(&v.video_id, video_id))
     }
 
     pub fn load_dir(dir: &Path, string_set: &mut StringSet) -> Result<LoadResult> {
@@ -194,6 +220,7 @@ impl DearrowDB {
                 title_votes: dir.join("titleVotes.csv"),
                 usernames: dir.join("userNames.csv"),
                 vip_users: dir.join("vipUsers.csv"),
+                sponsor_times: dir.join("sponsorTimes.csv"),
             },
             string_set,
         )
@@ -201,19 +228,21 @@ impl DearrowDB {
 
     pub fn load(paths: DBPaths, string_set: &mut StringSet) -> Result<LoadResult> {
         // Briefly open each file in read-only to check if they exist before continuing to parse
-        drop(File::open(&paths.thumbnails).context("Could not open the thumbnails file")?);
-        drop(File::open(&paths.thumbnail_timestamps).context("Could not open the thumbnail timestamps file")?);
-        drop(File::open(&paths.thumbnail_votes).context("Could not open the thumbnail votes file")?);
-        drop(File::open(&paths.titles).context("Could not open the titles file")?);
-        drop(File::open(&paths.title_votes).context("Could not open the title votes file")?);
-        drop(File::open(&paths.usernames).context("Could not open the usernames file")?);
-        drop(File::open(&paths.vip_users).context("Could not open the VIP users file")?);
+        File::open(&paths.thumbnails).context("Could not open the thumbnails file")?;
+        File::open(&paths.thumbnail_timestamps).context("Could not open the thumbnail timestamps file")?;
+        File::open(&paths.thumbnail_votes).context("Could not open the thumbnail votes file")?;
+        File::open(&paths.titles).context("Could not open the titles file")?;
+        File::open(&paths.title_votes).context("Could not open the title votes file")?;
+        File::open(&paths.usernames).context("Could not open the usernames file")?;
+        File::open(&paths.vip_users).context("Could not open the VIP users file")?;
+        File::open(&paths.sponsor_times).context("Could not open the SponsorBlock segments file")?;
 
         // Create a vec for non-fatal deserialization errors
         let mut errors: Vec<Error> = Vec::new();
         
         // Load the entirety of thumbnailTimestamps and thumbnailVotes into HashMaps, while
         // deduplicating strings
+        info!("Loading thumbnails...");
         let thumbnail_timestamps: HashMap<Arc<str>, csv_data::ThumbnailTimestamps> = csv::Reader::from_path(&paths.thumbnail_timestamps)
             .context("Could not initialize csv reader for thumbnail timestamps")?
             .into_deserialize::<csv_data::ThumbnailTimestamps>()
@@ -279,6 +308,7 @@ impl DearrowDB {
         drop(thumbnail_votes);
 
         // Do the same for titles
+        info!("Loading titles...");
         let title_votes: HashMap<Arc<str>, csv_data::TitleVotes> = csv::Reader::from_path(&paths.title_votes)
             .context("Could not initialize csv reader for title votes")?
             .into_deserialize::<csv_data::TitleVotes>()
@@ -325,8 +355,9 @@ impl DearrowDB {
         drop(title_votes);
 
         // Load usernames and VIP users
+        info!("Loading usernames...");
         let usernames: HashMap<Arc<str>, Username> = csv::Reader::from_path(&paths.usernames)
-            .context("could not initialize csv reader for VIP users")?
+            .context("could not initialize csv reader for usernames")?
             .into_deserialize::<csv_data::Username>()
             .filter_map(|result| match result.context("Error while deserializing titles") {
                 Ok(mut username) => {
@@ -346,6 +377,7 @@ impl DearrowDB {
             })
             .map(|username| (username.user_id.clone(), username))
             .collect();
+        info!("Loading VIPs...");
         let vip_users: HashSet<Arc<str>> = csv::Reader::from_path(&paths.vip_users)
             .context("could not initialize csv reader for VIP users")?
             .into_deserialize::<csv_data::VIPUser>()
@@ -361,25 +393,127 @@ impl DearrowDB {
             })
             .collect();
 
-        Ok((DearrowDB {titles, thumbnails, usernames, vip_users}, errors))
+        // Load video info from SponsorBlock segments
+        info!("Extracting video info from SponsorBlock segments...");
+        let mut segments: Box<[HashMap<Arc<str>, Vec<csv_data::TrimmedSponsorTime>>]> = (0..=u16::MAX).map(|_| HashMap::new()).collect();
+        let mut video_durations: Box<[HashMap<Arc<str>, csv_data::VideoDuration>]> = (0..=u16::MAX).map(|_| HashMap::new()).collect();
+        csv::Reader::from_path(&paths.sponsor_times)
+            .context("could not initialize csv reader for SponsorBlock segments")?
+            .into_deserialize::<csv_data::SponsorTime>()
+            .for_each(|result| match result.context("Error while deserializing SponsorBlock segments") {
+                Ok(mut segment) => {
+                    segment.dedupe(string_set);
+                    if let Some((hash_prefix, duration, segment)) = segment.filter_and_split() {
+                        video_durations[hash_prefix as usize].entry(duration.video_id.clone())
+                            .and_modify(|d| {
+                                if d.time_submitted < duration.time_submitted {
+                                    let mut duration = duration.clone();
+                                    duration.has_outro |= d.has_outro;
+                                    *d = duration;
+                                } else {
+                                    d.has_outro |= duration.has_outro;
+                                }
+                            })
+                            .or_insert(duration);
+                        segments[hash_prefix as usize].entry(segment.video_id.clone()).or_default().push(segment);
+                    }
+                },
+                Err(error) => errors.push(error),
+            });
+        let video_infos: Box<[Box<[VideoInfo]>]> = (0..=(u16::MAX as usize))
+            .map(|hash_prefix| {
+                video_durations[hash_prefix].values()
+                    .filter_map(|duration| {
+                        let video_duration = if duration.video_duration > 0. {
+                            duration.video_duration
+                        } else {
+                            match segments[hash_prefix].get(&duration.video_id).and_then(|l| l.iter().map(|s| s.end_time).max_by(f64::total_cmp)) {
+                                None => return None, // no duration, no segments - no data
+                                Some(d) => d,
+                            }
+                        };
+                        Some(VideoInfo {
+                            video_id: duration.video_id.clone(),
+                            video_duration,
+                            uncut_segments: match segments[hash_prefix].get_mut(&duration.video_id) {
+                                None => Box::new([UncutSegment { offset: 0., length: 1. }]),
+                                Some(segments) => {
+                                    segments.sort_unstable_by(|a, b| a.start_time.total_cmp(&b.start_time));
+                                    let mut uncut_segments: Vec<UncutSegment> = vec![];
+                                    for segment in segments {
+                                        if segment.start_time >= duration.video_duration {
+                                            continue;
+                                        }
+                                        let offset = segment.start_time / duration.video_duration;
+                                        let end = segment.end_time.min(duration.video_duration) / duration.video_duration;
+                                        if let Some(last_segment) = uncut_segments.last_mut() {
+                                            // segment already included in previous one
+                                            if last_segment.offset > end {
+                                                continue;
+                                            }
+                                            // segment overlaps previous one, but extends past its
+                                            // end time
+                                            if last_segment.offset > offset {
+                                                *last_segment = UncutSegment {
+                                                    offset: end,
+                                                    length: 1.-end,
+                                                };
+                                            // segment does not overlap previous one
+                                            } else {
+                                                *last_segment = UncutSegment {
+                                                    offset: last_segment.offset,
+                                                    length: offset-last_segment.offset,
+                                                };
+                                                uncut_segments.push(UncutSegment { offset: end, length: 1.-end });
+                                            }
+                                        } else {
+                                            if offset != 0. {
+                                                uncut_segments.push(UncutSegment { offset: 0., length: offset });
+                                            }
+                                            if segment.end_time != duration.video_duration {
+                                                uncut_segments.push(UncutSegment { offset: end, length: 1.-end });
+                                            }
+                                        }
+                                    }
+                                    if let Some(segment) = uncut_segments.last() {
+                                        if segment.offset == 1. {
+                                            uncut_segments.pop();
+                                        }
+                                    } else {
+                                        uncut_segments.push(UncutSegment { offset: 0., length: 1. });
+                                    }
+                                    uncut_segments.into_iter().collect()
+                                },
+                            },
+                            has_outro: duration.has_outro,
+                        })
+                    })
+                    .collect()
+            })
+            .collect();
+
+        drop(segments);
+        drop(video_durations);
+
+        info!("DearrowDB loaded!");
+        Ok((DearrowDB {titles, thumbnails, usernames, vip_users, video_infos}, errors))
     }
 }
 
+pub fn compute_hashprefix(s: &str) -> u16 {
+    let mut hasher = Sha256::new();
+    hasher.update(s);
+    let hash = hasher.finalize();
+    u16::from_be_bytes([hash[0], hash[1]])
+}
 
 mod csv_data {
     use std::sync::Arc;
     use serde::Deserialize;
     use enumflags2::BitFlag;
-    use sha2::{Sha256, Digest, digest::{typenum::U32, generic_array::GenericArray}};
-    use super::{ParseError, ObjectKind, ParseErrorKind, ThumbnailFlags, TitleFlags, StringSet, Dedupe};
+    use super::{ParseError, ObjectKind, ParseErrorKind, ThumbnailFlags, TitleFlags, StringSet, Dedupe, compute_hashprefix};
 
     type Result<T> = std::result::Result<T, ParseError>;
-
-    fn sha256(s: &str) -> GenericArray<u8, U32> {
-        let mut hasher = Sha256::new();
-        hasher.update(s);
-        hasher.finalize()
-    }
 
     #[derive(Deserialize)]
     pub struct Thumbnail {
@@ -459,6 +593,43 @@ mod csv_data {
         pub locked: i8,
     }
 
+    #[derive(Deserialize)]
+    pub struct SponsorTime {
+        #[serde(rename="videoID")]
+        pub video_id: Arc<str>,
+        #[serde(rename="startTime")]
+        pub start_time: f64,
+        #[serde(rename="endTime")]
+        pub end_time: f64,
+        #[serde(rename="videoDuration")]
+        pub video_duration: f64,
+        pub votes: i16,
+        #[serde(rename="shadowHidden")]
+        pub shadow_hidden: i8,
+        pub hidden: i8,
+        pub category: String,
+        #[serde(rename="actionType")]
+        pub action_type: String,
+        #[serde(rename="hashedVideoID")]
+        pub hashed_video_id: String,
+        #[serde(rename="timeSubmitted")]
+        pub time_submitted: i64,
+    }
+
+    pub struct TrimmedSponsorTime {
+        pub video_id: Arc<str>,
+        pub start_time: f64,
+        pub end_time: f64,
+    }
+
+    #[derive(Clone)]
+    pub struct VideoDuration {
+        pub video_id: Arc<str>,
+        pub time_submitted: i64,
+        pub video_duration: f64,
+        pub has_outro: bool,
+    }
+
     macro_rules! intbool {
         (thumb $struct:expr, $field:ident) => {
             intbool!(! $struct, $field, ObjectKind::Thumbnail, uuid, 0, 1)
@@ -517,10 +688,7 @@ mod csv_data {
                 flags,
                 hash_prefix: match u16::from_str_radix(&self.hashed_video_id[..4], 16) {
                     Ok(n) => n,
-                    Err(_) => {
-                        let hash = sha256(&self.video_id);
-                        u16::from_be_bytes([hash[0], hash[1]])
-                    },
+                    Err(_) => compute_hashprefix(&self.video_id),
                 },
                 video_id: self.video_id,
             })
@@ -548,13 +716,38 @@ mod csv_data {
                 flags,
                 hash_prefix: match u16::from_str_radix(&self.hashed_video_id[..4], 16) {
                     Ok(n) => n,
-                    Err(_) => {
-                        let hash = sha256(&self.video_id);
-                        u16::from_be_bytes([hash[0], hash[1]])
-                    },
+                    Err(_) => compute_hashprefix(&self.video_id),
                 },
                 video_id: self.video_id,
             })
+        }
+    }
+
+    impl SponsorTime {
+        pub fn filter_and_split(self) -> Option<(u16, VideoDuration, TrimmedSponsorTime)> {
+            let hash_prefix = match u16::from_str_radix(&self.hashed_video_id[..4], 16) {
+                Ok(n) => n,
+                Err(_) => compute_hashprefix(&self.video_id),
+            };
+            // https://github.com/ajayyy/SponsorBlockServer/blob/af31f511a53a7e30ad27123656a911393200672b/src/routes/getBranding.ts#L112
+            if self.votes > -2 && self.shadow_hidden == 0 && self.hidden == 0 && self.action_type == "skip" {
+                Some((
+                    hash_prefix,
+                    VideoDuration {
+                        video_id: self.video_id.clone(),
+                        video_duration: self.video_duration,
+                        time_submitted: self.time_submitted,
+                        has_outro: self.category == "outro",
+                    },
+                    TrimmedSponsorTime { 
+                        video_id: self.video_id, 
+                        start_time: self.start_time, 
+                        end_time: self.end_time, 
+                    }, 
+                ))
+            } else {
+                None
+            }
         }
     }
 
@@ -610,6 +803,24 @@ mod csv_data {
         fn dedupe(&mut self, set: &mut StringSet) {
             set.dedupe_arc(&mut self.user_id);
             set.dedupe_arc(&mut self.username);
+        }
+    }
+
+    impl Dedupe for SponsorTime {
+        fn dedupe(&mut self, set: &mut StringSet) {
+            set.dedupe_arc(&mut self.video_id);
+        }
+    }
+
+    impl Dedupe for TrimmedSponsorTime {
+        fn dedupe(&mut self, set: &mut StringSet) {
+            set.dedupe_arc(&mut self.video_id);
+        }
+    }
+
+    impl Dedupe for VideoDuration {
+        fn dedupe(&mut self, set: &mut StringSet) {
+            set.dedupe_arc(&mut self.video_id);
         }
     }
 }

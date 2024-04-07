@@ -454,9 +454,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.0.90"
+version = "1.0.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8cd6604a82acf3039f1144f54b8eb34e91ffba622051189e71b781822d5ee1f5"
+checksum = "1fd97381a8cc6493395a5afc4c691c1084b3768db713b73aa215217aa245d153"
 dependencies = [
  "jobserver",
  "libc",
@@ -582,7 +582,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-browser-api"
-version = "1.6.0"
+version = "1.6.1"
 dependencies = [
  "dearrow-parser",
  "serde",
@@ -590,7 +590,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-browser-frontend"
-version = "1.6.0"
+version = "1.6.1"
 dependencies = [
  "anyhow",
  "built",
@@ -609,7 +609,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-browser-server"
-version = "1.6.0"
+version = "1.6.1"
 dependencies = [
  "actix-files",
  "actix-web",
@@ -631,11 +631,12 @@ dependencies = [
 
 [[package]]
 name = "dearrow-parser"
-version = "1.6.0"
+version = "1.6.1"
 dependencies = [
  "anyhow",
  "csv",
  "enumflags2",
+ "log",
  "serde",
  "sha2",
 ]

@@ -14,3 +14,4 @@ csv = "1.3.0"
 enumflags2.workspace = true
 serde.workspace = true
 sha2.workspace = true
+log.workspace = true

@@ -4,6 +4,7 @@ use anyhow::{anyhow, bail};
 use chrono::{Utc, DateTime};
 use dearrow_parser::{StringSet, DearrowDB, TitleFlags};
 use dearrow_browser_api::*;
+use log::warn;
 use serde::Deserialize;
 
 use crate::{utils::{self, IfNoneMatch}, state::*, built_info, etag_shortcircuit, etagged_json};
@@ -86,6 +87,7 @@ fn do_reload(db_lock: DBLock, string_set_lock: StringSetLock, config: web::Data<
         }
         db_state.updating_now = true;
     }
+    warn!("Reload requested");
     let mut string_set_clone = string_set_lock.read().map_err(|_| anyhow!("Failed to acquire StringSet for reading"))?.clone();
     let (mut new_db, errors) = DearrowDB::load_dir(config.mirror_path.as_path(), &mut string_set_clone)?;
     new_db.sort();
@@ -106,6 +108,7 @@ fn do_reload(db_lock: DBLock, string_set_lock: StringSetLock, config: web::Data<
         db_state.etag = Some(db_state.generate_etag());
         string_set.clean();
     }
+    warn!("Reload finished");
     Ok(())
 }
 

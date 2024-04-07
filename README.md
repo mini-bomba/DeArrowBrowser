@@ -21,8 +21,8 @@ Emulated endpoints live under the `/sbserver` path. You can use them in the exte
 
 Supported endpoints:
 - `GET /api/branding` and `GET /api/branding/:sha256HashPrefix`
-  - `videoDuration` field not implemented (yet)
-  - `randomTime` field might be different than server by the main server if SponsorBlock segments exist (to be fixed)
+  - `randomTime` and `videoDuration` fields appear to be different on videos with segments without video duration info
+    - appears to work on new videos tho
 - `GET /api/userInfo`
   - `userID` param (lookup by private id) not supported
   - `value(s)` params ignored completely

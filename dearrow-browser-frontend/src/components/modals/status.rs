@@ -161,6 +161,14 @@ pub fn StatusModal() -> Html {
                             }
                         </tr>
                         <tr class="hoverswitch-trigger">
+                            <th>{"Videos with durations"}</th>
+                            {number_hoverswitch!(td, status.video_infos)}
+                        </tr>
+                        <tr class="hoverswitch-trigger">
+                            <th>{"Unmarked video segments"}</th>
+                            {number_hoverswitch!(td, status.uncut_segments)}
+                        </tr>
+                        <tr class="hoverswitch-trigger">
                             <th>{"Parse errors"}</th>
                             <td>
                                 {number_hoverswitch!(span, status.errors)}{" "}

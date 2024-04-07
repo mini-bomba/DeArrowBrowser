@@ -1,5 +1,6 @@
 use std::rc::Rc;
 use dearrow_browser_api::StatusResponse;
+use gloo_console::error;
 use reqwest::Url;
 use yew::prelude::*;
 use yew_hooks::{use_async_with_options, UseAsyncOptions, use_interval};
@@ -36,7 +37,7 @@ fn App() -> Html {
             async { Ok(
                 reqwest::get(window_context.origin.join("/api/status")?).await?
                     .json().await?
-            )}.await.map(Rc::new).map_err(Rc::new)
+            )}.await.map(Rc::new).map_err(Rc::new).inspect_err(|err| error!(format!("Failed to fetch status: {err:?}")))
         }, UseAsyncOptions::enable_auto())
     };
     {

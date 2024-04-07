@@ -13,6 +13,8 @@ pub struct StatusResponse {
     pub usernames: usize,
     pub errors: usize,
     pub string_count: Option<usize>,
+    pub video_infos: usize,
+    pub uncut_segments: usize,
     pub server_version: Arc<str>,
     pub server_git_hash: Option<Arc<str>>,
     pub server_git_dirty: Option<bool>,

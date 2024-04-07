@@ -66,6 +66,8 @@ async fn get_status(db_lock: DBLock, string_set: StringSetLock, config: web::Dat
         usernames: db.db.usernames.len(),
         errors: db.errors.len(),
         string_count: strings,
+        video_infos: db.video_info_count(),
+        uncut_segments: db.uncut_segment_count(),
         server_version: built_info::PKG_VERSION.into(),
         server_git_hash: built_info::GIT_COMMIT_HASH.map(|s| s.into()),
         server_git_dirty: built_info::GIT_DIRTY,

@@ -434,18 +434,18 @@ impl DearrowDB {
                         };
                         Some(VideoInfo {
                             video_id: duration.video_id.clone(),
-                            video_duration,
+                            video_duration: duration.video_duration,
                             uncut_segments: match segments[hash_prefix].get_mut(&duration.video_id) {
                                 None => Box::new([UncutSegment { offset: 0., length: 1. }]),
                                 Some(segments) => {
                                     segments.sort_unstable_by(|a, b| a.start_time.total_cmp(&b.start_time));
                                     let mut uncut_segments: Vec<UncutSegment> = vec![];
                                     for segment in segments {
-                                        if segment.start_time >= duration.video_duration {
+                                        if segment.start_time >= video_duration {
                                             continue;
                                         }
-                                        let offset = segment.start_time / duration.video_duration;
-                                        let end = segment.end_time.min(duration.video_duration) / duration.video_duration;
+                                        let offset = segment.start_time / video_duration;
+                                        let end = segment.end_time.min(video_duration) / video_duration;
                                         if let Some(last_segment) = uncut_segments.last_mut() {
                                             // segment already included in previous one
                                             if last_segment.offset > end {
@@ -470,7 +470,7 @@ impl DearrowDB {
                                             if offset != 0. {
                                                 uncut_segments.push(UncutSegment { offset: 0., length: offset });
                                             }
-                                            if segment.end_time != duration.video_duration {
+                                            if segment.end_time != video_duration {
                                                 uncut_segments.push(UncutSegment { offset: end, length: 1.-end });
                                             }
                                         }

@@ -1,3 +1,4 @@
+#![allow(clippy::needless_pass_by_value)]
 use std::sync::{RwLock, Arc};
 use actix_web::{Responder, get, post, web, http::StatusCode, CustomizeResponder, HttpResponse, rt::task::spawn_blocking};
 use anyhow::{anyhow, bail};
@@ -9,7 +10,7 @@ use serde::Deserialize;
 
 use crate::{utils::{self, IfNoneMatch}, state::*, built_info, etag_shortcircuit, etagged_json};
 
-pub fn configure_routes(cfg: &mut web::ServiceConfig) {
+pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(helo)
        .service(get_titles)
        .service(get_unverified_titles)
@@ -69,7 +70,7 @@ async fn get_status(db_lock: DBLock, string_set: StringSetLock, config: web::Dat
         video_infos: db.video_info_count(),
         uncut_segments: db.uncut_segment_count(),
         server_version: built_info::PKG_VERSION.into(),
-        server_git_hash: built_info::GIT_COMMIT_HASH.map(|s| s.into()),
+        server_git_hash: built_info::GIT_COMMIT_HASH.map(std::convert::Into::into),
         server_git_dirty: built_info::GIT_DIRTY,
         server_build_timestamp: DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC).ok().map(|t| t.timestamp()),
         server_startup_timestamp: config.startup_timestamp.timestamp(),

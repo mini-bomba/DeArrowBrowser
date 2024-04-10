@@ -17,7 +17,7 @@ use pages::*;
 
 #[function_component]
 fn App() -> Html {
-    let window_context = use_memo((), |_| {
+    let window_context = use_memo((), |()| {
         let window = window().expect("window should exist");
         WindowContext {
             origin: Url::parse(

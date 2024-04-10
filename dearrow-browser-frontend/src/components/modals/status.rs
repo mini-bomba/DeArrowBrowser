@@ -46,7 +46,7 @@ pub fn StatusModal() -> Html {
                     <tr>
                         <th>{"Git hash"}</th>
                         <td>
-                            if let Some(ref hash) = built_info::GIT_COMMIT_HASH {
+                            if let Some(hash) = built_info::GIT_COMMIT_HASH {
                                 <a href={format!("https://github.com/mini-bomba/DeArrowBrowser/commit/{hash}")} target="_blank">{&hash[..8]}</a>
                                 if built_info::GIT_DIRTY == Some(true) {
                                     {" "}<b>{"+ uncommitted changes"}</b>

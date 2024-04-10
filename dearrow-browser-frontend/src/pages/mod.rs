@@ -38,6 +38,7 @@ pub struct LocationState {
     pub detail_table_page: usize,
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn render_main_route(route: MainRoute) -> Html {
     let document = window().expect("window should exist")
         .document().expect("document should exist");

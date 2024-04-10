@@ -68,14 +68,14 @@ async fn main() -> anyhow::Result<()> {
             let mut app = App::new()
                 .wrap(NormalizePath::trim())
                 .service(web::scope("/api")
-                    .configure(routes::configure_routes)
+                    .configure(routes::configure)
                     .app_data(config.clone())
                     .app_data(db.clone())
                     .app_data(string_set.clone())
                 );
             if config.enable_sbserver_emulation {
                 app = app.service(web::scope("/sbserver")
-                    .configure(sbserver_emulation::configure_routes)
+                    .configure(sbserver_emulation::configure_enabled)
                     .app_data(config.clone())
                     .app_data(db.clone())
                     .app_data(string_set.clone())
@@ -101,30 +101,19 @@ async fn main() -> anyhow::Result<()> {
             )
         })
     };
-    server = match config.listen.tcp {
-        None => server,
-        Some((ref ip, port)) => {
-            let ip_str = ip.as_str();
-            let srv = server.bind((ip_str, port)).with_context(|| format!("Failed to bind to tcp port {ip_str}:{port}"))?;
-            info!("Listening on {ip_str}:{port}");
-            srv
-        }
+    if let Some((ref ip, port)) = config.listen.tcp {
+        let ip_str = ip.as_str();
+        server = server.bind((ip_str, port)).with_context(|| format!("Failed to bind to tcp port {ip_str}:{port}"))?;
+        info!("Listening on {ip_str}:{port}");
     };
-    server = match config.listen.unix {
-        None => server,
-        Some(ref path) => {
-            let path_str = path.as_str();
-            let srv = server.bind_uds(path_str).with_context(|| format!("Failed to bind to unix socket {path_str}"))?;
-            match config.listen.unix_mode {
-                None => (),
-                Some(mode) => {
-                    let perms = Permissions::from_mode(mode);
-                    set_permissions(path_str, perms).with_context(|| format!("Failed to change mode of unix socket {path_str} to {mode}"))?
-                }
-            }
-            info!("Listening on {path_str}");
-            srv
+    if let Some(ref path) = config.listen.unix {
+        let path_str = path.as_str();
+        server = server.bind_uds(path_str).with_context(|| format!("Failed to bind to unix socket {path_str}"))?;
+        if let Some(mode) = config.listen.unix_mode {
+            let perms = Permissions::from_mode(mode);
+            set_permissions(path_str, perms).with_context(|| format!("Failed to change mode of unix socket {path_str} to {mode}"))?;
         }
+        info!("Listening on {path_str}");
     };
     server.run()
     .await

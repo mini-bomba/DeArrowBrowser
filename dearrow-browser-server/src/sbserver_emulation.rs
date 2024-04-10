@@ -1,3 +1,4 @@
+#![allow(clippy::needless_pass_by_value)]
 use std::{sync::{RwLock, Arc}, collections::HashMap};
 
 use actix_web::{web, HttpResponse, CustomizeResponder, get, http::StatusCode, post};
@@ -16,7 +17,7 @@ pub fn configure_disabled(cfg: &mut web::ServiceConfig) {
     cfg.default_service(web::to(disabled_route));
 }
 
-pub fn configure_routes(cfg: &mut web::ServiceConfig) {
+pub fn configure_enabled(cfg: &mut web::ServiceConfig) {
     cfg.service(get_video_branding)
         .service(post_video_branding)
         .service(get_chunk_branding)
@@ -63,7 +64,7 @@ impl SBApiTitle {
             // https://github.com/ajayyy/SponsorBlockServer/blob/af31f511a53a7e30ad27123656a911393200672b/src/routes/getBranding.ts#L58
             title: title.title.replace('<', "‹"),
             original: title.flags.contains(TitleFlags::Original),
-            votes: title.votes.saturating_sub(title.downvotes).saturating_sub(if title.flags.contains(TitleFlags::Unverified){ 1 } else { 0 }),
+            votes: title.votes.saturating_sub(title.downvotes).saturating_sub(title.flags.contains(TitleFlags::Unverified).into()),
             locked: title.flags.contains(TitleFlags::Locked),
             UUID: title.uuid.clone(),
             userID: include_userid.then(|| title.user_id.clone()),
@@ -230,10 +231,7 @@ async fn get_chunk_branding(db_lock: DBLock, query: web::Query<ChunkBrandingPara
     if path.hash_prefix.len() != 4 {
         return Err(utils::Error::from(anyhow!("Unsupported hashprefix! Only 4-character prefixes are supported by DeArrow Browser's SponsorBlockServer emulation, but your was {} chars long!", path.hash_prefix.len())).set_status(StatusCode::BAD_REQUEST));
     }
-    let hash_prefix = match u16::from_str_radix(&path.hash_prefix, 16) {
-        Ok(n) => n,
-        Err(_) => return Err(utils::Error::from(anyhow!("Invalid hashprefix!")).set_status(StatusCode::BAD_REQUEST)),
-    };
+    let hash_prefix = u16::from_str_radix(&path.hash_prefix, 16).map_err(|_| utils::Error::from(anyhow!("Invalid hashprefix!")).set_status(StatusCode::BAD_REQUEST))?;
 
     // Find and group details
     let mut videos: HashMap<Arc<str>, Option<&VideoInfo>> = db.db.video_infos[hash_prefix as usize].iter().map(|v| (v.video_id.clone(), Some(v))).collect();
@@ -244,7 +242,7 @@ async fn get_chunk_branding(db_lock: DBLock, query: web::Query<ChunkBrandingPara
             && t.votes > -1 
             && !t.flags.intersects(TitleFlags::Removed | TitleFlags::ShadowHidden)
             && t.votes.saturating_sub(t.downvotes) > -2 
-            && (query.0.fetchAll || t.flags.contains(TitleFlags::Locked) || t.votes.saturating_sub(t.downvotes) >= if t.flags.contains(TitleFlags::Unverified) { 1 } else { 0 })
+            && (query.0.fetchAll || t.flags.contains(TitleFlags::Locked) || t.votes.saturating_sub(t.downvotes) >= t.flags.contains(TitleFlags::Unverified).into())
         )
         .for_each(|t| match titles.get_mut(&t.video_id) {
             Some(v) => v.push(SBApiTitle::from_db(t, query.0.returnUserID)),
@@ -306,7 +304,7 @@ async fn get_user_info(db_lock: DBLock, string_set: StringSetLock, query: web::Q
             UserInfo { userID: user_id.clone(), userName: user_id, titleSubmissionCount: 0, thumbnailSubmissionCount: 0, vip: false }
         },
         Some(user_id) => UserInfo {
-            userName: db.db.usernames.get(&user_id).map(|u| u.username.clone()).unwrap_or_else(|| user_id.clone()),
+            userName: db.db.usernames.get(&user_id).map_or_else(|| user_id.clone(), |u| u.username.clone()),
             titleSubmissionCount: db.db.titles.iter().filter(|t| Arc::ptr_eq(&t.user_id, &user_id) && t.votes >= 0).count(),
             thumbnailSubmissionCount: db.db.thumbnails.iter().filter(|t| Arc::ptr_eq(&t.user_id, &user_id) && t.votes >= 0).count(),
             vip: db.db.vip_users.contains(&user_id),

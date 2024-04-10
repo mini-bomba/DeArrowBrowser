@@ -97,7 +97,7 @@ impl StringSet {
     }
 
     pub fn clean(&mut self) {
-        self.set.retain(|s| Arc::strong_count(s) > 1)
+        self.set.retain(|s| Arc::strong_count(s) > 1);
     }
 }
 
@@ -170,9 +170,9 @@ impl Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let object_kind = &self.0;
         match *self.1 {
-            ParseErrorKind::InvalidValue { ref uuid, ref field, ref value } => write!(f, "Parsing error: Field {field} in {object_kind} {uuid} contained an invalid value: {value}"),
-            ParseErrorKind::MismatchedUUIDs { ref struct_name, ref uuid_main, ref uuid_struct } => write!(f, "Merge error: Component {struct_name} of {object_kind} {uuid_main} had a different UUID: {uuid_struct}"),
-            ParseErrorKind::MissingSubobject { ref struct_name, ref uuid } => write!(f, "Parsing error: {object_kind} {uuid} was missing an associated {struct_name} object")
+            ParseErrorKind::InvalidValue { ref uuid, field, value } => write!(f, "Parsing error: Field {field} in {object_kind} {uuid} contained an invalid value: {value}"),
+            ParseErrorKind::MismatchedUUIDs { struct_name, ref uuid_main, ref uuid_struct } => write!(f, "Merge error: Component {struct_name} of {object_kind} {uuid_main} had a different UUID: {uuid_struct}"),
+            ParseErrorKind::MissingSubobject { struct_name, ref uuid } => write!(f, "Parsing error: {object_kind} {uuid} was missing an associated {struct_name} object")
         }
     }
 }
@@ -212,7 +212,7 @@ impl DearrowDB {
 
     pub fn load_dir(dir: &Path, string_set: &mut StringSet) -> Result<LoadResult> {
         DearrowDB::load(
-            DBPaths {
+            &DBPaths {
                 thumbnails: dir.join("thumbnails.csv"),
                 thumbnail_timestamps: dir.join("thumbnailTimestamps.csv"),
                 thumbnail_votes: dir.join("thumbnailVotes.csv"),
@@ -226,7 +226,7 @@ impl DearrowDB {
         )
     }
 
-    pub fn load(paths: DBPaths, string_set: &mut StringSet) -> Result<LoadResult> {
+    pub fn load(paths: &DBPaths, string_set: &mut StringSet) -> Result<LoadResult> {
         // Briefly open each file in read-only to check if they exist before continuing to parse
         File::open(&paths.thumbnails).context("Could not open the thumbnails file")?;
         File::open(&paths.thumbnail_timestamps).context("Could not open the thumbnail timestamps file")?;
@@ -240,9 +240,28 @@ impl DearrowDB {
         // Create a vec for non-fatal deserialization errors
         let mut errors: Vec<Error> = Vec::new();
         
+        info!("Loading thumbnails...");
+        let thumbnails = Self::load_thumbnails(paths, string_set, &mut errors)?;
+
+        info!("Loading titles...");
+        let titles = Self::load_titles(paths, string_set, &mut errors)?;
+
+        info!("Loading usernames...");
+        let usernames = Self::load_usernames(paths, string_set, &mut errors)?;
+
+        info!("Loading VIPs...");
+        let vip_users = Self::load_vips(paths, string_set, &mut errors)?;
+
+        info!("Extracting video info from SponsorBlock segments...");
+        let video_infos = Self::load_video_info(paths, string_set, &mut errors)?;
+
+        info!("DearrowDB loaded!");
+        Ok((DearrowDB {titles, thumbnails, usernames, vip_users, video_infos}, errors))
+    }
+
+    fn load_thumbnails(paths: &DBPaths, string_set: &mut StringSet, errors: &mut Vec<Error>) -> Result<Vec<Thumbnail>> {
         // Load the entirety of thumbnailTimestamps and thumbnailVotes into HashMaps, while
         // deduplicating strings
-        info!("Loading thumbnails...");
         let thumbnail_timestamps: HashMap<Arc<str>, csv_data::ThumbnailTimestamps> = csv::Reader::from_path(&paths.thumbnail_timestamps)
             .context("Could not initialize csv reader for thumbnail timestamps")?
             .into_deserialize::<csv_data::ThumbnailTimestamps>()
@@ -275,40 +294,29 @@ impl DearrowDB {
             .collect();
 
         // Load the Thumbnail objects while deduplicating strings and merging them with other Thumbnail* objects
-        let thumbnails: Vec<Thumbnail> = csv::Reader::from_path(&paths.thumbnails)
+        Ok(csv::Reader::from_path(&paths.thumbnails)
             .context("Could not initialize csv reader for thumbnails")?
             .into_deserialize::<csv_data::Thumbnail>()
             .filter_map(|result| match result.context("Error while deserializing thumbnails") {
                 Ok(mut thumb) => {
                     thumb.dedupe(string_set);
                     let timestamp = thumbnail_timestamps.get(&thumb.uuid);
-                    let votes = match thumbnail_votes.get(&thumb.uuid) {
-                        Some(v) => v,
-                        None => {
-                            errors.push(Error::new(ParseError(ObjectKind::Thumbnail, Box::new(ParseErrorKind::MissingSubobject { struct_name: "ThumbnailVotes", uuid: thumb.uuid.clone() }))));
-                            return None;
-                        }
+                    let Some(votes) = thumbnail_votes.get(&thumb.uuid) 
+                    else {
+                        errors.push(Error::new(ParseError(ObjectKind::Thumbnail, Box::new(ParseErrorKind::MissingSubobject { struct_name: "ThumbnailVotes", uuid: thumb.uuid.clone() }))));
+                        return None;
                     };
-                    match thumb.try_merge(timestamp, votes) {
-                        Ok(t) => Some(t),
-                        Err(e) => {
-                            errors.push(e.into());
-                            None
-                        }
-                    }
+                    thumb.try_merge(timestamp, votes).map_err(|e| errors.push(e.into())).ok()
                 },
                 Err(error) => {
                     errors.push(error);
                     None
                 }
             })
-            .collect();
+            .collect())
+    }
 
-        drop(thumbnail_timestamps);
-        drop(thumbnail_votes);
-
-        // Do the same for titles
-        info!("Loading titles...");
+    fn load_titles(paths: &DBPaths, string_set: &mut StringSet, errors: &mut Vec<Error>) -> Result<Vec<Title>> {
         let title_votes: HashMap<Arc<str>, csv_data::TitleVotes> = csv::Reader::from_path(&paths.title_votes)
             .context("Could not initialize csv reader for title votes")?
             .into_deserialize::<csv_data::TitleVotes>()
@@ -324,51 +332,35 @@ impl DearrowDB {
             })
             .map(|title| (title.uuid.clone(), title))
             .collect();
-        let titles: Vec<Title> = csv::Reader::from_path(&paths.titles)
+        Ok(csv::Reader::from_path(&paths.titles)
             .context("Could not initialize csv reader for titles")?
             .into_deserialize::<csv_data::Title>()
             .filter_map(|result| match result.context("Error while deserializing titles") {
                 Ok(mut title) => {
                     title.dedupe(string_set);
-                    let votes = match title_votes.get(&title.uuid) {
-                        Some(v) => v,
-                        None => {
-                            errors.push(Error::new(ParseError(ObjectKind::Title, Box::new(ParseErrorKind::MissingSubobject { struct_name: "TitleVotes", uuid: title.uuid.clone() }))));
-                            return None;
-                        }
+                    let Some(votes) = title_votes.get(&title.uuid) 
+                    else {
+                        errors.push(Error::new(ParseError(ObjectKind::Title, Box::new(ParseErrorKind::MissingSubobject { struct_name: "TitleVotes", uuid: title.uuid.clone() }))));
+                        return None;
                     };
-                    match title.try_merge(votes) {
-                        Ok(t) => Some(t),
-                        Err(e) => {
-                            errors.push(e.into());
-                            None
-                        }
-                    }
+                    title.try_merge(votes).map_err(|e| errors.push(e.into())).ok()
                 },
                 Err(error) => {
                     errors.push(error);
                     None
                 }
             })
-            .collect();
+            .collect())
+    }
 
-        drop(title_votes);
-
-        // Load usernames and VIP users
-        info!("Loading usernames...");
-        let usernames: HashMap<Arc<str>, Username> = csv::Reader::from_path(&paths.usernames)
+    fn load_usernames(paths: &DBPaths, string_set: &mut StringSet, errors: &mut Vec<Error>) -> Result<HashMap<Arc<str>, Username>> {
+        Ok(csv::Reader::from_path(&paths.usernames)
             .context("could not initialize csv reader for usernames")?
             .into_deserialize::<csv_data::Username>()
             .filter_map(|result| match result.context("Error while deserializing titles") {
                 Ok(mut username) => {
                     username.dedupe(string_set);
-                    match TryInto::<Username>::try_into(username) {
-                        Ok(u) => Some(u),
-                        Err(e) => {
-                            errors.push(e.into());
-                            None
-                        }
-                    }
+                    TryInto::<Username>::try_into(username).map_err(|e| errors.push(e.into())).ok()
                 },
                 Err(error) => {
                     errors.push(error);
@@ -376,9 +368,11 @@ impl DearrowDB {
                 }
             })
             .map(|username| (username.user_id.clone(), username))
-            .collect();
-        info!("Loading VIPs...");
-        let vip_users: HashSet<Arc<str>> = csv::Reader::from_path(&paths.vip_users)
+            .collect())
+    }
+
+    fn load_vips(paths: &DBPaths, string_set: &mut StringSet, errors: &mut Vec<Error>) -> Result<HashSet<Arc<str>>> {
+        Ok(csv::Reader::from_path(&paths.vip_users)
             .context("could not initialize csv reader for VIP users")?
             .into_deserialize::<csv_data::VIPUser>()
             .filter_map(|result| match result.context("Error while deserializing titles") {
@@ -391,12 +385,14 @@ impl DearrowDB {
                     None
                 }
             })
-            .collect();
+            .collect())
+    }
 
-        // Load video info from SponsorBlock segments
-        info!("Extracting video info from SponsorBlock segments...");
-        let mut segments: Box<[HashMap<Arc<str>, Vec<csv_data::TrimmedSponsorTime>>]> = (0..=u16::MAX).map(|_| HashMap::new()).collect();
-        let mut video_durations: Box<[HashMap<Arc<str>, csv_data::VideoDuration>]> = (0..=u16::MAX).map(|_| HashMap::new()).collect();
+    #[allow(clippy::float_cmp)]
+    fn load_video_info(paths: &DBPaths, string_set: &mut StringSet, errors: &mut Vec<Error>) -> Result<Box<[Box<[VideoInfo]>]>> {
+        const HASHBLOCK_RANGE: std::ops::RangeInclusive<usize> = 0..=u16::MAX as usize;
+        let mut segments: Box<[HashMap<Arc<str>, Vec<csv_data::TrimmedSponsorTime>>]> = HASHBLOCK_RANGE.map(|_| HashMap::new()).collect();
+        let mut video_durations: Box<[HashMap<Arc<str>, csv_data::VideoDuration>]> = HASHBLOCK_RANGE.map(|_| HashMap::new()).collect();
         csv::Reader::from_path(&paths.sponsor_times)
             .context("could not initialize csv reader for SponsorBlock segments")?
             .into_deserialize::<csv_data::SponsorTime>()
@@ -420,8 +416,7 @@ impl DearrowDB {
                 },
                 Err(error) => errors.push(error),
             });
-        let video_infos: Box<[Box<[VideoInfo]>]> = (0..=(u16::MAX as usize))
-            .map(|hash_prefix| {
+        Ok(HASHBLOCK_RANGE.map(|hash_prefix| {
                 video_durations[hash_prefix].values()
                     .filter_map(|duration| {
                         let video_duration = if duration.video_duration > 0. {
@@ -490,13 +485,7 @@ impl DearrowDB {
                     })
                     .collect()
             })
-            .collect();
-
-        drop(segments);
-        drop(video_durations);
-
-        info!("DearrowDB loaded!");
-        Ok((DearrowDB {titles, thumbnails, usernames, vip_users, video_infos}, errors))
+            .collect())
     }
 }
 

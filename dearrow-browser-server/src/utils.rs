@@ -33,10 +33,8 @@ impl From<anyhow::Error> for Error {
 impl std::error::Error for Error {}
 impl ResponseError for Error {
     fn status_code(&self) -> StatusCode {
-        match self {
-            Error::Anyhow(_, status) => *status,
-            Error::EmptyStatus(status) => *status,
-        }
+        let (Error::Anyhow(_, status) | Error::EmptyStatus(status)) = self;
+        *status
     }
 
     fn error_response(&self) -> HttpResponse {

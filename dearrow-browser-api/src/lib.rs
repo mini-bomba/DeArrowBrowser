@@ -65,7 +65,7 @@ impl From<&dearrow_parser::Title> for ApiTitle {
             shadow_hidden: value.flags.contains(TitleFlags::ShadowHidden),
             unverified,
             removed: value.flags.contains(TitleFlags::Removed),
-            score: value.votes - value.downvotes - if unverified { 1 } else { 0 },
+            score: value.votes - value.downvotes - i8::from(unverified),
             username: None,
             vip: false,
         }

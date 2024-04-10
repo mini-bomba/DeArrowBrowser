@@ -17,6 +17,22 @@ built = { version = "0.7.1", features = ["git2", "chrono"] }
 sha2 = "0.10.8"
 log = "0.4.21"
 
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+# lints that aren't compatible with what I'm doing
+struct_field_names = "allow"      # triggers on things like "username" in the Username struct or "title" on Title
+struct_excessive_bools = "allow"  # false positives
+# personal code style preferences
+single_match_else = "allow"
+wildcard_imports = "allow"
+module_name_repetitions = "allow"
+# might enable these later
+must_use_candidate = "allow"
+missing_errors_doc = "allow"      # no docs currently
+missing_panics_doc = "allow"      # no docs currently
+# let me do dumb shit
+inline_always = "allow"
+
 [profile.release]
 strip = true
 lto = true

@@ -5,6 +5,14 @@
         <title>DeArrow Browser</title>
         <link data-trunk rel="icon" href="../logo.svg">
         <link data-trunk rel="scss" href="index.scss">
-        <link data-trunk rel="rust">
+        <link data-trunk rel="rust" data-reference-types="true" data-initializer="initializer.mjs">
     </head>
+    <body>
+        <div id="loading">
+            <h1 id="load-header">DeArrow Browser is loading...</h1>
+            <p id="load-text">DAB's WASM module has to be downloaded & compiled before the UI is initialized.<br>This shouldn't take too long.</p>
+            <progress id="load-progress"></progress>
+            <span id="load-detail">it's probably loading js or css right now idk</span>
+        </div>
+    </body>
 </html>

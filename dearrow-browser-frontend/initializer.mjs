@@ -26,7 +26,7 @@ export default function() {
       document.getElementById("load-detail").remove();
       document.getElementById("load-progress").remove();
       document.getElementById("load-header").innerText = "DeArrow Browser failed to initialize";
-      document.getElementById("load-text").innerText = "Make sure your browser supports WASM and try hard-refreshing (usually by clicking reload while holding shift)\n\nDetails about the error should appear below.";
+      document.getElementById("load-text").innerText = `Make sure your browser supports WASM and try hard-refreshing (usually by clicking reload while holding shift)\n\nDetails about the error should appear below.`;
       const err_detail = document.createElement("pre");
       err_detail.innerText = `${e.toString()}\n\nStack trace:\n${e.stack}`;
       document.getElementById("loading").appendChild(err_detail);

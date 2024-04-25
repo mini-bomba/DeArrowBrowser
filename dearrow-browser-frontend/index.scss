@@ -360,6 +360,9 @@ input, textarea {
   bottom: 0;
   left: 0;
   right: 0;
+  opacity: 0;
+  animation: 0.5s ease-in 0.5s 1 loading_fadein;
+  animation-fill-mode: both;
 
   #load-detail {
     text-align: right;
@@ -393,4 +396,14 @@ input, textarea {
 
 @keyframes progressbar {
   100% { background-position: 25rem 0px; }
+}
+
+@keyframes loading_fadein {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }

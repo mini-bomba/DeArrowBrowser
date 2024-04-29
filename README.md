@@ -10,7 +10,6 @@ This repository is split into 4 crates:
 - dearrow-browser-api - definitions of API structures
 - dearrow-browser-frontend - the frontend, uses Yew, functions as a single page application
 
-The logo is a combination of the DeArrow logo and the magnifying glass emoji from [twemoji](https://github.com/twitter/twemoji)
 
 ## SponsorBlockServer emulation
 DeArrow Browser can emulate a limited set of SponsorBlockServer endpoints, specifically used by the DeArrow extension, allowing it to be used as an API mirror.<br>
@@ -46,6 +45,7 @@ To run a local development server without docker, you'll need:
   - `titleVotes.csv`
   - `userNames.csv`
   - `vipUsers.csv`
+  - `sponsorTimes.csv`
 2. Build the frontend:
   - `trunk build` in the `dearrow-browser-frontend` directory to make a one-time build
   - `trunk watch` in the `dearrow-browser-frontend` directory to rebuild every time source files are updated
@@ -67,3 +67,12 @@ docker run -h dearrow-browser --name dearrow-browser -v <path to mirror>:/mirror
 
 If you've got a proper mirror set up (instead of manually sourced .csv files), make it make a POST request to `/api/reload` with the auth secret as the `auth` URL parameter to reload the database.
 DeArrow Browser should remain usable while the database is reloaded. (assuming we don't run out of RAM)
+
+## Credits
+
+The DeArrow Browser logo is a combination of the DeArrow logo (which is based on Twemoji) and the magnifying glass emoji from [Twemoji](https://github.com/twitter/twemoji) and is licensed under the CC-BY 4.0 license.
+
+The DeArrow Browser source code is licensed under the [GNU Affero General Public License version 3](https://github.com/mini-bomba/DeArrowBrowser/blob/master/LICENSE).
+
+© mini_bomba & [contributors](https://github.com/mini-bomba/DeArrowBrowser/graphs/contributors) 2023-2024
+

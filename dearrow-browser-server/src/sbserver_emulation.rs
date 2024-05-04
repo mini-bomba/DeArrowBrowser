@@ -1,6 +1,9 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
 *  Copyright (C) 2023-2024 mini_bomba
+*
+*  This file contains code adapted from the SponsorBlockServer repository, licensed under AGPL 3.0
+*  https://github.com/ajayyy/SponsorBlockServer
 *  
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -125,14 +128,13 @@ struct SBApiVideo {
 
 // https://github.com/ajayyy/SponsorBlockServer/blob/af31f511a53a7e30ad27123656a911393200672b/src/routes/getBranding.ts#L233
 fn get_random_time_for_video(video_id: &str, video_info: Option<&VideoInfo>) -> f64 {
-    let random_time = Alea::new(video_id).random();
+    let mut random_time = Alea::new(video_id).random();
 
     if let Some(video_info) = video_info {
-        let mut random_time = if !video_info.has_outro && random_time > 0.9 {
-            random_time - 0.9
-        } else {
-            random_time
-        };
+        // Exclude last 10% if there's no outro
+        if !video_info.has_outro {
+            random_time *= 0.9;
+        }
 
         // Scale to the unmarked length of the video
         random_time *= video_info.uncut_segments.iter().map(|s| s.length).sum::<f64>();
@@ -145,13 +147,10 @@ fn get_random_time_for_video(video_id: &str, video_info: Option<&VideoInfo>) -> 
             }
             random_time -= segment.length;
         };
-
-        random_time
-    } else if random_time > 0.9 {
-        random_time - 0.9
     } else {
-        random_time
+        random_time *= 0.9;
     }
+    random_time
 }
 
 fn unknown_video(video_id: &str) -> SBApiVideo {

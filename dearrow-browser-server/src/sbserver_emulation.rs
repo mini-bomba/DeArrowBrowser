@@ -1,6 +1,9 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
 *  Copyright (C) 2023-2024 mini_bomba
+*
+*  This file contains code adapted from the SponsorBlockServer project, licensed under AGPL 3.0
+*  https://github.com/ajayyy/SponsorBlockServer
 *  
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by

@@ -419,7 +419,7 @@ impl DearrowDB {
                     if let Some((hash_prefix, duration, segment)) = segment.filter_and_split() {
                         video_durations[hash_prefix as usize].entry(duration.video_id.clone())
                             .and_modify(|d| {
-                                if d.time_submitted > duration.time_submitted && duration.video_duration != 0. {
+                                if duration.video_duration != 0. && (d.time_submitted > duration.time_submitted || d.video_duration == 0.) {
                                     let mut duration = duration.clone();
                                     duration.has_outro |= d.has_outro;
                                     *d = duration;

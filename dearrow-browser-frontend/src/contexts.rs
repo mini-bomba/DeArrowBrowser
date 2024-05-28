@@ -22,11 +22,22 @@ use reqwest::Url;
 use yew::AttrValue;
 
 pub use crate::components::modals::ModalRendererControls;
+use crate::utils::ReqwestUrlExt;
 
 #[derive(Clone, PartialEq)]
 pub struct WindowContext {
     pub origin: Url,
     pub logo_url: Option<AttrValue>,
+}
+
+impl WindowContext {
+    #[must_use]
+    pub fn origin_join_segments<I>(&self, segments: I) -> Url
+    where I: IntoIterator,
+    I::Item: AsRef<str>,
+    {
+        self.origin.join_segments(segments).expect("WindowContext.origin should be a valid base")
+    }
 }
 
 #[derive(Clone, Copy, PartialEq)]

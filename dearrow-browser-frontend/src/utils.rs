@@ -15,7 +15,7 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use std::{rc::Rc, ops::Deref};
+use std::{ops::Deref, rc::Rc};
 
 use anyhow::Context;
 use chrono::{DateTime, Utc, NaiveDateTime};
@@ -162,10 +162,10 @@ struct OEmbedResponse {
     title: Option<String>,
 }
 
-pub async fn get_original_title(vid: String) -> Result<String, anyhow::Error> {
+pub async fn get_original_title(vid: &str) -> Result<String, anyhow::Error> {
     let url = Url::parse_with_params(
         "https://www.youtube-nocookie.com/oembed", 
-        &[("url", format!("https://youtu.be/{vid}"))]
+        &[("url", &youtu_be_link(vid))]
     ).context("Failed to construct an oembed request URL")?;
     let resp: OEmbedResponse = reqwest::get(url).await.context("Failed to send oembed request")?
         .json().await.context("Failed to deserialize oembed response")?;
@@ -189,4 +189,43 @@ impl<T> Deref for RcEq<T> {
     fn deref(&self) -> &T {
         &self.0
     }
+}
+
+pub trait ReqwestUrlExt {
+    #[allow(clippy::result_unit_err)]
+    fn extend_segments<I>(&mut self, segments: I) -> Result<&mut Self, ()>
+    where I: IntoIterator,
+    I::Item: AsRef<str>;
+    #[allow(clippy::result_unit_err)]
+    fn join_segments<I>(&self, segments: I) -> Result<Self, ()>
+    where I: IntoIterator,
+    I::Item: AsRef<str>,
+    Self: Sized;
+}
+
+impl ReqwestUrlExt for Url {
+    fn extend_segments<I>(&mut self, segments: I) -> Result<&mut Self, ()>
+        where I: IntoIterator,
+        I::Item: AsRef<str>,
+    {
+        {
+            let mut path = self.path_segments_mut()?;
+            path.extend(segments);
+        }
+        Ok(self)
+    }
+    fn join_segments<I>(&self, segments: I) -> Result<Self, ()>
+        where I: IntoIterator,
+        I::Item: AsRef<str>,
+    {
+        let mut url = self.clone();
+        url.extend_segments(segments)?;
+        Ok(url)
+    }
+}
+
+pub fn youtu_be_link(vid: &str) -> Url {
+    let mut url = Url::parse("https://youtu.be/").expect("should be able to parse youtu.be base URL");
+    url.extend_segments(&[vid]).expect("https://youtu.be/ should be a valid base");
+    url
 }

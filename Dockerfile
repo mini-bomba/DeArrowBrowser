@@ -26,7 +26,7 @@ WORKDIR /source
 RUN git restore config.toml.example Dockerfile LICENSE README.md .dockerignore .gitignore
 RUN --mount=type=cache,target=/root/.cargo,id=alpine_cargo_dir --mount=type=cache,target=/source/target,id=dearrow_browser_target touch /source/add_metadata.rs && cargo build --release --locked --bin dearrow-browser-server && cp /source/target/release/dearrow-browser-server /
 WORKDIR /source/dearrow-browser-frontend
-RUN --mount=type=cache,target=/root/.cargo,id=alpine_cargo_dir --mount=type=cache,target=/source/target,id=dearrow_browser_target touch /source/add_metadata.rs && trunk build --release --locked --offline
+RUN --mount=type=cache,target=/root/.cargo,id=alpine_cargo_dir --mount=type=cache,target=/source/target,id=dearrow_browser_target touch /source/add_metadata.rs && trunk build --release --locked --offline --minify
 
 
 FROM docker.io/library/alpine:latest

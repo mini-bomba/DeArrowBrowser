@@ -31,7 +31,7 @@ struct UserDetailsProps {
 fn UserDetails(props: &UserDetailsProps) -> HtmlResult {
     let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
     let status: StatusContext = use_context().expect("StatusResponse should be defined");
-    let url = window_context.origin.join(format!("/api/users/user_id/{}", props.userid).as_str()).expect("Should be able to create an API url");
+    let url = window_context.origin_join_segments(&["api","users","user_id", &props.userid]);
     let result: Rc<Result<User, anyhow::Error>> = use_async_suspension(|(url, _)| async move {
         Ok(reqwest::get((url).clone()).await?.json().await?)
     }, (url, status.map(|s| s.last_updated)))?;
@@ -77,9 +77,9 @@ pub fn UserPage(props: &UserPageProps) -> Html {
     let entry_count = use_state_eq(|| None);
 
     let url = match state.detail_table_mode {
-        DetailType::Title => window_context.origin.join(format!("/api/titles/user_id/{}", props.userid).as_str()),
-        DetailType::Thumbnail => window_context.origin.join(format!("/api/thumbnails/user_id/{}", props.userid).as_str()),
-    }.expect("Should be able to create an API url");
+        DetailType::Title => window_context.origin_join_segments(&["api", "titles", "user_id", &props.userid]),
+        DetailType::Thumbnail => window_context.origin_join_segments(&["api", "thumbnails", "user_id", &props.userid]),
+    };
 
     let details_fallback = html! {
         <div><b>{"Loading..."}</b></div>

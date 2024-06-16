@@ -244,7 +244,7 @@ async fn get_thumbnails(db_lock: DBLock, inm: IfNoneMatch, query: web::Query<Mai
     etag_shortcircuit!(db_lock, inm);
     if query.count > 1024 {
         return Err(
-            utils::Error::from(anyhow!("Too many requested thumbnails. You requested {} thumnails, but the configured max is 1024.", query.count))
+            utils::Error::from(anyhow!("Too many requested thumbnails. You requested {} thumbnails, but the configured max is 1024.", query.count))
                 .set_status(StatusCode::BAD_REQUEST)
         );
     }

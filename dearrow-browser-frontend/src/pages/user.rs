@@ -17,7 +17,7 @@
 */
 use std::rc::Rc;
 
-use dearrow_browser_api::User;
+use dearrow_browser_api::unsync::User;
 use yew::prelude::*;
 
 use crate::{contexts::{WindowContext, StatusContext}, hooks::{use_async_suspension, use_location_state}, components::detail_table::*};

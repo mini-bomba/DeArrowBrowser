@@ -19,10 +19,12 @@ use std::rc::Rc;
 
 use yew::prelude::*;
 use chrono::DateTime;
+use yew_hooks::use_async;
 
 use crate::contexts::{StatusContext, WindowContext};
+use crate::thumbnails::components::{Thumbgen, ThumbgenContext};
 use crate::utils::{render_datetime, RenderNumber};
-use crate::built_info;
+use crate::{built_info, UpdateClock};
 
 macro_rules! number_hoverswitch {
     ($switch_element: tt, $n: expr) => {
@@ -46,8 +48,39 @@ macro_rules! number_hoverswitch {
 pub fn StatusModal() -> Html {
     let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
     let status: StatusContext = use_context().expect("StatusContext should be defined");
+    let thumbgen: ThumbgenContext = use_context().expect("ThumbgenContext should be available");
+    let update_clock: UpdateClock = use_context().expect("UpdateClock should be available");
 
     let errors_url: Rc<AttrValue> = use_memo(window_context, |wc| wc.origin.join("/api/errors").expect("should be able to create errors API URL").as_str().to_owned().into());
+
+    let thumbgen_impl = match &thumbgen {
+        None => None,
+        Some(Thumbgen::Remote(..)) => Some("SharedWorker"),
+        Some(Thumbgen::Local{..}) => Some("Local"),
+    };
+
+    let thumbgen_fallback_reason: Rc<Option<AttrValue>> = use_memo(
+        match &thumbgen {
+            Some(Thumbgen::Local{ error, .. }) => Some(error.clone()),
+            _ => None,
+        },
+        |err| err.as_ref().map(|err| format!("{:?}", err.0).into())
+    );
+
+    let thumbgen_stats = { 
+        let thumbgen = thumbgen.clone();
+        use_async(async move {
+            let Some(thumbgen) = thumbgen else { return Err(()) };
+            thumbgen.get_stats().await.map_err(|_| ())
+        })
+    };
+
+    {
+        let thumbgen_stats = thumbgen_stats.clone();
+        use_memo(update_clock, |_| {
+            thumbgen_stats.run();
+        });
+    }
 
     html! {
         <div id="status-modal">
@@ -83,6 +116,61 @@ pub fn StatusModal() -> Html {
                             }
                         </td>
                     </tr>
+                </table>
+                <h4>{"Thumbnail generator info"}</h4>
+                <table>
+                    <tr>
+                        <th>{"Status"}</th>
+                        <td>
+                            if thumbgen.is_none() {
+                                {"Initializing"}
+                            } else {
+                                {"Ready"}
+                            }
+                        </td>
+                    </tr>
+                    if let Some(r#impl) = thumbgen_impl {
+                    <tr>
+                        <th>{"Implementation type"}</th>
+                        <td>{r#impl}</td>
+                    </tr>
+                    }
+                    if let Some(ref reason) = *thumbgen_fallback_reason {
+                    <tr>
+                        <th>{"Fallback reason"}</th>
+                        <td>{reason}</td>
+                    </tr>
+                    }
+                    if thumbgen_stats.loading {
+                    <em>{"Loading..."}</em>
+                    } else if let Some(ref stats) = thumbgen_stats.data {
+                    <tr>
+                        <th>{"Cached entries"}</th>
+                        <td>{stats.cache_stats.total}</td>
+                    </tr>
+                    <tr>
+                        <th>{"Cached thumbnails"}</th>
+                        <td>{format!("{} ({} in use)", stats.cache_stats.thumbs, stats.cache_stats.in_use)}</td>
+                    </tr>
+                    <tr>
+                        <th>{"Cached errors"}</th>
+                        <td>{stats.cache_stats.errors}</td>
+                    </tr>
+                    <tr>
+                        <th>{"Pending thumbnails"}</th>
+                        <td>{stats.cache_stats.pending}</td>
+                    </tr>
+                    if let Some(ref worker_stats) = stats.worker_stats {
+                    <tr>
+                        <th>{"Clients connected"}</th>
+                        <td>{worker_stats.clients}</td>
+                    </tr>
+                    <tr>
+                        <th>{"Refs owned by this client"}</th>
+                        <td>{worker_stats.this_client_refs}</td>
+                    </tr>
+                    }
+                    }
                 </table>
             </div>
             <div id="status-modal-server">

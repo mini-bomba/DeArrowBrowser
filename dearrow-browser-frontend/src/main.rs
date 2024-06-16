@@ -16,9 +16,10 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 use std::rc::Rc;
-use dearrow_browser_api::StatusResponse;
+use dearrow_browser_api::unsync::StatusResponse;
 use gloo_console::error;
 use reqwest::Url;
+use thumbnails::components::ThumbgenProvider;
 use yew::prelude::*;
 use yew_hooks::{use_async_with_options, UseAsyncOptions, use_interval};
 use yew_router::prelude::*;
@@ -29,6 +30,7 @@ pub mod utils;
 pub mod components;
 pub mod contexts;
 pub mod pages;
+pub mod thumbnails;
 use contexts::*;
 use pages::*;
 
@@ -69,11 +71,13 @@ fn App() -> Html {
     html! {
         <ContextProvider<Rc<WindowContext>> context={window_context}>
         <ContextProvider<StatusContext> context={status.data.clone()}>
+        <ThumbgenProvider>
         <ContextProvider<UpdateClock> context={*update_clock}>
             <BrowserRouter>
                 <Switch<MainRoute> render={render_main_route} />
             </BrowserRouter>
         </ContextProvider<UpdateClock>>
+        </ThumbgenProvider>
         </ContextProvider<StatusContext>>
         </ContextProvider<Rc<WindowContext>>>
     }

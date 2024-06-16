@@ -23,9 +23,9 @@ use reqwest::Url;
 use web_sys::HtmlInputElement;
 use yew::{prelude::*, suspense::SuspensionResult};
 use yew_router::prelude::*;
-use dearrow_browser_api::*;
+use dearrow_browser_api::unsync::*;
 
-use crate::{pages::{MainRoute, LocationState}, contexts::StatusContext, hooks::{use_async_suspension, use_location_state}, utils::{render_datetime, RcEq}};
+use crate::{components::modals::{thumbnail::ThumbnailModal, ModalMessage}, contexts::StatusContext, hooks::{use_async_suspension, use_location_state}, pages::{LocationState, MainRoute}, utils::{render_datetime, RcEq}, ModalRendererControls};
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum DetailType {
@@ -381,8 +381,85 @@ macro_rules! username_link {
     };
 }
 
+#[derive(Properties, PartialEq, Clone)]
+struct DetailTableRowProps {
+    details: DetailSlice,
+    index: usize,
+    #[prop_or_default]
+    pub hide_userid: bool,
+    #[prop_or_default]
+    pub hide_username: bool,
+    #[prop_or_default]
+    pub hide_videoid: bool,
+}
+
 #[function_component]
-pub fn BaseDetailTableRenderer(props: &BaseDetailTableRendererProps) -> Html{
+fn DetailTableRow(props: &DetailTableRowProps) -> Html {
+    let modal_controls: ModalRendererControls = use_context().expect("ModalRendererControls should be available");
+
+    match props.details {
+        DetailSlice::Titles(ref list) => {
+            let t = &list[props.index];
+            html! {
+                <tr>
+                    <td>{DateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), render_datetime)}</td>
+                    if !props.hide_videoid {
+                        <td>{video_link!(t.video_id)}</td>
+                    }
+                    <td class="title-col">{t.title.clone()}<br />{original_indicator!(t.original, title)}</td>
+                    <td class="score-col hoverswitch-trigger">{title_score(t)}<br />{title_flags(t)}</td>
+                    <td>{t.uuid.clone()}</td>
+                    if !props.hide_username {
+                        <td>{username_link!(t.username)}</td>
+                    }
+                    if !props.hide_userid {
+                        <td>{user_link!(t.user_id)}</td>
+                    }
+                </tr>
+            }
+        },
+        DetailSlice::Thumbnails(ref list) => {
+            let t = &list[props.index];
+            let onclick = {
+                let list = list.clone();
+                let index = props.index;
+                Callback::from(move |_| {
+                    let t = &list[index];
+                    modal_controls.emit(ModalMessage::Open(html! {
+                        <ThumbnailModal video_id={t.video_id.clone()} timestamp={t.timestamp} />
+                    }));
+                })
+            };
+            html! {
+                <tr>
+                    <td>{DateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), render_datetime)}</td>
+                    if !props.hide_videoid {
+                        <td>{video_link!(t.video_id)}</td>
+                    }
+                    <td {onclick} class="clickable">{t.timestamp.map_or(original_indicator!(t.original, thumbnail), |ts| html! {{ts.to_string()}})}</td>
+                    <td class="score-col hoverswitch-trigger">{thumb_score(t)}<br />{thumbnail_flags(t)}</td>
+                    <td>{t.uuid.clone()}</td>
+                    if !props.hide_username {
+                        <td>{username_link!(t.username)}</td>
+                    }
+                    if !props.hide_userid {
+                        <td>{user_link!(t.user_id)}</td>
+                    }
+                </tr>
+            }
+        }
+    }
+}
+
+#[function_component]
+pub fn BaseDetailTableRenderer(props: &BaseDetailTableRendererProps) -> Html {
+    let row_props = DetailTableRowProps {
+        details: props.details.clone(),
+        index: 0,
+        hide_userid: props.hide_userid,
+        hide_username: props.hide_username,
+        hide_videoid: props.hide_videoid,
+    };
     match props.details {
         DetailSlice::Titles(ref list) => html! {
             <table class="detail-table titles">
@@ -401,22 +478,10 @@ pub fn BaseDetailTableRenderer(props: &BaseDetailTableRendererProps) -> Html{
                         <th>{"User ID"}</th>
                     }
                 </tr>
-                { for list.iter().map(|t| html! {
-                    <tr key={&*t.uuid}>
-                        <td>{DateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), render_datetime)}</td>
-                        if !props.hide_videoid {
-                            <td>{video_link!(t.video_id)}</td>
-                        }
-                        <td class="title-col">{t.title.clone()}<br />{original_indicator!(t.original, title)}</td>
-                        <td class="score-col hoverswitch-trigger">{title_score(t)}<br />{title_flags(t)}</td>
-                        <td>{t.uuid.clone()}</td>
-                        if !props.hide_username {
-                            <td>{username_link!(t.username)}</td>
-                        }
-                        if !props.hide_userid {
-                            <td>{user_link!(t.user_id)}</td>
-                        }
-                    </tr>
+                { for list.iter().enumerate().map(|(i, t)| {
+                    let mut row_props = row_props.clone();
+                    row_props.index = i;
+                    html! { <DetailTableRow key={t.uuid.clone()} ..row_props />}
                 }) }
             </table>
         },
@@ -437,22 +502,10 @@ pub fn BaseDetailTableRenderer(props: &BaseDetailTableRendererProps) -> Html{
                         <th>{"User ID"}</th>
                     }
                 </tr>
-                { for list.iter().map(|t| html! {
-                    <tr key={&*t.uuid}>
-                        <td>{DateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), render_datetime)}</td>
-                        if !props.hide_videoid {
-                            <td>{video_link!(t.video_id)}</td>
-                        }
-                        <td>{t.timestamp.map_or(original_indicator!(t.original, thumbnail), |ts| html! {{ts.to_string()}})}</td>
-                        <td class="score-col hoverswitch-trigger">{thumb_score(t)}<br />{thumbnail_flags(t)}</td>
-                        <td>{t.uuid.clone()}</td>
-                        if !props.hide_username {
-                            <td>{username_link!(t.username)}</td>
-                        }
-                        if !props.hide_userid {
-                            <td>{user_link!(t.user_id)}</td>
-                        }
-                    </tr>
+                { for list.iter().enumerate().map(|(i, t)| {
+                    let mut row_props = row_props.clone();
+                    row_props.index = i;
+                    html! { <DetailTableRow key={t.uuid.clone()} ..row_props />}
                 }) }
             </table>
         },

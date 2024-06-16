@@ -3,7 +3,7 @@ members = ["dearrow-browser-server", "dearrow-browser-api", "dearrow-parser", "d
 resolver = "2"
 
 [workspace.package]
-version = "1.6.5"
+version = "1.7.0"
 homepage = "https://dearrow.minibomba.pro"
 repository = "https://github.com/mini-bomba/DeArrowBrowser"
 license = "AGPL-3.0-only"
@@ -19,6 +19,7 @@ log = "0.4.21"
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
+todo = "warn"
 # lints that aren't compatible with what I'm doing
 struct_field_names = "allow"      # triggers on things like "username" in the Username struct or "title" on Title
 struct_excessive_bools = "allow"  # false positives

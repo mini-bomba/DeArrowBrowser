@@ -173,21 +173,39 @@ pub async fn get_original_title(vid: &str) -> Result<String, anyhow::Error> {
 }
 
 /// Wrapper type for comparing Rc's via their addresses
-#[derive(Clone)]
-pub struct RcEq<T>(pub Rc<T>);
+pub struct RcEq<T: ?Sized>(pub Rc<T>);
 
-impl<T> PartialEq for RcEq<T> {
+impl<T: ?Sized> PartialEq for RcEq<T> {
     fn eq(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
     }
 }
+impl<T: ?Sized> Eq for RcEq<T> {}
 
-impl<T> Deref for RcEq<T> {
+impl<T: ?Sized> Deref for RcEq<T> {
     type Target = T;
 
     #[inline(always)]
     fn deref(&self) -> &T {
         &self.0
+    }
+}
+
+impl<T: ?Sized> Clone for RcEq<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<T> From<T> for RcEq<T> {
+    fn from(value: T) -> Self {
+        Self::new(value)
+    }
+}
+
+impl<T> RcEq<T> {
+    pub fn new(val: T) -> Self {
+        Self(Rc::new(val))
     }
 }
 

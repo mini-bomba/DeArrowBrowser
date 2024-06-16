@@ -68,6 +68,15 @@ docker run -h dearrow-browser --name dearrow-browser -v <path to mirror>:/mirror
 If you've got a proper mirror set up (instead of manually sourced .csv files), make it make a POST request to `/api/reload` with the auth secret as the `auth` URL parameter to reload the database.
 DeArrow Browser should remain usable while the database is reloaded. (assuming we don't run out of RAM)
 
+## Note about the internal API crate
+The API provided by `dearrow-browser-server` and used by `dearrow-browser-frontend` is considered to be internal.
+
+While API structures are publicly defined in the `dearrow-browser-api` crate (which can be used in other projects), breaking changes may be made to the API at any time with no backwards compatibility and without a major version number change.
+
+The `dearrow-browser-api` crate provides both `sync` (threadsafe, `Arc<>` based) and `unsync` (not threadsafe, `Rc<>` based) implementations of the API structures.
+These implementations can be enabled or disabled using respective features and are available in separate modules.
+The `sync` implementation is enabled by default.
+
 ## Credits
 
 The DeArrow Browser logo is a combination of the DeArrow logo (which is based on Twemoji) and the magnifying glass emoji from [Twemoji](https://github.com/twitter/twemoji) and is licensed under the CC-BY 4.0 license.

@@ -267,6 +267,23 @@ body {
   }
 }
 
+#thumbnail-modal {
+  @extend %flex-column;
+  justify-content: stretch;
+  align-items: stretch;
+  text-align: center;
+  overflow: hidden;
+  max-height: 100%;
+
+  .thumbnail {
+    flex-grow: 1;
+  }
+
+  h2, h3 {
+    margin-top: 0;
+  }
+}
+
 .clickable {
   cursor: pointer;
 }

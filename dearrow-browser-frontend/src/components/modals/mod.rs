@@ -18,6 +18,7 @@
 use yew::prelude::*;
 
 pub mod status;
+pub mod thumbnail;
 
 pub enum ModalMessage {
     Open(Html),
@@ -75,23 +76,32 @@ struct ModalContainersProps {
 
 #[function_component]
 fn ModalContainers(props: &ModalContainersProps) -> Html {
+    html! {
+        <>
+            {for (0..props.state.modals.len()).map(|index| html! { <ModalContainer state={props.state.clone()} {index} /> })}
+        </>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct ModalContainerProps {
+    state: UseReducerHandle<ModalState>,
+    index: usize,
+}
+
+#[function_component]
+fn ModalContainer(props: &ModalContainerProps) -> Html {
     let close_top = {
         let state = props.state.clone();
         use_callback((), move |_, ()| state.dispatch(ModalMessage::CloseTop))
     };
 
     html! {
-        <>
-            {for props.state.modals.iter().enumerate().map(|(i, modal)| {
-                html! {
-                    <div class="modal-container" style={format!("z-index: {};", i+1)} key={i}>
-                        <div class="modal-background" onclick={close_top.clone()} />
-                        <div class="modal-content">
-                            {modal.clone()}
-                        </div>
-                    </div>
-                }
-            })}
-        </>
+        <div class="modal-container" style={format!("z-index: {};", props.index+1)}>
+            <div class="modal-background" onclick={close_top.clone()} />
+            <div class="modal-content">
+                {props.state.modals[props.index].clone()}
+            </div>
+        </div>
     }
 }

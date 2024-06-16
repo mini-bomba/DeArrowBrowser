@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2023-2024 mini_bomba
+*  Copyright (C) 2024 mini_bomba
 *  
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -15,32 +15,12 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use std::rc::Rc;
+import wasm_loader from '/thumbnails_worker.js';
 
-use dearrow_browser_api::unsync::StatusResponse;
-use reqwest::Url;
-use yew::AttrValue;
+// this will store missed 'connect' events until the wasm binary boots up
+// so we don't have to do the weird "ping the worker first" hack on the page
+globalThis.events = [];
+globalThis.onconnect = e => globalThis.events.push(e);
 
-pub use crate::components::modals::ModalRendererControls;
-use crate::utils::ReqwestUrlExt;
-
-#[derive(Clone, PartialEq)]
-pub struct WindowContext {
-    pub origin: Url,
-    pub logo_url: Option<AttrValue>,
-}
-
-impl WindowContext {
-    #[must_use]
-    pub fn origin_join_segments<I>(&self, segments: I) -> Url
-    where I: IntoIterator,
-    I::Item: AsRef<str>,
-    {
-        self.origin.join_segments(segments).expect("WindowContext.origin should be a valid base")
-    }
-}
-
-#[derive(Clone, Copy, PartialEq)]
-pub struct UpdateClock(pub bool);
-
-pub type StatusContext = Option<Rc<StatusResponse>>;
+// worker.rs takes over here
+wasm_loader();

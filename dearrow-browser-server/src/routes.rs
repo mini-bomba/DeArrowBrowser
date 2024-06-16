@@ -21,7 +21,7 @@ use actix_web::{Responder, get, post, web, http::StatusCode, CustomizeResponder,
 use anyhow::{anyhow, bail};
 use chrono::{Utc, DateTime};
 use dearrow_parser::{StringSet, DearrowDB, TitleFlags};
-use dearrow_browser_api::*;
+use dearrow_browser_api::sync::*;
 use log::warn;
 use serde::Deserialize;
 

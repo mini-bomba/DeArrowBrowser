@@ -50,7 +50,7 @@ pub fn ThumbnailModal(props: &ThumbnailModalProps) -> Html {
 
     html!{
         <div id="thumbnail-modal">
-            <h2>{"Thumnail preview"}</h2>
+            <h2>{"Thumbnail preview"}</h2>
             <h3>{(*header_text).clone()}</h3>
             if props.timestamp.is_some() {
                 <Suspense {fallback}>

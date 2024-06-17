@@ -19,7 +19,7 @@
 use std::{cell::{Cell, OnceCell, RefCell}, collections::HashMap, fmt::{Debug, Display}, rc::Rc};
 
 use anyhow::Context;
-use gloo_console::{error, log, warn};
+use gloo_console::{error, warn};
 use futures::{channel::oneshot::*, select_biased, future::FutureExt};
 use wasm_bindgen::{closure::Closure, JsCast, JsValue};
 use web_sys::{js_sys::{Array, Object, Uint8Array}, window, MessageEvent, PageTransitionEvent, SharedWorker, WorkerOptions};
@@ -160,7 +160,6 @@ impl ThumbnailWorker {
                 .name("thumbnails_worker")
                 .type_(web_sys::WorkerType::Module)
         ).map_err(Error::JS)?;
-        log!(&worker);
         let port = worker.port();
 
         // Send it an initial version message

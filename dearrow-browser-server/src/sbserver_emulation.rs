@@ -19,19 +19,18 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 #![allow(clippy::needless_pass_by_value)]
-use std::{sync::{RwLock, Arc}, collections::HashMap};
+use std::{sync::Arc, collections::HashMap};
 
-use actix_web::{web, HttpResponse, CustomizeResponder, get, http::StatusCode, post};
+use actix_web::{get, http::StatusCode, post, web, CustomizeResponder, HttpResponse, Responder};
 use alea_js::Alea;
 use anyhow::anyhow;
-use dearrow_parser::{StringSet, Title, TitleFlags, Thumbnail, ThumbnailFlags, VideoInfo};
+use dearrow_parser::{Title, TitleFlags, Thumbnail, ThumbnailFlags, VideoInfo};
 use serde::{Deserialize, Serialize};
 
-use crate::{utils::{self, IfNoneMatch}, state::DatabaseState, etag_shortcircuit, etagged_json};
+use crate::{middleware::ETagCache, state::{DBLock, StringSetLock}, utils};
 
+type JsonResult<T> = utils::Result<web::Json<T>>;
 type CustomizedJsonResult<T> = utils::Result<CustomizeResponder<web::Json<T>>>;
-type DBLock = web::Data<RwLock<DatabaseState>>;
-type StringSetLock = web::Data<RwLock<StringSet>>;
 
 pub fn configure_disabled(cfg: &mut web::ServiceConfig) {
     cfg.default_service(web::to(disabled_route));
@@ -171,22 +170,21 @@ async fn post_video_branding() -> HttpResponse {
     HttpResponse::NotFound().body("Voting through DeArrow Browser is not supported. See the README.md of DeArrow Browser to learn more about the limitations of SponsorBlockServer emulation.")
 }
 
-#[get("/api/branding")]
-async fn get_video_branding(db_lock: DBLock, string_set: StringSetLock, query: web::Query<VideoBrandingParams>, inm: IfNoneMatch) -> CustomizedJsonResult<SBApiVideo> {
-    etag_shortcircuit!(db_lock, inm);
+#[get("/api/branding", wrap = "ETagCache")]
+async fn get_video_branding(db_lock: DBLock, string_set: StringSetLock, query: web::Query<VideoBrandingParams>) -> CustomizedJsonResult<SBApiVideo> {
     let video_id = string_set.read().map_err(|_| anyhow!("Failed to acquire StringSet for reading"))?
         .set.get(query.0.videoID.as_str()).cloned();
     let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
     if let Some(service) = query.0.service {
         if service != "YouTube" {
-            return Ok(etagged_json!(db, unknown_video(&query.0.videoID)).with_status(StatusCode::NOT_FOUND));
+            return Ok(web::Json(unknown_video(&query.0.videoID)).customize().with_status(StatusCode::NOT_FOUND));
         }
     }
     match video_id {
-        None => Ok(etagged_json!(db, unknown_video(&query.0.videoID)).with_status(StatusCode::NOT_FOUND)),
+        None => Ok(web::Json(unknown_video(&query.0.videoID)).customize().with_status(StatusCode::NOT_FOUND)),
         Some(video_id) => {
             let video_info = db.db.get_video_info(&video_id);
-            Ok(etagged_json!(db, SBApiVideo {
+            Ok(web::Json(SBApiVideo {
                 titles: {
                     let mut titles: Vec<SBApiTitle> = db.db.titles.iter()
                         .filter(|t| 
@@ -217,7 +215,7 @@ async fn get_video_branding(db_lock: DBLock, string_set: StringSetLock, query: w
                 },
                 randomTime: get_random_time_for_video(&video_id, video_info),
                 videoDuration: video_info.map(|v| v.video_duration),
-            }))
+            }).customize())
         }
     }
 }
@@ -238,13 +236,12 @@ struct ChunkBrandingPath {
     hash_prefix: String,
 }
 
-#[get("/api/branding/{hash_prefix}")]
-async fn get_chunk_branding(db_lock: DBLock, query: web::Query<ChunkBrandingParams>, path: web::Path<ChunkBrandingPath>, inm: IfNoneMatch) -> CustomizedJsonResult<HashMap<Arc<str>, SBApiVideo>> {
-    etag_shortcircuit!(db_lock, inm);
+#[get("/api/branding/{hash_prefix}", wrap = "ETagCache")]
+async fn get_chunk_branding(db_lock: DBLock, query: web::Query<ChunkBrandingParams>, path: web::Path<ChunkBrandingPath>) -> CustomizedJsonResult<HashMap<Arc<str>, SBApiVideo>> {
     let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
     if let Some(service) = query.0.service {
         if service != "YouTube" {
-            return Ok(etagged_json!(db, HashMap::new()).with_status(StatusCode::NOT_FOUND));
+            return Ok(web::Json(HashMap::new()).customize().with_status(StatusCode::NOT_FOUND));
         }
     }
     // validate & parse hashprefix
@@ -288,12 +285,12 @@ async fn get_chunk_branding(db_lock: DBLock, query: web::Query<ChunkBrandingPara
         });
 
     // Construct response
-    Ok(etagged_json!(db, videos.into_iter().map(|(v, info)| (v.clone(), SBApiVideo {
+    Ok(web::Json(videos.into_iter().map(|(v, info)| (v.clone(), SBApiVideo {
         titles: titles.get(&v).cloned().unwrap_or_default(),
         thumbnails: thumbnails.get(&v).cloned().unwrap_or_default(),
         randomTime: get_random_time_for_video(&v, info),
         videoDuration: info.map(|info| info.video_duration),
-    })).collect::<HashMap<Arc<str>, SBApiVideo>>()))
+    })).collect::<HashMap<Arc<str>, SBApiVideo>>()).customize())
 }
 
 #[allow(non_snake_case)]
@@ -312,13 +309,12 @@ struct UserInfo {
     vip: bool,
 }
 
-#[get("/api/userInfo")]
-async fn get_user_info(db_lock: DBLock, string_set: StringSetLock, query: web::Query<UserInfoParams>, inm: IfNoneMatch) -> CustomizedJsonResult<UserInfo> {
-    etag_shortcircuit!(db_lock, inm);
+#[get("/api/userInfo", wrap = "ETagCache")]
+async fn get_user_info(db_lock: DBLock, string_set: StringSetLock, query: web::Query<UserInfoParams>) -> JsonResult<UserInfo> {
     let user_id = string_set.read().map_err(|_| anyhow!("Failed to acquire StringSet for reading"))?
         .set.get(query.0.publicUserID.as_str()).cloned();
     let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
-    Ok(etagged_json!(db, match user_id {
+    Ok(web::Json(match user_id {
         None => {
             let user_id: Arc<str> = query.0.publicUserID.into();
             UserInfo { userID: user_id.clone(), userName: user_id, titleSubmissionCount: 0, thumbnailSubmissionCount: 0, vip: false }

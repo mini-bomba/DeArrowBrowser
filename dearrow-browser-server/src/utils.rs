@@ -15,9 +15,9 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use std::{fmt::{Debug, Display}, path::Path, fs, time::UNIX_EPOCH, future::{Ready, ready}};
+use std::{fmt::{Debug, Display}, fs, path::Path, time::UNIX_EPOCH};
 
-use actix_web::{ResponseError, http::{StatusCode, header::{ContentType, self, Header, EntityTag}}, HttpResponse, FromRequest};
+use actix_web::{http::{header::{ContentType, HeaderMap, TryIntoHeaderPair}, StatusCode}, HttpResponse, ResponseError};
 use sha2::{Sha256, Digest, digest::{typenum::U32, generic_array::GenericArray}};
 
 
@@ -88,49 +88,14 @@ pub fn get_mtime(p: &Path) -> i64 {
         .unwrap_or(0)
 }
 
-#[derive(Debug)]
-pub struct IfNoneMatch(Vec<EntityTag>);
-
-impl FromRequest for IfNoneMatch {
-    type Error = actix_web::error::ParseError;
-    type Future = Ready<std::result::Result<Self, Self::Error>>;
-
-    fn from_request(req: &actix_web::HttpRequest, _: &mut actix_web::dev::Payload) -> Self::Future {
-        ready(header::IfNoneMatch::parse(req).map(|h| match h {
-            header::IfNoneMatch::Any => IfNoneMatch(vec![]),
-            header::IfNoneMatch::Items(v) => IfNoneMatch(v),
-        }))
-    }    
+pub trait HeaderMapExt {
+    fn append_header<H: TryIntoHeaderPair>(&mut self, header: H) -> std::result::Result<(), H::Error>;
 }
 
-impl IfNoneMatch {
-    pub fn any_match(&self, other: &EntityTag) -> bool {
-        self.0.iter().any(|etag| etag.weak_eq(other))
+impl HeaderMapExt for HeaderMap {
+    fn append_header<H: TryIntoHeaderPair>(&mut self, header: H) -> std::result::Result<(), H::Error> {
+        let (name, value) = header.try_into_pair()?;
+        self.append(name, value);
+        Ok(())
     }
-
-    pub fn shortcircuit(&self, other: &EntityTag) -> Result<()> {
-        if self.any_match(other) {
-            Err(Error::EmptyStatus(StatusCode::NOT_MODIFIED))
-        } else {
-            Ok(())
-        }
-    }
-}
-
-#[macro_export]
-macro_rules! etag_shortcircuit {
-    ($db_lock: expr, $inm: expr) => {
-        let db = $db_lock.read().map_err(|_| anyhow::anyhow!("Failed to acquire DatabaseState for reading"))?;
-        $inm.shortcircuit(&db.get_etag())?
-    };
-}
-
-#[macro_export]
-macro_rules! etagged_json {
-    ($db: expr, $struct: expr) => {{
-        use actix_web::Responder;
-        actix_web::web::Json($struct).customize()
-        .append_header(actix_web::http::header::ETag($db.get_etag()))
-        .append_header(actix_web::http::header::CacheControl(vec![actix_web::http::header::CacheDirective::NoCache]))
-    }};
 }

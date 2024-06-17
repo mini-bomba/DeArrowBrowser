@@ -15,14 +15,17 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use actix_web::http::header::EntityTag;
+use actix_web::{http::header::EntityTag, web};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use chrono::{DateTime, Utc};
-use dearrow_parser::DearrowDB;
+use dearrow_parser::{DearrowDB, StringSet};
 use anyhow::Error;
 use getrandom::getrandom;
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::RwLock};
 use serde::{Serialize, Deserialize};
+
+pub type DBLock = web::Data<RwLock<DatabaseState>>;
+pub type StringSetLock = web::Data<RwLock<StringSet>>;
 
 #[derive(Serialize, Deserialize)]
 pub struct AppConfig {

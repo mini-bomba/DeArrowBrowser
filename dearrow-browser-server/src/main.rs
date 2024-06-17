@@ -28,6 +28,7 @@ mod utils;
 mod routes;
 mod state;
 mod sbserver_emulation;
+mod middleware;
 use state::*;
 
 const CONFIG_PATH: &str = "config.toml";
@@ -84,18 +85,15 @@ async fn main() -> anyhow::Result<()> {
             let config2 = config.clone();
             let mut app = App::new()
                 .wrap(NormalizePath::trim())
+                .app_data(config.clone())
+                .app_data(db.clone())
+                .app_data(string_set.clone())
                 .service(web::scope("/api")
                     .configure(routes::configure)
-                    .app_data(config.clone())
-                    .app_data(db.clone())
-                    .app_data(string_set.clone())
                 );
             if config.enable_sbserver_emulation {
                 app = app.service(web::scope("/sbserver")
                     .configure(sbserver_emulation::configure_enabled)
-                    .app_data(config.clone())
-                    .app_data(db.clone())
-                    .app_data(string_set.clone())
                 );
             } else {
                 app = app.service(web::scope("/sbserver")

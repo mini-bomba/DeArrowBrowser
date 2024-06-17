@@ -73,7 +73,7 @@ The API provided by `dearrow-browser-server` and used by `dearrow-browser-fronte
 
 While API structures are publicly defined in the `dearrow-browser-api` crate (which can be used in other projects), breaking changes may be made to the API at any time with no backwards compatibility and without a major version number change.
 
-The `dearrow-browser-api` crate provides both `sync` (threadsafe, `Arc<>` based) and `unsync` (not threadsafe, `Rc<>` based) implementations of the API structures.
+The `dearrow-browser-api` crate provides `sync` (threadsafe, `Arc<>` based), `unsync` (not threadsafe, `Rc<>` based), `boxed` (`Box<>` based) and `string` (`String` based) implementations of the API structures.
 These implementations can be enabled or disabled using respective features and are available in separate modules.
 The `sync` implementation is enabled by default.
 

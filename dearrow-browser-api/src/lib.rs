@@ -98,3 +98,15 @@ pub mod unsync {
 
     include!("api.rs");
 }
+#[cfg(feature = "boxed")]
+pub mod boxed {
+    type RcStr = Box<str>;
+
+    include!("api.rs");
+}
+#[cfg(feature = "string")]
+pub mod string {
+    type RcStr = String;
+
+    include!("api.rs");
+}

@@ -268,15 +268,15 @@ body {
 }
 
 #thumbnail-modal {
-  @extend %flex-column;
-  justify-content: stretch;
-  align-items: stretch;
+  @extend %flex-column, %flex-center;
   text-align: center;
   overflow: hidden;
   max-height: 100%;
 
   .thumbnail {
     flex-grow: 1;
+    flex-shrink: 1;
+    min-height: 0;
   }
 
   h2, h3 {

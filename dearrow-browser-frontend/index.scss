@@ -148,6 +148,7 @@ body {
       
       &.title-col {
         max-width: 40vw;
+        overflow-wrap: break-word;
       }
       
       &.score-col {

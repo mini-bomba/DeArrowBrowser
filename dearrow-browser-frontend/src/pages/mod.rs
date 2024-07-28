@@ -26,11 +26,13 @@ mod home;
 mod unverified;
 mod user;
 mod video;
+mod uuid;
 
 use home::HomePage;
 use unverified::UnverifiedPage;
 use user::UserPage;
 use video::VideoPage;
+use uuid::UUIDPage;
 
 #[derive(Clone, Routable, PartialEq, IntoStaticStr)]
 pub enum MainRoute {
@@ -42,6 +44,8 @@ pub enum MainRoute {
     Video { id: AttrValue },
     #[at("/user_id/:id")]
     User { id: AttrValue },
+    #[at("/uuid/:id")]
+    UUID { id: AttrValue },
     #[at("/wip")]
     NotImplemented,
     #[not_found]
@@ -66,12 +70,14 @@ pub fn render_main_route(route: MainRoute) -> Html {
         MainRoute::NotImplemented => "Not implemented - DeArrow Browser".to_string(),
         MainRoute::Video { ref id } => format!("VideoID {id} - DeArrow Browser"),
         MainRoute::User { ref id } => format!("UserID {id} - Dearrow Browser"),
+        MainRoute::UUID { ref id } => format!("UUID {id} - Dearrow Browser"),
     }.as_str());
     let route_html = match route {
         MainRoute::Home => html! {<HomePage/>},
         MainRoute::Unverified => html! {<UnverifiedPage/>},
         MainRoute::Video { ref id } => html! {<VideoPage videoid={id.clone()} />},
         MainRoute::User { ref id } => html! {<UserPage userid={id.clone()} />},
+        MainRoute::UUID { ref id } => html! {<UUIDPage uuid={id.clone()} />},
         MainRoute::NotFound => html! {
             <>
                 <h2>{"404 - Not found"}</h2>

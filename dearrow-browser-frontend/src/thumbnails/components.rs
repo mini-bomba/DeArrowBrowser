@@ -21,9 +21,9 @@ use std::rc::Rc;
 use yew::prelude::*;
 use yew_hooks::{use_async_with_options, UseAsyncHandle, UseAsyncOptions};
 
-use crate::{hooks::use_async_suspension, utils::RcEq};
+use crate::{components::modals::{thumbnail::ThumbnailModal, ModalMessage}, hooks::use_async_suspension, utils::RcEq, ModalRendererControls};
 
-use super::{common::{ThumbgenStats, ThumbnailKey}, local::{LocalBlobLink, LocalThumbGenerator}, remote::{Error, RemoteBlobLink, ThumbnailWorker}};
+use super::{common::{ThumbgenStats, ThumbnailKey}, local::{LocalBlobLink, LocalThumbGenerator}, remote::{Error, RemoteBlobLink, ThumbnailWorker}, utils::sleep};
 
 #[derive(Clone, Eq, PartialEq)]
 pub enum Thumbgen {
@@ -52,10 +52,15 @@ impl ThumbnailUrl {
 
 impl Thumbgen {
     pub async fn get_thumbnail(&self, key: &ThumbnailKey) -> Result<ThumbnailUrl, Error> {
-        match self {
+        let result = match self {
             Self::Remote(worker) => worker.get_thumbnail(key.clone()).await.map(|t| ThumbnailUrl::Remote(Rc::new(t))),
             Self::Local { gen, .. } => gen.get_thumb(key).await.map(ThumbnailUrl::Local).map_err(|e| Error::Remote(e.into())),
+        };
+        if result.is_ok() {
+            // just some sleep to let firefox notice that the blob link is actually real and safe
+            sleep(50).await; 
         }
+        result
     }
 
     pub async fn get_stats(&self) -> Result<ThumbgenStats, Error> {
@@ -93,12 +98,12 @@ pub fn ThumbgenProvider(props: &ThumbnailGeneratorProviderProps) -> Html {
 }
 
 #[derive(Properties, PartialEq)]
-pub struct ThumbnailProps {
+pub struct BaseThumbnailProps {
     pub thumb_key: ThumbnailKey,
 }
 
 #[function_component]
-pub fn Thumbnail(props: &ThumbnailProps) -> HtmlResult {
+pub fn BaseThumbnail(props: &BaseThumbnailProps) -> HtmlResult {
     let generator: ThumbgenContext = use_context().expect("Thumbnail must be run under a ThumbnailGeneratorProvider");
     let thumbnail = use_async_suspension(|(generator, key)| async move {
         Some(generator?.get_thumbnail(&key).await)
@@ -109,4 +114,55 @@ pub fn Thumbnail(props: &ThumbnailProps) -> HtmlResult {
         Some(Err(ref err)) => html! { <span class="thumbnail-error">{format!("{err:?}")}</span> },
         Some(Ok(ref url)) => html! { <img class="thumbnail" src={Rc::from(url.get_url())} /> },
     })
+}
+
+#[derive(Properties, PartialEq, Clone)]
+pub struct ThumbnailProps {
+    pub video_id: Rc<str>,
+    /// none means original thumb
+    pub timestamp: Option<f64>,
+}
+
+#[function_component]
+pub fn UnwrappedThumbnail(props: &ThumbnailProps) -> Html {
+    let timestamp: Rc<Rc<str>> = use_memo(props.clone(), |props| {
+        match props.timestamp {
+            None => format!("https://img.youtube.com/vi/{}/maxresdefault.jpg", props.video_id),
+            Some(t) => format!("{t}"),
+        }.into()
+    });
+    if props.timestamp.is_none() {
+        html! {
+            <img class="thumbnail" src={(*timestamp).clone()} />
+        }
+    } else {
+        let fallback = html! {<span class="thumbnail-error">{"Generating thumbnail..."}</span>};
+        let thumb_key = ThumbnailKey {
+            video_id: props.video_id.clone(),
+            timestamp: (*timestamp).clone(),
+        };
+        html! {
+            <Suspense {fallback}>
+                <BaseThumbnail {thumb_key} />
+            </Suspense>
+        }
+    }
+}
+
+#[function_component]
+pub fn Thumbnail(props: &ThumbnailProps) -> Html {
+    let modal_controls: ModalRendererControls = use_context().expect("ModalRendererControls should be available");
+    let onclick = {
+        let props = props.clone();
+        Callback::from(move |_| {
+            modal_controls.emit(ModalMessage::Open(html! {
+                <ThumbnailModal ..props.clone() />
+            }));
+        })
+    };
+    html! {
+        <div class="thumbnail-container clickable" {onclick}>
+            <UnwrappedThumbnail ..props.clone() />
+        </div>
+    }
 }

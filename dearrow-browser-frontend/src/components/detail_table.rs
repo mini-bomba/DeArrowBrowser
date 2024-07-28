@@ -22,10 +22,9 @@ use chrono::DateTime;
 use reqwest::Url;
 use web_sys::HtmlInputElement;
 use yew::{prelude::*, suspense::SuspensionResult};
-use yew_router::prelude::*;
 use dearrow_browser_api::unsync::*;
 
-use crate::{components::modals::{thumbnail::ThumbnailModal, ModalMessage}, contexts::StatusContext, hooks::{use_async_suspension, use_location_state}, pages::{LocationState, MainRoute}, utils::{render_datetime, RcEq}, ModalRendererControls};
+use crate::{components::{modals::{thumbnail::ThumbnailModal, ModalMessage}, youtube::YoutubeVideoLink, links::*}, contexts::StatusContext, hooks::{use_async_suspension, use_location_state}, pages::LocationState, utils::{render_datetime, RcEq}, ModalRendererControls};
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum DetailType {
@@ -266,7 +265,14 @@ pub fn use_detail_slice(details: Rc<Result<DetailList, anyhow::Error>>, index: D
 fn title_flags(title: &ApiTitle) -> Html {
     html! {
         <>
-            if title.votes - title.downvotes < -1 {
+            if title.removed || title.shadow_hidden {
+                if title.removed {
+                    <span title="This title was removed by a VIP">{"❌"}</span>
+                }
+                if title.shadow_hidden {
+                    <span title="This title is shadowhidden">{"🚫"}</span>
+                }
+            } else if title.votes - title.downvotes < -1 {
                 <span title="This title was removed by the downvotes">{"👎"}</span>
             } else if title.votes < 0 {
                 <span title="This title was replaced by the submitter">{"👎"}</span>
@@ -279,14 +285,8 @@ fn title_flags(title: &ApiTitle) -> Html {
             if title.locked {
                 <span title="This title was locked by a VIP">{"🔒"}</span>
             }
-            if title.removed {
-                <span title="This title was removed by a VIP">{"❌"}</span>
-            }
             if title.vip {
                 <span title="This title was submitted by a VIP">{"👑"}</span>
-            }
-            if title.shadow_hidden {
-                <span title="This title is shadowhidden">{"🚫"}</span>
             }
         </>
     }
@@ -295,7 +295,14 @@ fn title_flags(title: &ApiTitle) -> Html {
 fn thumbnail_flags(thumb: &ApiThumbnail) -> Html {
     html! {
         <>
-            if thumb.votes - thumb.downvotes < -1 {
+            if thumb.removed || thumb.shadow_hidden {
+                if thumb.removed {
+                    <span title="This thumbnail was removed by a VIP">{"❌"}</span>
+                }
+                if thumb.shadow_hidden {
+                    <span title="This thumbnail is shadowhidden">{"🚫"}</span>
+                }
+            } else if thumb.votes - thumb.downvotes < -1 {
                 <span title="This thumbnail was removed by the downvotes">{"👎"}</span>
             } else if thumb.score < 0 {
                 <span title="This thumbnail should only appear in submission menus (score below 0)" class="grayscale">{"👎"}</span>
@@ -303,14 +310,8 @@ fn thumbnail_flags(thumb: &ApiThumbnail) -> Html {
             if thumb.locked {
                 <span title="This thumbnail was locked by a VIP">{"🔒"}</span>
             }
-            if thumb.removed {
-                <span title="This thumbnail was removed by a VIP">{"❌"}</span>
-            }
             if thumb.vip {
                 <span title="This thumbnail was submitted by a VIP">{"👑"}</span>
-            }
-            if thumb.shadow_hidden {
-                <span title="This thumbnail is shadowhidden">{"🚫"}</span>
             }
         </>
     }
@@ -345,33 +346,28 @@ macro_rules! original_indicator {
     };
 }
 
-macro_rules! video_link {
-    ($videoid:expr) => {
+macro_rules! uuid_cell {
+    ($uuid:expr) => {
         html! {
             <>
-                <a href={format!("https://youtu.be/{}", $videoid)} title="View this video on YouTube" target="_blank">{$videoid.clone()}</a><br />
-                <span class="icon-link" title="View this video in DeArrow Browser">
-                    <Link<MainRoute> to={MainRoute::Video { id: $videoid.clone().into() }}>{"🔍"}</Link<MainRoute>>
-                </span>
+                {$uuid.clone()}<br />{uuid_link($uuid.clone().into())}
             </>
         }
     };
 }
 
-macro_rules! user_link {
+macro_rules! userid_cell {
     ($userid:expr) => {
         html! {
             <>
-                <textarea readonly=true ~value={$userid.to_string()} /><br />
-                <span class="icon-link" title="View this user in DeArrow Browser">
-                    <Link<MainRoute> to={MainRoute::User { id: $userid.clone().into() }}>{"🔍"}</Link<MainRoute>>
-                </span>
+                <textarea readonly=true ~value={$userid.clone()} /><br />
+                {userid_link($userid.clone().into())}
             </>
         }
     };
 }
 
-macro_rules! username_link {
+macro_rules! username_cell {
     ($username:expr) => {
         if let Some(ref name) = $username {
             html! {<textarea readonly=true ~value={name.to_string()} />}
@@ -404,16 +400,16 @@ fn DetailTableRow(props: &DetailTableRowProps) -> Html {
                 <tr>
                     <td>{DateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), render_datetime)}</td>
                     if !props.hide_videoid {
-                        <td>{video_link!(t.video_id)}</td>
+                        <td><YoutubeVideoLink videoid={t.video_id.clone()} multiline={true} /></td>
                     }
                     <td class="title-col">{t.title.clone()}<br />{original_indicator!(t.original, title)}</td>
                     <td class="score-col hoverswitch-trigger">{title_score(t)}<br />{title_flags(t)}</td>
-                    <td>{t.uuid.clone()}</td>
+                    <td>{uuid_cell!(t.uuid)}</td>
                     if !props.hide_username {
-                        <td>{username_link!(t.username)}</td>
+                        <td>{username_cell!(t.username)}</td>
                     }
                     if !props.hide_userid {
-                        <td>{user_link!(t.user_id)}</td>
+                        <td>{userid_cell!(t.user_id)}</td>
                     }
                 </tr>
             }
@@ -434,16 +430,16 @@ fn DetailTableRow(props: &DetailTableRowProps) -> Html {
                 <tr>
                     <td>{DateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), render_datetime)}</td>
                     if !props.hide_videoid {
-                        <td>{video_link!(t.video_id)}</td>
+                        <td><YoutubeVideoLink videoid={t.video_id.clone()} multiline={true} /></td>
                     }
                     <td {onclick} class="clickable">{t.timestamp.map_or(original_indicator!(t.original, thumbnail), |ts| html! {{ts.to_string()}})}</td>
                     <td class="score-col hoverswitch-trigger">{thumb_score(t)}<br />{thumbnail_flags(t)}</td>
-                    <td>{t.uuid.clone()}</td>
+                    <td>{uuid_cell!(t.uuid)}</td>
                     if !props.hide_username {
-                        <td>{username_link!(t.username)}</td>
+                        <td>{username_cell!(t.username)}</td>
                     }
                     if !props.hide_userid {
-                        <td>{user_link!(t.user_id)}</td>
+                        <td>{userid_cell!(t.user_id)}</td>
                     }
                 </tr>
             }

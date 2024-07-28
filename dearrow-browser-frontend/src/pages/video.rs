@@ -17,32 +17,9 @@
 */
 use std::rc::Rc;
 
-use gloo_console::error;
-use reqwest::Url;
 use yew::prelude::*;
 
-use crate::{components::detail_table::*, contexts::WindowContext, hooks::{use_async_suspension, use_location_state}, utils::{self, youtu_be_link, ReqwestUrlExt}};
-
-#[derive(Properties, PartialEq)]
-struct OriginalTitleProps {
-    videoid: AttrValue,
-}
-
-#[function_component]
-fn OriginalTitle(props: &OriginalTitleProps) -> HtmlResult {
-    let title = use_async_suspension(|vid| async move {
-        let result = utils::get_original_title(&vid).await;
-        if let Err(ref e) = result {
-            error!(format!("Failed to fetch original title for video {vid}: {e:?}"));
-        }
-        result
-    }, props.videoid.clone())?;
-    if let Ok(ref t) = *title {
-        Ok(html!{<span>{t.as_str()}</span>})
-    } else {
-        Ok(html!{<span><em>{"Failed to fetch original title"}</em></span>})
-    }
-}
+use crate::{components::{detail_table::*, youtube::{OriginalTitle, YoutubeIframe}}, contexts::WindowContext, hooks::use_location_state, utils::youtu_be_link};
 
 #[derive(Properties, PartialEq)]
 struct VideoDetailsTableProps {
@@ -57,7 +34,7 @@ fn VideoDetailsTable(props: &VideoDetailsTableProps) -> Html {
         <span><em>{"Loading..."}</em></span>
     };
     html! {
-        <div id="details-table">
+        <div class="info-table">
             <div>{format!("Video ID: {}", props.videoid)}</div>
             <div hidden={props.mode != DetailType::Title}>
                 {"Original title: "}
@@ -85,11 +62,6 @@ pub fn VideoPage(props: &VideoPageProps) -> Html {
             DetailType::Thumbnail => window_context.origin_join_segments(&["api", "thumbnails", "video_id", vid]),
         }
     });
-    let embed_url: Rc<AttrValue> = use_memo(props.videoid.clone(), |vid| {
-        let mut url = Url::parse("https://www.youtube-nocookie.com/embed/").unwrap();
-        url.extend_segments(&[vid]).unwrap();
-        return AttrValue::Rc(url.as_str().into())
-    });
 
     let fallback = html! {
         <center><b>{"Loading..."}</b></center>
@@ -97,8 +69,8 @@ pub fn VideoPage(props: &VideoPageProps) -> Html {
     
     html! {
         <>
-            <div id="page-details">
-                <iframe src={&*embed_url} allowfullscreen=true />
+            <div class="page-details">
+                <YoutubeIframe videoid={props.videoid.clone()} />
                 <VideoDetailsTable videoid={props.videoid.clone()} mode={state.detail_table_mode} />
             </div>
             <TableModeSwitch entry_count={*entry_count} />

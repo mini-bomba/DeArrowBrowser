@@ -20,25 +20,10 @@ use yew::prelude::*;
 
 use std::rc::Rc;
 
-use crate::thumbnails::{common::ThumbnailKey, components::Thumbnail};
-
-
-#[derive(Properties, PartialEq, Clone)]
-pub struct ThumbnailModalProps {
-    pub video_id: Rc<str>,
-    /// none means original thumb
-    pub timestamp: Option<f64>,
-}
+use crate::thumbnails::components::{UnwrappedThumbnail, ThumbnailProps};
 
 #[function_component]
-pub fn ThumbnailModal(props: &ThumbnailModalProps) -> Html {
-    let timestamp: Rc<Rc<str>> = use_memo(props.clone(), |props| {
-        match props.timestamp {
-            None => format!("https://img.youtube.com/vi/{}/maxresdefault.jpg", props.video_id),
-            Some(t) => format!("{t}"),
-        }.into()
-    });
-
+pub fn ThumbnailModal(props: &ThumbnailProps) -> Html {
     let header_text: Rc<Rc<str>> = use_memo(props.clone(), |props| {
         match props.timestamp {
             None => format!("Video ID: {}, original thumbnail", props.video_id),
@@ -46,19 +31,11 @@ pub fn ThumbnailModal(props: &ThumbnailModalProps) -> Html {
         }.into()
     });
 
-    let fallback = html! {<span class="thumbnail-error">{"Generating thumbnail..."}</span>};
-
     html!{
         <div id="thumbnail-modal">
             <h2>{"Thumbnail preview"}</h2>
             <h3>{(*header_text).clone()}</h3>
-            if props.timestamp.is_some() {
-                <Suspense {fallback}>
-                    <Thumbnail thumb_key={ThumbnailKey { video_id: props.video_id.clone(), timestamp: (*timestamp).clone() }} />
-                </Suspense>
-            } else {
-                <img class="thumbnail" src={(*timestamp).clone()} />
-            }
+            <UnwrappedThumbnail ..props.clone() />
         </div>
     }
 }

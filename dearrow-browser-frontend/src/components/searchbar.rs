@@ -41,7 +41,8 @@ pub fn Searchbar() -> Html {
         let navigator = navigator.clone();
         Callback::from(move |e: KeyboardEvent| {
             if e.key() == "Enter" {
-                navigator.push(&MainRoute::NotImplemented);
+                let input: HtmlInputElement = e.target_unchecked_into();
+                navigator.push(&MainRoute::UUID { id: input.value().into() });
             }
         })
     };

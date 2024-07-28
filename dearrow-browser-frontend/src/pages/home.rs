@@ -50,7 +50,7 @@ pub fn HomePage() -> Html {
     
     html! {
         <>
-            <div id="page-details">
+            <div class="page-details">
                 <Searchbar />
             </div>
             <TableModeSwitch entry_count={detail_count} />

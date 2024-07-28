@@ -90,8 +90,8 @@ pub fn UserPage(props: &UserPageProps) -> Html {
     
     html! {
         <>
-            <div id="page-details">
-                <div id="details-table">
+            <div class="page-details">
+                <div class="info-table">
                     <Suspense fallback={details_fallback}><UserDetails userid={props.userid.clone()} /></Suspense>
                 </div>
             </div>

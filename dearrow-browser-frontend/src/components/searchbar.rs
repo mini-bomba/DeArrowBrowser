@@ -50,7 +50,7 @@ pub fn Searchbar() -> Html {
         Callback::from(move |e: KeyboardEvent| {
             if e.key() == "Enter" {
                 let input: HtmlInputElement = e.target_unchecked_into();
-                navigator.push(&MainRoute::User {id: input.value()});
+                navigator.push(&MainRoute::User {id: input.value().into()});
             }
         })
     };
@@ -66,7 +66,7 @@ pub fn Searchbar() -> Html {
                         ).unwrap_or(value)  // Fall back to original value
                     } else {
                         value  // Fall back to original value
-                    }
+                    }.into()
                 });
             }
         })

@@ -39,9 +39,9 @@ pub enum MainRoute {
     #[at("/unverified")]
     Unverified,
     #[at("/video_id/:id")]
-    Video { id: String },
+    Video { id: AttrValue },
     #[at("/user_id/:id")]
-    User { id: String },
+    User { id: AttrValue },
     #[at("/wip")]
     NotImplemented,
     #[not_found]

@@ -351,7 +351,7 @@ macro_rules! video_link {
             <>
                 <a href={format!("https://youtu.be/{}", $videoid)} title="View this video on YouTube" target="_blank">{$videoid.clone()}</a><br />
                 <span class="icon-link" title="View this video in DeArrow Browser">
-                    <Link<MainRoute> to={MainRoute::Video { id: $videoid.to_string() }}>{"🔍"}</Link<MainRoute>>
+                    <Link<MainRoute> to={MainRoute::Video { id: $videoid.clone().into() }}>{"🔍"}</Link<MainRoute>>
                 </span>
             </>
         }
@@ -364,7 +364,7 @@ macro_rules! user_link {
             <>
                 <textarea readonly=true ~value={$userid.to_string()} /><br />
                 <span class="icon-link" title="View this user in DeArrow Browser">
-                    <Link<MainRoute> to={MainRoute::User { id: $userid.to_string() }}>{"🔍"}</Link<MainRoute>>
+                    <Link<MainRoute> to={MainRoute::User { id: $userid.clone().into() }}>{"🔍"}</Link<MainRoute>>
                 </span>
             </>
         }

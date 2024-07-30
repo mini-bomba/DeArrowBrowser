@@ -28,7 +28,7 @@ use crate::contexts::SettingsContext;
 ///
 /// Takes in the name of the settings field and a function to verify the input field's value
 macro_rules! esc_callback {
-    ($name:ident, $verify_func:ident) => {
+    ($name:ident, $verify_func:expr) => {
         move |e: KeyboardEvent, settings_context| {
             if e.key() == "Escape" {
                 let settings = settings_context.settings();
@@ -47,7 +47,7 @@ macro_rules! esc_callback {
 ///
 /// Takes in the name of the settings field and a function to verify the input field's value
 macro_rules! undo_callback {
-    ($name:ident, $verify_func:ident) => {
+    ($name:ident, $verify_func:expr) => {
         move |_: MouseEvent, (settings_context, initial_settings, node_ref)| {
             let mut settings = settings_context.settings().clone();
             let target: HtmlInputElement = node_ref.cast().expect("Expected the NodeRef to be an HtmlInputElement");
@@ -77,7 +77,7 @@ macro_rules! should_show_undo {
 ///
 /// Takes in the name of the settings field and a function to verify the input field's value
 macro_rules! reset_callback {
-    ($name:ident, $verify_func:ident) => {
+    ($name:ident, $verify_func:expr) => {
         move |_: MouseEvent, (settings_context, node_ref)| {
             let mut settings = settings_context.settings().clone();
             let target: HtmlInputElement = node_ref.cast().expect("Expected the NodeRef to be an HtmlInputElement");
@@ -120,11 +120,6 @@ macro_rules! save_callback {
 /// Takes the name of the new function, the return type and a code block that does additional verification,
 /// should the JS verification pass.
 macro_rules! verify_fn {
-    ($name:ident) => {
-        fn $name(target: &HtmlInputElement) -> Option<String> {
-            target.report_validity().then(|| target.value())
-        }
-    };
     ($name:ident: $target:ident -> $type:ty => $check:block) => {
         fn $name($target: &HtmlInputElement) -> Option<$type> {
             let mut res = None;
@@ -138,11 +133,7 @@ macro_rules! verify_fn {
                     Ok(v) => Some(v),
                 }
             }
-            if !$target.report_validity() {
-                None
-            } else {
-                res
-            }
+            $target.report_validity().then_some(res).flatten()
         }
     };
 }
@@ -176,10 +167,23 @@ impl Display for BaseUrlVerifyError {
 }
 
 
-// verify_fn!(basic_verify);
-verify_fn!(nonzerousize_verify: target -> NonZeroUsize => {
-    NonZeroUsize::from_str(&target.value())
-});
+fn fromstr_verify<T>(target: &HtmlInputElement) -> Option<T> 
+where T: FromStr,
+      T::Err: Display,
+{
+    let mut res = None;
+    target.set_custom_validity("");
+    if target.validity().valid() {
+        res = match FromStr::from_str(&target.value()) {
+            Err(e) => {
+                target.set_custom_validity(&format!("{e}"));
+                None
+            },
+            Ok(v) => Some(v),
+        }
+    }
+    target.report_validity().then_some(res).flatten()
+}
 verify_fn!(baseurl_verify: target -> Rc<str> => {
     match Url::from_str(&target.value()) {
         Err(e) => Err(BaseUrlVerifyError::UrlParseError(e)),
@@ -206,21 +210,21 @@ pub fn SettingsModal() -> Html {
     let thumbgen_api_base_url_ref = use_node_ref();
 
     let nonzerousize_oninput = use_callback((), move |e: InputEvent, ()| {
-        nonzerousize_verify(&e.target_unchecked_into());
+        fromstr_verify::<NonZeroUsize>(&e.target_unchecked_into());
     });
     let baseurl_oninput = use_callback((), move |e: InputEvent, ()| {
         baseurl_verify(&e.target_unchecked_into());
     });
 
-    let entries_per_page_revert = use_callback(settings_context.clone(), esc_callback!(entries_per_page, nonzerousize_verify));
+    let entries_per_page_revert = use_callback(settings_context.clone(), esc_callback!(entries_per_page, fromstr_verify::<NonZeroUsize>));
     let thumbgen_api_base_url_revert = use_callback(settings_context.clone(), esc_callback!(thumbgen_api_base_url, baseurl_verify));
 
-    let entries_per_page_save = use_callback(settings_context.clone(), save_callback!(entries_per_page, nonzerousize_verify));
+    let entries_per_page_save = use_callback(settings_context.clone(), save_callback!(entries_per_page, fromstr_verify));
     let thumbgen_api_base_url_save = use_callback(settings_context.clone(), save_callback!(thumbgen_api_base_url, baseurl_verify));
 
     let entries_per_page_undo = use_callback(
         (settings_context.clone(), initial_settings.clone(), entries_per_page_ref.clone()), 
-        undo_callback!(entries_per_page, nonzerousize_verify)
+        undo_callback!(entries_per_page, fromstr_verify::<NonZeroUsize>)
     );
     let thumbgen_api_base_url_undo = use_callback(
         (settings_context.clone(), initial_settings.clone(), thumbgen_api_base_url_ref.clone()), 
@@ -229,7 +233,7 @@ pub fn SettingsModal() -> Html {
 
     let entries_per_page_reset = use_callback(
         (settings_context.clone(), entries_per_page_ref.clone()), 
-        reset_callback!(entries_per_page, nonzerousize_verify)
+        reset_callback!(entries_per_page, fromstr_verify::<NonZeroUsize>)
     );
     let thumbgen_api_base_url_reset = use_callback(
         (settings_context.clone(), thumbgen_api_base_url_ref.clone()), 

@@ -18,12 +18,14 @@
 
 use std::rc::Rc;
 
+use gloo_console::{error, log};
+use reqwest::Url;
 use yew::prelude::*;
 use yew_hooks::{use_async_with_options, UseAsyncHandle, UseAsyncOptions};
 
-use crate::{components::modals::{thumbnail::ThumbnailModal, ModalMessage}, hooks::use_async_suspension, utils::RcEq, ModalRendererControls};
+use crate::{components::modals::{thumbnail::ThumbnailModal, ModalMessage}, hooks::use_async_suspension, thumbnails::worker_api::{ThumbnailWorkerRequest, WorkerSetting}, utils::RcEq, ModalRendererControls, SettingsContext};
 
-use super::{common::{ThumbgenStats, ThumbnailKey}, local::{LocalBlobLink, LocalThumbGenerator}, remote::{Error, RemoteBlobLink, ThumbnailWorker}, utils::sleep};
+use super::{common::{ThumbgenStats, ThumbnailKey}, local::{LocalBlobLink, LocalThumbGenerator}, remote::{Error, RemoteBlobLink, ThumbnailWorker}};
 
 #[derive(Clone, Eq, PartialEq)]
 pub enum Thumbgen {
@@ -52,15 +54,10 @@ impl ThumbnailUrl {
 
 impl Thumbgen {
     pub async fn get_thumbnail(&self, key: &ThumbnailKey) -> Result<ThumbnailUrl, Error> {
-        let result = match self {
+        match self {
             Self::Remote(worker) => worker.get_thumbnail(key.clone()).await.map(|t| ThumbnailUrl::Remote(Rc::new(t))),
             Self::Local { gen, .. } => gen.get_thumb(key).await.map(ThumbnailUrl::Local).map_err(|e| Error::Remote(e.into())),
-        };
-        if result.is_ok() {
-            // just some sleep to let firefox notice that the blob link is actually real and safe
-            sleep(50).await; 
         }
-        result
     }
 
     pub async fn get_stats(&self) -> Result<ThumbgenStats, Error> {
@@ -73,6 +70,15 @@ impl Thumbgen {
 
 pub type ThumbgenContext = Option<Thumbgen>;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct ThumbgenRefreshContext(pub u8);
+
+impl ThumbgenRefreshContext {
+    fn bump(self) -> Self {
+        ThumbgenRefreshContext(self.0.wrapping_add(1))
+    }
+}
+
 #[derive(Properties, PartialEq)]
 pub struct ThumbnailGeneratorProviderProps {
     pub children: Html
@@ -80,7 +86,9 @@ pub struct ThumbnailGeneratorProviderProps {
 
 #[function_component]
 pub fn ThumbgenProvider(props: &ThumbnailGeneratorProviderProps) -> Html {
-    let state: UseAsyncHandle<Thumbgen, ()> = use_async_with_options(async move {
+    let settings_context: SettingsContext = use_context().expect("ThumbnailProvider must be placed under a SettingsContext provider");
+    let settings = settings_context.settings();
+    let thumgen_state: UseAsyncHandle<Thumbgen, ()> = use_async_with_options(async move {
         Ok(match ThumbnailWorker::new().await {
             Ok(worker) => Thumbgen::Remote(worker),
             Err(err) => Thumbgen::Local {
@@ -89,10 +97,43 @@ pub fn ThumbgenProvider(props: &ThumbnailGeneratorProviderProps) -> Html {
             },
         })
     }, UseAsyncOptions::enable_auto());
+    let refresh_state = use_state(|| ThumbgenRefreshContext(0));
+
+    // Thumbgen API URL updates
+    use_memo((thumgen_state.data.clone(), settings.thumbgen_api_base_url.clone()), |(thumbgen, api_base_url)| {
+        match thumbgen {
+            None => (),
+            Some(Thumbgen::Remote(worker)) => {
+                if let Err(e) = worker.post_request(ThumbnailWorkerRequest::SettingUpdated {
+                    setting: WorkerSetting::ThumbgenBaseUrl(api_base_url.to_string())
+                }) {
+                    error!(format!("Failed to notify Thumbgen::Remote about a thumbgen API base URL change: {e}"));
+                }
+            },
+            Some(Thumbgen::Local { r#gen, .. }) => {
+                let mut url = match Url::parse(api_base_url) {
+                    Ok(url) => url,
+                    Err(e) => return error!(format!("Failed to parse new ThumbgenBaseUrl: {e}")),
+                };
+                {
+                    let Ok(mut path) = url.path_segments_mut() else {
+                        return error!(format!("Failed to append API endpoint to new ThumbgenBaseUrl: {api_base_url} cannot be a base"))
+                    };
+                    path.extend(&["api", "v1", "getThumbnail"]);
+                };
+                r#gen.set_api_url(url);
+                let errors_removed = r#gen.clear_errors();
+                log!(format!("Cleared {errors_removed} error entries after updating thumbgen API URL"));
+            }
+        };
+        refresh_state.set(refresh_state.bump());
+    });
 
     html! {
-        <ContextProvider<ThumbgenContext> context={state.data.clone()}>
+        <ContextProvider<ThumbgenContext> context={thumgen_state.data.clone()}>
+        <ContextProvider<ThumbgenRefreshContext> context={*refresh_state}>
             { props.children.clone() }
+        </ContextProvider<ThumbgenRefreshContext>>
         </ContextProvider<ThumbgenContext>>
     }
 }
@@ -104,10 +145,11 @@ pub struct BaseThumbnailProps {
 
 #[function_component]
 pub fn BaseThumbnail(props: &BaseThumbnailProps) -> HtmlResult {
-    let generator: ThumbgenContext = use_context().expect("Thumbnail must be run under a ThumbnailGeneratorProvider");
-    let thumbnail = use_async_suspension(|(generator, key)| async move {
+    let generator: ThumbgenContext = use_context().expect("BaseThumbnail must be run under a ThumbnailGeneratorProvider");
+    let refresher: ThumbgenRefreshContext = use_context().expect("BaseThumbnail must be run under a ThumbnailGeneratorProvider");
+    let thumbnail = use_async_suspension(|(generator, key, _)| async move {
         Some(generator?.get_thumbnail(&key).await)
-    }, (generator, props.thumb_key.clone()))?;
+    }, (generator, props.thumb_key.clone(), refresher))?;
     
     Ok(match *thumbnail {
         None => html! { <span class="thumbnail-error">{"Waiting for thumbnail generator..."}</span>},

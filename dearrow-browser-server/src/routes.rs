@@ -48,16 +48,19 @@ type JsonResult<T> = utils::Result<web::Json<T>>;
 type CustomizedJsonResult<T> = utils::Result<CustomizeResponder<web::Json<T>>>;
 
 #[derive(Deserialize)]
+#[serde(default)]
 pub struct MainEndpointURLParams {
-    #[serde(default)]
     pub offset: usize,
-    #[serde(default = "default_count")]
     pub count: usize,
 }
 
-#[inline(always)]
-pub fn default_count() -> usize {
-    50
+impl Default for MainEndpointURLParams {
+    fn default() -> Self {
+        Self {
+            offset: 0,
+            count: 50,
+        }
+    }
 }
 
 #[get("/")]

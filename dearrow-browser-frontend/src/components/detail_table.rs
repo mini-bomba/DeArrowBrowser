@@ -24,7 +24,7 @@ use web_sys::HtmlInputElement;
 use yew::{prelude::*, suspense::SuspensionResult};
 use dearrow_browser_api::unsync::*;
 
-use crate::{components::{modals::{thumbnail::ThumbnailModal, ModalMessage}, youtube::YoutubeVideoLink, links::*}, contexts::StatusContext, hooks::{use_async_suspension, use_location_state}, pages::LocationState, utils::{render_datetime, RcEq}, ModalRendererControls};
+use crate::{components::{links::*, modals::{thumbnail::ThumbnailModal, ModalMessage}, youtube::YoutubeVideoLink}, contexts::{StatusContext, SettingsContext}, hooks::{use_async_suspension, use_location_state}, pages::LocationState, utils::{render_datetime, RcEq}, ModalRendererControls};
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum DetailType {
@@ -537,10 +537,12 @@ pub fn UnpaginatedDetailTableRenderer(props: &DetailTableRendererProps) -> HtmlR
 
 #[function_component]
 pub fn PaginatedDetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
-    const PAGE_SIZE: usize = 50;
+    let settings_context: SettingsContext = use_context().expect("SettingsContext should be available");
+    let settings = settings_context.settings();
+    let entries_per_page: usize = settings.entries_per_page.into();
     let state = use_location_state().get_state();
     let details = use_detail_download(props.url.clone(), props.mode, props.sort)?;
-    let detail_slice = use_detail_slice(details.clone(), DetailIndex::Page { size: PAGE_SIZE, index: state.detail_table_page });
+    let detail_slice = use_detail_slice(details.clone(), DetailIndex::Page { size: entries_per_page, index: state.detail_table_page });
 
     if let Some(entry_count) = &props.entry_count {
         if let Ok(ref list) = *details {
@@ -559,7 +561,7 @@ pub fn PaginatedDetailTableRenderer(props: &DetailTableRendererProps) -> HtmlRes
         });
     }
     let detail_count = details.as_ref().as_ref().unwrap().len();
-    let page_count = (detail_count+PAGE_SIZE-1)/PAGE_SIZE;
+    let page_count = (detail_count+entries_per_page)/entries_per_page;
     
     Ok(html! {
         <>

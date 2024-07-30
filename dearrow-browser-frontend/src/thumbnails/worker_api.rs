@@ -65,6 +65,9 @@ pub enum ThumbnailWorkerRequest {
     GetThumbnail {
         key: ThumbnailKey,
     },
+    SettingUpdated {
+        setting: WorkerSetting,
+    },
     GetStats,
     Ping,
     Disconnecting,
@@ -93,6 +96,11 @@ pub enum ThumbnailWorkerResponse {
 pub struct RawRemoteRef {
     pub url: Box<str>,
     pub ref_id: u16,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum WorkerSetting {
+    ThumbgenBaseUrl(String),
 }
 
 #[derive(Serialize, Deserialize, Debug)]

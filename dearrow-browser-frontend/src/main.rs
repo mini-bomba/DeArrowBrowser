@@ -21,7 +21,7 @@ use gloo_console::error;
 use reqwest::Url;
 use thumbnails::components::ThumbgenProvider;
 use yew::prelude::*;
-use yew_hooks::{use_async_with_options, UseAsyncOptions, use_interval};
+use yew_hooks::{use_async_with_options, use_interval, UseAsyncOptions};
 use yew_router::prelude::*;
 use web_sys::window;
 
@@ -31,6 +31,7 @@ pub mod components;
 pub mod contexts;
 pub mod pages;
 pub mod thumbnails;
+pub mod settings;
 use contexts::*;
 use pages::*;
 
@@ -70,15 +71,17 @@ fn App() -> Html {
 
     html! {
         <ContextProvider<Rc<WindowContext>> context={window_context}>
-        <ContextProvider<StatusContext> context={status.data.clone()}>
+        <SettingsProvider>
         <ThumbgenProvider>
+        <ContextProvider<StatusContext> context={status.data.clone()}>
         <ContextProvider<UpdateClock> context={*update_clock}>
             <BrowserRouter>
                 <Switch<MainRoute> render={render_main_route} />
             </BrowserRouter>
         </ContextProvider<UpdateClock>>
-        </ThumbgenProvider>
         </ContextProvider<StatusContext>>
+        </ThumbgenProvider>
+        </SettingsProvider>
         </ContextProvider<Rc<WindowContext>>>
     }
 }

@@ -21,6 +21,7 @@ use std::{cell::{Cell, OnceCell, RefCell}, collections::HashMap, rc::Rc};
 
 use common::{ThumbgenStats, WorkerStats};
 use gloo_console::{error, log, warn};
+use reqwest::Url;
 use slab::Slab;
 use wasm_bindgen::{closure::Closure, JsCast};
 use wasm_bindgen_futures::spawn_local;
@@ -270,6 +271,26 @@ impl WorkerContext {
                     id, 
                     response: ThumbnailWorkerResponse::Thumbnail { r#ref: result }
                 });
+            },
+            ThumbnailWorkerRequest::SettingUpdated { setting } => {
+                match setting {
+                    worker_api::WorkerSetting::ThumbgenBaseUrl(base_url) => {
+                        let mut url = match Url::parse(&base_url) {
+                            Ok(url) => url,
+                            Err(e) => return error!(format!("Failed to parse new ThumbgenBaseUrl: {e}")),
+                        };
+                        {
+                            let Ok(mut path) = url.path_segments_mut() else {
+                                return error!(format!("Failed to append API endpoint to new ThumbgenBaseUrl: {base_url} cannot be a base"))
+                            };
+                            path.extend(&["api", "v1", "getThumbnail"]);
+                        };
+                        log!(format!("Updating thumnail generator API url to {url}"));
+                        self.thumbgen.set_api_url(url);
+                        let errors_removed = self.thumbgen.clear_errors();
+                        log!(format!("Cleared {errors_removed} error entries after updating thumbgen API URL"));
+                    }
+                }
             },
             ThumbnailWorkerRequest::GetStats => {
                 port.reply(ThumbnailWorkerResponseMessage { id, response: ThumbnailWorkerResponse::Stats { stats: ThumbgenStats { 

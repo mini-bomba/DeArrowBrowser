@@ -21,12 +21,16 @@ use chrono::DateTime;
 use yew::prelude::*;
 use yew_router::hooks::use_navigator;
 
-use crate::{contexts::*, pages::MainRoute, components::modals::{ModalMessage, status::StatusModal}, utils::render_datetime_with_delta};
+use crate::{components::modals::{settings::SettingsModal, status::StatusModal, ModalMessage}, contexts::*, pages::MainRoute, utils::render_datetime_with_delta};
 
 #[function_component]
 pub fn Header() -> Html {
     let navigator = use_navigator().expect("navigator should exist");
     let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
+    let modal_controls: ModalRendererControls = use_context().expect("Header should be placed inside a ModalRenderer");
+    let open_settings_modal = use_callback(modal_controls, |_, modal_controls| {
+        modal_controls.emit(ModalMessage::Open(html! {<SettingsModal />}));
+    });
 
     let go_home = {
         Callback::from(move |_| {
@@ -41,6 +45,7 @@ pub fn Header() -> Html {
             }
             <div>
                 <h1 class="clickable" onclick={go_home}>{"DeArrow Browser"}</h1>
+                <span id="settings-button" class="clickable" onclick={open_settings_modal}>{"⚙️"}</span>
             </div>
         </div>
     }

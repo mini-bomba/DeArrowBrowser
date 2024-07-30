@@ -71,11 +71,17 @@ body {
     display: flex;
     align-items: center;
     flex-direction: row;
+    flex-grow: 1;
+    justify-content: space-between;
   }
   
   h1 {
     font-size: 2rem;
     margin: 0;
+  }
+
+  #settings-button {
+    font-size: 2rem;
   }
 }
 
@@ -402,6 +408,39 @@ input, textarea {
 
   &::placeholder {
     color: #888;
+  }
+}
+
+fieldset {
+  border-color: #888;
+}
+
+#settings-modal {
+  :invalid {
+    border-color: red;
+  }
+  .setting-changed:not(:invalid) {
+    border-color: yellow;
+  }
+
+  fieldset {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    place-items: stretch;
+    place-content: stretch;
+    gap: 1rem;
+  }
+
+  label {
+    grid-column: 1 / span 1;
+  }
+
+  input, select {
+    grid-column: 2 / span 1;
+  }
+
+  .setting-actions {
+    grid-column: 3 / span 1;
   }
 }
 

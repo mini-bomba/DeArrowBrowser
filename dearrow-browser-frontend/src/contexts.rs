@@ -19,10 +19,11 @@ use std::rc::Rc;
 
 use dearrow_browser_api::unsync::StatusResponse;
 use reqwest::Url;
-use yew::AttrValue;
+use yew::prelude::*;
+use yew_hooks::{use_local_storage, UseLocalStorageHandle};
 
 pub use crate::components::modals::ModalRendererControls;
-use crate::utils::ReqwestUrlExt;
+use crate::{settings::Settings, utils::ReqwestUrlExt};
 
 #[derive(Clone, PartialEq)]
 pub struct WindowContext {
@@ -44,3 +45,40 @@ impl WindowContext {
 pub struct UpdateClock(pub bool);
 
 pub type StatusContext = Option<Rc<StatusResponse>>;
+
+#[derive(Clone, PartialEq)]
+pub struct SettingsContext {
+    pub storage: UseLocalStorageHandle<Settings>,
+    pub default: Rc<Settings>,
+}
+
+impl SettingsContext {
+    pub fn settings(&self) -> &Settings {
+        self.storage.as_ref().unwrap_or(&self.default)
+    }
+
+    pub fn update(&self, settings: Settings) {
+        self.storage.set(settings);
+    }
+}
+
+#[derive(Properties, PartialEq)]
+pub struct SettingsProviderProps {
+    pub children: Html
+}
+
+#[function_component]
+pub fn SettingsProvider(props: &SettingsProviderProps) -> Html {
+    let storage = use_local_storage("settings".into());
+    let default = use_memo((), |()| Settings::default());
+    let context = SettingsContext {
+        storage,
+        default,
+    };
+
+    html! {
+        <ContextProvider<SettingsContext> {context}>
+            {props.children.clone()}
+        </ContextProvider<SettingsContext>>
+    }
+}

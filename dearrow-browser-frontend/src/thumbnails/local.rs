@@ -228,6 +228,7 @@ impl LocalThumbGenerator {
             LocalThumbnailState::Pending(fut) => fut.clone(),
         };
         future.await?;
+        sleep(50).await; // let firefox register the bloblink
         // At this point the thumbnail should be in the Ready state
         match self.inner.thumbs.borrow_mut().get_mut(key).expect("thumbnail should be Ready here") {
             LocalThumbnailState::Ready { thumbnail, ref mut eviction_timer, .. } => {
@@ -277,7 +278,7 @@ impl LocalThumbGenerator {
     pub fn clear_errors(&self) -> usize {
         let mut thumbs = self.inner.thumbs.borrow_mut();
         let before = thumbs.len();
-        thumbs.retain(|_, v| matches!(v, LocalThumbnailState::Failed(..)));
+        thumbs.retain(|_, v| !matches!(v, LocalThumbnailState::Failed(..)));
         before-thumbs.len()
     }
 

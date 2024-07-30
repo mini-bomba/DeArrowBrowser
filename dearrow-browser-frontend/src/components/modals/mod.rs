@@ -17,6 +17,7 @@
 */
 use yew::prelude::*;
 
+pub mod settings;
 pub mod status;
 pub mod thumbnail;
 

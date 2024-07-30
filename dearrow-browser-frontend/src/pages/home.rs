@@ -19,12 +19,15 @@ use std::rc::Rc;
 
 use yew::prelude::*;
 
-use crate::{contexts::{WindowContext, StatusContext}, components::{detail_table::*, searchbar::Searchbar}, hooks::use_location_state};
+use crate::{components::{detail_table::*, searchbar::Searchbar}, contexts::{StatusContext, WindowContext, SettingsContext}, hooks::use_location_state};
 
 #[function_component]
 pub fn HomePage() -> Html {
     let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
     let status_context: StatusContext = use_context().expect("StatusContext should be defined");
+    let settings_context: SettingsContext = use_context().expect("SettingsContext should be available");
+    let settings = settings_context.settings();
+    let entries_per_page: usize = settings.entries_per_page.into();
     let state = use_location_state().get_state();
 
     let mut url = match state.detail_table_mode {
@@ -33,8 +36,8 @@ pub fn HomePage() -> Html {
     }.expect("Should be able to create an API url");
 
     url.query_pairs_mut()
-        .append_pair("offset", &format!("{}", state.detail_table_page*50))
-        .append_pair("count", "50");
+        .append_pair("offset", &format!("{}", state.detail_table_page*entries_per_page))
+        .append_pair("count", &entries_per_page.to_string());
 
     let fallback = html! {
         <center><b>{"Loading..."}</b></center>
@@ -46,7 +49,7 @@ pub fn HomePage() -> Html {
             DetailType::Title     => status_context.titles,
         }
     );
-    let page_count = detail_count.map(|detail_count| (detail_count+49)/50);
+    let page_count = detail_count.map(|detail_count| (detail_count+(entries_per_page-1))/entries_per_page);
     
     html! {
         <>

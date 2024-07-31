@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2023-2024 mini_bomba
+*  Copyright (C) 2024 mini_bomba
 *  
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by

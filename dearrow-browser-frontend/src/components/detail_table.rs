@@ -444,14 +444,16 @@ fn DetailTableRow(props: &DetailTableRowProps) -> Html {
         DetailSlice::Titles(ref list) => {
             let t = &list[props.index];
             let expanded_layout = settings.title_table_layout == TableLayout::Expanded;
-            let rows = if settings.title_table_layout == TableLayout::Compressed { "1" } else { "2" }; 
+            let compressed_layout = settings.title_table_layout == TableLayout::Compressed;
+            let rows = if compressed_layout { "1" } else { "2" }; 
+            let title_column_classes = classes!("title-col", compressed_layout.then_some("compressed"));
             html! {
                 <tr>
                     <td>{DateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), render_datetime)}</td>
                     if !props.hide_videoid {
                         <td class="monospaced"><YoutubeVideoLink videoid={t.video_id.clone()} multiline={expanded_layout} /></td>
                     }
-                    <td class="title-col">
+                    <td class={title_column_classes}>
                         {t.title.clone()}
                         if expanded_layout { <br /> } else {{""}}
                         {original_indicator!(t.original, title)}
@@ -472,7 +474,8 @@ fn DetailTableRow(props: &DetailTableRowProps) -> Html {
         DetailSlice::Thumbnails(ref list) => {
             let t = &list[props.index];
             let expanded_layout = settings.thumbnail_table_layout == TableLayout::Expanded;
-            let rows = if settings.thumbnail_table_layout == TableLayout::Compressed { "1" } else { "2" }; 
+            let compressed_layout = settings.thumbnail_table_layout == TableLayout::Compressed;
+            let rows = if compressed_layout { "1" } else { "2" }; 
             let onclick = {
                 let list = list.clone();
                 let index = props.index;

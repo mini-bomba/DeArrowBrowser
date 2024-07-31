@@ -159,6 +159,10 @@ body {
       &.title-col {
         max-width: 40vw;
         overflow-wrap: break-word;
+
+        &.compressed {
+          max-width: calc(100vw - 70rem);
+        }
       }
       
       &.score-col {

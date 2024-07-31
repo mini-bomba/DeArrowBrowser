@@ -19,10 +19,12 @@
 use std::{fmt::Display, num::NonZeroUsize, rc::Rc, str::FromStr};
 
 use reqwest::Url;
-use web_sys::HtmlInputElement;
+use strum::VariantNames;
+use web_sys::{HtmlInputElement, HtmlSelectElement};
 use yew::prelude::*;
+use gloo_console::log;
 
-use crate::contexts::SettingsContext;
+use crate::{contexts::SettingsContext, settings::TableLayout};
 
 /// Generator macro for a revert callback (Esc key pressed)
 ///
@@ -45,20 +47,12 @@ macro_rules! esc_callback {
 
 /// Generator macro for the undo button callback
 ///
-/// Takes in the name of the settings field and a function to verify the input field's value
+/// Takes in the name of the settings field
 macro_rules! undo_callback {
-    ($name:ident, $verify_func:expr) => {
-        move |_: MouseEvent, (settings_context, initial_settings, node_ref)| {
+    ($name:ident) => {
+        move |_: MouseEvent, (settings_context, initial_settings)| {
             let mut settings = settings_context.settings().clone();
-            let target: HtmlInputElement = node_ref.cast().expect("Expected the NodeRef to be an HtmlInputElement");
-            target.set_value(&initial_settings.$name.to_string());
-            if $verify_func(&target).is_none() {
-                target.set_value(&settings_context.default.$name.to_string());
-                assert!($verify_func(&target).is_some(), stringify!(Default value of $name setting was invalid!));
-                settings.$name = settings_context.default.$name.clone();
-            } else {
-                settings.$name = initial_settings.$name.clone();
-            }
+            settings.$name = initial_settings.$name.clone();
             settings_context.update(settings);
         }
     };
@@ -75,14 +69,11 @@ macro_rules! should_show_undo {
 
 /// Generator macro for the reset to default button callback
 ///
-/// Takes in the name of the settings field and a function to verify the input field's value
+/// Takes in the name of the settings field
 macro_rules! reset_callback {
-    ($name:ident, $verify_func:expr) => {
-        move |_: MouseEvent, (settings_context, node_ref)| {
+    ($name:ident) => {
+        move |_: MouseEvent, settings_context| {
             let mut settings = settings_context.settings().clone();
-            let target: HtmlInputElement = node_ref.cast().expect("Expected the NodeRef to be an HtmlInputElement");
-            target.set_value(&settings_context.default.$name.to_string());
-            assert!($verify_func(&target).is_some(), stringify!(Default value of $name setting was invalid!));
             settings.$name = settings_context.default.$name.clone();
             settings_context.update(settings);
         }
@@ -107,6 +98,7 @@ macro_rules! save_callback {
         move |e: Event, settings_context| {
             let target: HtmlInputElement = e.target_unchecked_into();
             if let Some(v) = $verify_func(&target) {
+                log!(format!("Saved! {v:?}"));
                 let mut settings = settings_context.settings().clone();
                 settings.$name = v;
                 settings_context.update(settings);
@@ -199,6 +191,13 @@ verify_fn!(baseurl_verify: target -> Rc<str> => {
     }
 });
 
+fn update_select<T>(input: &(NodeRef, T))
+where T: Into<&'static str> + Clone
+{
+    if let Some(r#ref) = input.0.cast::<HtmlSelectElement>() {
+        r#ref.set_value(input.1.clone().into());
+    }
+}
 
 #[function_component]
 pub fn SettingsModal() -> Html {
@@ -208,6 +207,8 @@ pub fn SettingsModal() -> Html {
 
     let entries_per_page_ref = use_node_ref();
     let thumbgen_api_base_url_ref = use_node_ref();
+    let title_table_layout_ref = use_node_ref();
+    let thumbnail_table_layout_ref = use_node_ref();
 
     let nonzerousize_oninput = use_callback((), move |e: InputEvent, ()| {
         fromstr_verify::<NonZeroUsize>(&e.target_unchecked_into());
@@ -215,30 +216,31 @@ pub fn SettingsModal() -> Html {
     let baseurl_oninput = use_callback((), move |e: InputEvent, ()| {
         baseurl_verify(&e.target_unchecked_into());
     });
+    // let tablelayout_oninput = use_callback((), move |e: InputEvent, ()| {
+    //     fromstr_verify::<TableLayout>(&e.target_unchecked_into());
+    // });
 
-    let entries_per_page_revert = use_callback(settings_context.clone(), esc_callback!(entries_per_page, fromstr_verify::<NonZeroUsize>));
+    let entries_per_page_revert      = use_callback(settings_context.clone(), esc_callback!(entries_per_page, fromstr_verify::<NonZeroUsize>));
     let thumbgen_api_base_url_revert = use_callback(settings_context.clone(), esc_callback!(thumbgen_api_base_url, baseurl_verify));
 
-    let entries_per_page_save = use_callback(settings_context.clone(), save_callback!(entries_per_page, fromstr_verify));
-    let thumbgen_api_base_url_save = use_callback(settings_context.clone(), save_callback!(thumbgen_api_base_url, baseurl_verify));
+    let entries_per_page_save       = use_callback(settings_context.clone(), save_callback!(entries_per_page, fromstr_verify));
+    let thumbgen_api_base_url_save  = use_callback(settings_context.clone(), save_callback!(thumbgen_api_base_url, baseurl_verify));
+    let title_table_layout_save     = use_callback(settings_context.clone(), save_callback!(title_table_layout, fromstr_verify));
+    let thumbnail_table_layout_save = use_callback(settings_context.clone(), save_callback!(thumbnail_table_layout, fromstr_verify));
 
-    let entries_per_page_undo = use_callback(
-        (settings_context.clone(), initial_settings.clone(), entries_per_page_ref.clone()), 
-        undo_callback!(entries_per_page, fromstr_verify::<NonZeroUsize>)
-    );
-    let thumbgen_api_base_url_undo = use_callback(
-        (settings_context.clone(), initial_settings.clone(), thumbgen_api_base_url_ref.clone()), 
-        undo_callback!(thumbgen_api_base_url, baseurl_verify)
-    );
+    let entries_per_page_undo       = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(entries_per_page));
+    let thumbgen_api_base_url_undo  = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(thumbgen_api_base_url));
+    let title_table_layout_undo     = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(title_table_layout));
+    let thumbnail_table_layout_undo = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(thumbnail_table_layout));
 
-    let entries_per_page_reset = use_callback(
-        (settings_context.clone(), entries_per_page_ref.clone()), 
-        reset_callback!(entries_per_page, fromstr_verify::<NonZeroUsize>)
-    );
-    let thumbgen_api_base_url_reset = use_callback(
-        (settings_context.clone(), thumbgen_api_base_url_ref.clone()), 
-        reset_callback!(thumbgen_api_base_url, baseurl_verify)
-    );
+    let entries_per_page_reset       = use_callback(settings_context.clone(), reset_callback!(entries_per_page));
+    let thumbgen_api_base_url_reset  = use_callback(settings_context.clone(), reset_callback!(thumbgen_api_base_url));
+    let title_table_layout_reset     = use_callback(settings_context.clone(), reset_callback!(title_table_layout));
+    let thumbnail_table_layout_reset = use_callback(settings_context.clone(), reset_callback!(thumbnail_table_layout));
+
+    // ~value doesnt work for <select>
+    use_effect_with((title_table_layout_ref.clone(), current_settings.title_table_layout), update_select);
+    use_effect_with((thumbnail_table_layout_ref.clone(), current_settings.thumbnail_table_layout), update_select);
 
     html! {
         <div id="settings-modal">
@@ -267,6 +269,52 @@ pub fn SettingsModal() -> Html {
                         <span 
                             class="clickable" title="Reset to default"
                             onclick={entries_per_page_reset}
+                        >{"🔄"}</span>
+                    }
+                </div>
+                <label for="title_table_layout">{"Title table layout: "}</label>
+                <select 
+                    id="title_table_layout"
+                    class={setting_class!(initial_settings, current_settings, title_table_layout)} 
+                    onchange={title_table_layout_save}
+                    ref={title_table_layout_ref}
+                >
+                    {for TableLayout::VARIANTS.iter().map(|&name| html!{ <option key={name}>{name}</option> })}
+                </select>
+                <div class="setting-actions">
+                    if should_show_undo!(title_table_layout, current_settings, initial_settings) {
+                        <span 
+                            class="clickable" title="Undo"
+                            onclick={title_table_layout_undo}
+                        >{"↩️"}</span>
+                    }
+                    if should_show_reset!(title_table_layout, current_settings, settings_context) {
+                        <span 
+                            class="clickable" title="Reset to default"
+                            onclick={title_table_layout_reset}
+                        >{"🔄"}</span>
+                    }
+                </div>
+                <label for="thumbnail_table_layout">{"Thumbnail table layout: "}</label>
+                <select 
+                    id="thumbnail_table_layout"
+                    class={setting_class!(initial_settings, current_settings, thumbnail_table_layout)} 
+                    onchange={thumbnail_table_layout_save}
+                    ref={thumbnail_table_layout_ref}
+                >
+                    {for TableLayout::VARIANTS.iter().map(|&name| html!{ <option key={name}>{name}</option> })}
+                </select>
+                <div class="setting-actions">
+                    if should_show_undo!(thumbnail_table_layout, current_settings, initial_settings) {
+                        <span 
+                            class="clickable" title="Undo"
+                            onclick={thumbnail_table_layout_undo}
+                        >{"↩️"}</span>
+                    }
+                    if should_show_reset!(thumbnail_table_layout, current_settings, settings_context) {
+                        <span 
+                            class="clickable" title="Reset to default"
+                            onclick={thumbnail_table_layout_reset}
                         >{"🔄"}</span>
                     }
                 </div>

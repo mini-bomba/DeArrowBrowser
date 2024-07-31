@@ -19,12 +19,15 @@
 use std::{num::NonZeroUsize, rc::Rc};
 
 use serde::{Deserialize, Serialize};
+use strum::{EnumString, EnumVariantNames, IntoStaticStr};
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct Settings {
     pub thumbgen_api_base_url: Rc<str>,
     pub entries_per_page: NonZeroUsize,
+    pub title_table_layout: TableLayout,
+    pub thumbnail_table_layout: TableLayout,
 }
 
 impl Default for Settings {
@@ -32,7 +35,19 @@ impl Default for Settings {
         Self {
             thumbgen_api_base_url: "https://dearrow-thumb.minibomba.pro/".into(),
             entries_per_page: 50.try_into().unwrap(),
+            title_table_layout: TableLayout::Expanded,
+            thumbnail_table_layout: TableLayout::Expanded,
         }
     }
 }
 
+// serde names set explicitly to avoid issues in the future if names changes
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumString, IntoStaticStr, EnumVariantNames, Debug)]
+pub enum TableLayout {
+    #[serde(rename="compressed")]
+    Compressed,
+    #[serde(rename="compact")]
+    Compact,
+    #[serde(rename="expanded", other)]
+    Expanded,
+}

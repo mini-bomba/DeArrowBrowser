@@ -24,7 +24,7 @@ use web_sys::HtmlInputElement;
 use yew::{prelude::*, suspense::SuspensionResult};
 use dearrow_browser_api::unsync::*;
 
-use crate::{components::{links::*, modals::{thumbnail::ThumbnailModal, ModalMessage}, youtube::YoutubeVideoLink}, contexts::{StatusContext, SettingsContext}, hooks::{use_async_suspension, use_location_state}, pages::LocationState, utils::{render_datetime, RcEq}, ModalRendererControls};
+use crate::{components::{links::*, modals::{thumbnail::ThumbnailModal, ModalMessage}, youtube::YoutubeVideoLink}, contexts::{SettingsContext, StatusContext}, hooks::{use_async_suspension, use_location_state}, pages::LocationState, settings::TableLayout, utils::{render_datetime, RcEq}, ModalRendererControls};
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum DetailType {
@@ -317,21 +317,63 @@ fn thumbnail_flags(thumb: &ApiThumbnail) -> Html {
     }
 }
 
-fn title_score(title: &ApiTitle) -> Html {
-    html! {
-        <span class="hoverswitch">
-            <span>{title.score}</span>
-            <span>{format!("👍 {} | {} 👎", title.votes, title.downvotes)}</span>
-        </span>
+/// Stupid recursive function for counting elements in a `VNode` tree
+fn html_length(html: &Html) -> usize {
+    match html {
+        Html::VList(ref list) => list.iter().map(html_length).sum(),
+        _ => 1,
     }
 }
-fn thumb_score(thumb: &ApiThumbnail) -> Html {
-    html! {
-        <span class="hoverswitch">
-            <span>{thumb.score}</span>
-            <span>{format!("👍 {} | {} 👎", thumb.votes, thumb.downvotes)}</span>
-        </span>
+
+/// This is for the compact mode, to avoid a trailing bar
+///
+/// Yes, this is stupid
+/// Let me do stupid things
+/// I'm having *fun*
+fn bar_prepender_if_not_empty(html: Html) -> Html {
+    if html_length(&html) == 0 {
+        html! {}
+    } else {
+        html! {
+            <>
+                {" | "}
+                {html}
+            </>
+        }
     }
+}
+
+macro_rules! detail_flags {
+    (thumb, $detail:expr) => {
+        thumbnail_flags($detail)
+    };
+    (title, $detail:expr) => {
+        title_flags($detail)
+    };
+}
+
+macro_rules! score_col {
+    ($type:tt, $detail:expr, $expanded:expr) => {
+        if $expanded {
+            html! {
+                <>
+                    <span class="hoverswitch">
+                        <span>{$detail.score}</span>
+                        <span>{format!("👍 {} | {} 👎", $detail.votes, $detail.downvotes)}</span>
+                    </span>
+                    <br />
+                    {detail_flags!($type, $detail)}
+                </>
+            }
+        } else {
+            html! {
+                <>
+                    {format!("{} | 👍 {} | {} 👎", $detail.score, $detail.votes, $detail.downvotes)}
+                    {bar_prepender_if_not_empty(detail_flags!($type, $detail))}
+                </>
+            }
+        }
+    };
 }
 
 macro_rules! original_indicator {
@@ -347,20 +389,23 @@ macro_rules! original_indicator {
 }
 
 macro_rules! uuid_cell {
-    ($uuid:expr) => {
+    ($uuid:expr, $multiline:expr) => {
         html! {
             <>
-                {$uuid.clone()}<br />{uuid_link($uuid.clone().into())}
+                {$uuid.clone()}
+                if $multiline { <br /> } else {{" "}}
+                {uuid_link($uuid.clone().into())}
             </>
         }
     };
 }
 
 macro_rules! userid_cell {
-    ($userid:expr) => {
+    ($userid:expr, $rows:expr, $multiline:expr) => {
         html! {
             <>
-                <textarea readonly=true ~value={$userid.clone()} /><br />
+                <textarea readonly=true cols=16 rows={$rows} ~value={$userid.clone()} />
+                if $multiline { <br /> } else {{" "}}
                 {userid_link($userid.clone().into())}
             </>
         }
@@ -368,9 +413,9 @@ macro_rules! userid_cell {
 }
 
 macro_rules! username_cell {
-    ($username:expr) => {
+    ($username:expr, $rows:expr) => {
         if let Some(ref name) = $username {
-            html! {<textarea readonly=true ~value={name.to_string()} />}
+            html! {<textarea readonly=true cols=16 rows={$rows} ~value={name.to_string()} />}
         } else {
             html! {{"-"}}
         }
@@ -392,30 +437,42 @@ struct DetailTableRowProps {
 #[function_component]
 fn DetailTableRow(props: &DetailTableRowProps) -> Html {
     let modal_controls: ModalRendererControls = use_context().expect("ModalRendererControls should be available");
+    let settings_context: SettingsContext = use_context().expect("SettingsContext should be available");
+    let settings = settings_context.settings();
 
     match props.details {
         DetailSlice::Titles(ref list) => {
             let t = &list[props.index];
+            let expanded_layout = settings.title_table_layout == TableLayout::Expanded;
+            let rows = if settings.title_table_layout == TableLayout::Compressed { "1" } else { "2" }; 
             html! {
                 <tr>
                     <td>{DateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), render_datetime)}</td>
                     if !props.hide_videoid {
-                        <td><YoutubeVideoLink videoid={t.video_id.clone()} multiline={true} /></td>
+                        <td class="monospaced"><YoutubeVideoLink videoid={t.video_id.clone()} multiline={expanded_layout} /></td>
                     }
-                    <td class="title-col">{t.title.clone()}<br />{original_indicator!(t.original, title)}</td>
-                    <td class="score-col hoverswitch-trigger">{title_score(t)}<br />{title_flags(t)}</td>
-                    <td>{uuid_cell!(t.uuid)}</td>
+                    <td class="title-col">
+                        {t.title.clone()}
+                        if expanded_layout { <br /> } else {{""}}
+                        {original_indicator!(t.original, title)}
+                    </td>
+                    <td class="score-col hoverswitch-trigger">
+                        {score_col!(title, t, expanded_layout)}
+                    </td>
+                    <td class="monospaced">{uuid_cell!(t.uuid, expanded_layout)}</td>
                     if !props.hide_username {
-                        <td>{username_cell!(t.username)}</td>
+                        <td>{username_cell!(t.username, rows)}</td>
                     }
                     if !props.hide_userid {
-                        <td>{userid_cell!(t.user_id)}</td>
+                        <td>{userid_cell!(t.user_id, rows, expanded_layout)}</td>
                     }
                 </tr>
             }
         },
         DetailSlice::Thumbnails(ref list) => {
             let t = &list[props.index];
+            let expanded_layout = settings.thumbnail_table_layout == TableLayout::Expanded;
+            let rows = if settings.thumbnail_table_layout == TableLayout::Compressed { "1" } else { "2" }; 
             let onclick = {
                 let list = list.clone();
                 let index = props.index;
@@ -430,16 +487,18 @@ fn DetailTableRow(props: &DetailTableRowProps) -> Html {
                 <tr>
                     <td>{DateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), render_datetime)}</td>
                     if !props.hide_videoid {
-                        <td><YoutubeVideoLink videoid={t.video_id.clone()} multiline={true} /></td>
+                        <td class="monospaced"><YoutubeVideoLink videoid={t.video_id.clone()} multiline={expanded_layout} /></td>
                     }
                     <td {onclick} class="clickable">{t.timestamp.map_or(original_indicator!(t.original, thumbnail), |ts| html! {{ts.to_string()}})}</td>
-                    <td class="score-col hoverswitch-trigger">{thumb_score(t)}<br />{thumbnail_flags(t)}</td>
-                    <td>{uuid_cell!(t.uuid)}</td>
+                    <td class="score-col hoverswitch-trigger">
+                        {score_col!(thumb, t, expanded_layout)}
+                    </td>
+                    <td class="monospaced">{uuid_cell!(t.uuid, expanded_layout)}</td>
                     if !props.hide_username {
-                        <td>{username_cell!(t.username)}</td>
+                        <td>{username_cell!(t.username, rows)}</td>
                     }
                     if !props.hide_userid {
-                        <td>{userid_cell!(t.user_id)}</td>
+                        <td>{userid_cell!(t.user_id, rows, expanded_layout)}</td>
                     }
                 </tr>
             }

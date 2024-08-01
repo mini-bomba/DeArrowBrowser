@@ -28,6 +28,7 @@ pub struct Settings {
     pub entries_per_page: NonZeroUsize,
     pub title_table_layout: TableLayout,
     pub thumbnail_table_layout: TableLayout,
+    pub render_thumbnails_in_tables: bool,
 }
 
 impl Default for Settings {
@@ -37,6 +38,7 @@ impl Default for Settings {
             entries_per_page: 50.try_into().unwrap(),
             title_table_layout: TableLayout::Expanded,
             thumbnail_table_layout: TableLayout::Expanded,
+            render_thumbnails_in_tables: false,
         }
     }
 }

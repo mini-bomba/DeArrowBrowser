@@ -20,10 +20,10 @@ use yew::prelude::*;
 
 use std::rc::Rc;
 
-use crate::thumbnails::components::{UnwrappedThumbnail, ThumbnailProps};
+use crate::thumbnails::components::{UnwrappedThumbnail, UnwrappedThumbnailProps};
 
 #[function_component]
-pub fn ThumbnailModal(props: &ThumbnailProps) -> Html {
+pub fn ThumbnailModal(props: &UnwrappedThumbnailProps) -> Html {
     let header_text: Rc<Rc<str>> = use_memo(props.clone(), |props| {
         match props.timestamp {
             None => format!("Video ID: {}, original thumbnail", props.video_id),

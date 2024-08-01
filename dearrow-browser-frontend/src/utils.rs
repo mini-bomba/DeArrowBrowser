@@ -203,6 +203,14 @@ impl<T> From<T> for RcEq<T> {
     }
 }
 
+impl<I> From<&[I]> for RcEq<[I]> 
+where I: Clone,
+{
+    fn from(value: &[I]) -> Self {
+        Self(Rc::from(value))
+    }
+}
+
 impl<T> RcEq<T> {
     pub fn new(val: T) -> Self {
         Self(Rc::new(val))

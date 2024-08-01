@@ -159,14 +159,14 @@ pub fn BaseThumbnail(props: &BaseThumbnailProps) -> HtmlResult {
 }
 
 #[derive(Properties, PartialEq, Clone)]
-pub struct ThumbnailProps {
+pub struct UnwrappedThumbnailProps {
     pub video_id: Rc<str>,
     /// none means original thumb
     pub timestamp: Option<f64>,
 }
 
 #[function_component]
-pub fn UnwrappedThumbnail(props: &ThumbnailProps) -> Html {
+pub fn UnwrappedThumbnail(props: &UnwrappedThumbnailProps) -> Html {
     let timestamp: Rc<Rc<str>> = use_memo(props.clone(), |props| {
         match props.timestamp {
             None => format!("https://img.youtube.com/vi/{}/maxresdefault.jpg", props.video_id),
@@ -191,20 +191,65 @@ pub fn UnwrappedThumbnail(props: &ThumbnailProps) -> Html {
     }
 }
 
+#[derive(PartialEq, Clone, Default)]
+pub enum ThumbnailCaption {
+    #[default]
+    None,
+    Text(AttrValue),
+    Html(Html),
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Default)]
+#[allow(non_camel_case_types)]
+pub enum ContainerType {
+    #[default]
+    div,
+    td,
+}
+
+#[derive(Properties, PartialEq, Clone)]
+pub struct WrappedThumbnailProps {
+    pub video_id: Rc<str>,
+    /// none means original thumb
+    pub timestamp: Option<f64>,
+    /// displayed at the bottom of the image
+    #[prop_or_default]
+    pub caption: ThumbnailCaption,
+    #[prop_or_default]
+    pub container_type: ContainerType,
+}
+
 #[function_component]
-pub fn Thumbnail(props: &ThumbnailProps) -> Html {
+pub fn Thumbnail(props: &WrappedThumbnailProps) -> Html {
     let modal_controls: ModalRendererControls = use_context().expect("ModalRendererControls should be available");
+    let unwrapped_props = UnwrappedThumbnailProps {
+        video_id: props.video_id.clone(),
+        timestamp: props.timestamp,
+    };
     let onclick = {
-        let props = props.clone();
+        let props = unwrapped_props.clone();
         Callback::from(move |_| {
             modal_controls.emit(ModalMessage::Open(html! {
                 <ThumbnailModal ..props.clone() />
             }));
         })
     };
-    html! {
-        <div class="thumbnail-container clickable" {onclick}>
-            <UnwrappedThumbnail ..props.clone() />
-        </div>
+    let content = html! {
+        <>
+            <UnwrappedThumbnail ..unwrapped_props.clone() />
+            if let ThumbnailCaption::Text(caption) = &props.caption {
+                <span class="thumbnail-caption"><span>{caption}</span></span>
+            } else if let ThumbnailCaption::Html(caption) = &props.caption {
+                <span class="thumbnail-caption">{caption.clone()}</span>
+            }
+        </>
+    };
+    match props.container_type {
+        ContainerType::div => html! {
+            <div class="thumbnail-container clickable" {onclick}>{content}</div>
+        },
+        ContainerType::td => html! {
+            <td class="thumbnail-container clickable" {onclick}>{content}</td>
+        },
     }
 }

@@ -24,7 +24,7 @@ use dearrow_browser_api::unsync::{ApiThumbnail, ApiTitle};
 use reqwest::StatusCode;
 use yew::prelude::*;
 
-use crate::{components::{links::userid_link, youtube::{OriginalTitle, YoutubeIframe, YoutubeVideoLink}}, hooks::use_async_suspension, thumbnails::components::Thumbnail, utils::render_datetime, WindowContext};
+use crate::{components::{links::userid_link, youtube::{OriginalTitle, YoutubeIframe, YoutubeVideoLink}}, hooks::use_async_suspension, thumbnails::components::{Thumbnail, ThumbnailCaption}, utils::{render_datetime, RcEq}, WindowContext};
 
 #[derive(Properties, PartialEq, Clone)]
 pub struct UUIDPageProps {
@@ -145,6 +145,17 @@ fn UUIDThumbnail(props: &UUIDPageProps) -> HtmlResult {
         resp.error_for_status_ref().context("API request failed")?;
         resp.json::<ApiThumbnail>().await.context("Failed to deserialize API response").map(Some)
     }, (window_context, props.uuid.clone()))?;
+    let caption: Rc<ThumbnailCaption> = use_memo(RcEq(thumbnail.clone()), |thumbnail| {
+        if let Ok(Some(ref thumbnail)) = **thumbnail {
+            if let Some(timestamp) = thumbnail.timestamp {
+                ThumbnailCaption::Text(format!("{} @ {}", thumbnail.video_id, timestamp).into())
+            } else {
+                ThumbnailCaption::Text(format!("Original thumbnail of {}", thumbnail.video_id).into())
+            }
+        } else {
+            ThumbnailCaption::None
+        }
+    });
 
     let inline_placeholder = html! {<span>{"Loading..."}</span>};
 
@@ -211,7 +222,7 @@ fn UUIDThumbnail(props: &UUIDPageProps) -> HtmlResult {
                         }
                     </div>
                 </div>
-                <Thumbnail video_id={thumbnail.video_id.clone()} timestamp={thumbnail.timestamp} />
+                <Thumbnail video_id={thumbnail.video_id.clone()} timestamp={thumbnail.timestamp} caption={(*caption).clone()} />
                 <YoutubeIframe videoid={thumbnail.video_id.clone()} />
             </div>
         },

@@ -16,7 +16,7 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::{fmt::Display, num::NonZeroUsize, rc::Rc, str::FromStr};
+use std::{convert::Infallible, fmt::Display, num::NonZeroUsize, rc::Rc, str::FromStr};
 
 use reqwest::Url;
 use strum::VariantNames;
@@ -190,6 +190,9 @@ verify_fn!(baseurl_verify: target -> Rc<str> => {
         },
     }
 });
+verify_fn!(checkbox_verify: target -> bool => {
+    Result::<bool, Infallible>::Ok(target.checked())
+});
 
 fn update_select<T>(input: &(NodeRef, T))
 where T: Into<&'static str> + Clone
@@ -205,8 +208,6 @@ pub fn SettingsModal() -> Html {
     let initial_settings = use_memo((), |()| settings_context.settings().clone());
     let current_settings = settings_context.settings();
 
-    let entries_per_page_ref = use_node_ref();
-    let thumbgen_api_base_url_ref = use_node_ref();
     let title_table_layout_ref = use_node_ref();
     let thumbnail_table_layout_ref = use_node_ref();
 
@@ -220,23 +221,26 @@ pub fn SettingsModal() -> Html {
     //     fromstr_verify::<TableLayout>(&e.target_unchecked_into());
     // });
 
-    let entries_per_page_revert      = use_callback(settings_context.clone(), esc_callback!(entries_per_page, fromstr_verify::<NonZeroUsize>));
-    let thumbgen_api_base_url_revert = use_callback(settings_context.clone(), esc_callback!(thumbgen_api_base_url, baseurl_verify));
+    let entries_per_page_revert           = use_callback(settings_context.clone(), esc_callback!(entries_per_page, fromstr_verify::<NonZeroUsize>));
+    let thumbgen_api_base_url_revert      = use_callback(settings_context.clone(), esc_callback!(thumbgen_api_base_url, baseurl_verify));
 
-    let entries_per_page_save       = use_callback(settings_context.clone(), save_callback!(entries_per_page, fromstr_verify));
-    let thumbgen_api_base_url_save  = use_callback(settings_context.clone(), save_callback!(thumbgen_api_base_url, baseurl_verify));
-    let title_table_layout_save     = use_callback(settings_context.clone(), save_callback!(title_table_layout, fromstr_verify));
-    let thumbnail_table_layout_save = use_callback(settings_context.clone(), save_callback!(thumbnail_table_layout, fromstr_verify));
+    let entries_per_page_save             = use_callback(settings_context.clone(), save_callback!(entries_per_page, fromstr_verify));
+    let thumbgen_api_base_url_save        = use_callback(settings_context.clone(), save_callback!(thumbgen_api_base_url, baseurl_verify));
+    let title_table_layout_save           = use_callback(settings_context.clone(), save_callback!(title_table_layout, fromstr_verify));
+    let thumbnail_table_layout_save       = use_callback(settings_context.clone(), save_callback!(thumbnail_table_layout, fromstr_verify));
+    let render_thumbnails_in_tables_save  = use_callback(settings_context.clone(), save_callback!(render_thumbnails_in_tables, checkbox_verify));
 
-    let entries_per_page_undo       = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(entries_per_page));
-    let thumbgen_api_base_url_undo  = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(thumbgen_api_base_url));
-    let title_table_layout_undo     = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(title_table_layout));
-    let thumbnail_table_layout_undo = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(thumbnail_table_layout));
+    let entries_per_page_undo             = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(entries_per_page));
+    let thumbgen_api_base_url_undo        = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(thumbgen_api_base_url));
+    let title_table_layout_undo           = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(title_table_layout));
+    let thumbnail_table_layout_undo       = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(thumbnail_table_layout));
+    let render_thumbnails_in_tables_undo  = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(render_thumbnails_in_tables));
 
-    let entries_per_page_reset       = use_callback(settings_context.clone(), reset_callback!(entries_per_page));
-    let thumbgen_api_base_url_reset  = use_callback(settings_context.clone(), reset_callback!(thumbgen_api_base_url));
-    let title_table_layout_reset     = use_callback(settings_context.clone(), reset_callback!(title_table_layout));
-    let thumbnail_table_layout_reset = use_callback(settings_context.clone(), reset_callback!(thumbnail_table_layout));
+    let entries_per_page_reset            = use_callback(settings_context.clone(), reset_callback!(entries_per_page));
+    let thumbgen_api_base_url_reset       = use_callback(settings_context.clone(), reset_callback!(thumbgen_api_base_url));
+    let title_table_layout_reset          = use_callback(settings_context.clone(), reset_callback!(title_table_layout));
+    let thumbnail_table_layout_reset      = use_callback(settings_context.clone(), reset_callback!(thumbnail_table_layout));
+    let render_thumbnails_in_tables_reset = use_callback(settings_context.clone(), reset_callback!(render_thumbnails_in_tables));
 
     // ~value doesnt work for <select>
     use_effect_with((title_table_layout_ref.clone(), current_settings.title_table_layout), update_select);
@@ -255,7 +259,6 @@ pub fn SettingsModal() -> Html {
                     oninput={nonzerousize_oninput} 
                     onkeydown={entries_per_page_revert} 
                     onchange={entries_per_page_save} 
-                    ref={entries_per_page_ref}
                     ~value={current_settings.entries_per_page.to_string()} 
                 />
                 <div class="setting-actions">
@@ -318,6 +321,30 @@ pub fn SettingsModal() -> Html {
                         >{"🔄"}</span>
                     }
                 </div>
+                if current_settings.thumbnail_table_layout == TableLayout::Expanded {
+                    <label for="render_thumbnails_in_tables">{"Render thumbnails in tables: "}</label>
+                    <input 
+                        class={setting_class!(initial_settings, current_settings, render_thumbnails_in_tables)} 
+                        id="render_thumbnails_in_tables" 
+                        type="checkbox"
+                        onchange={render_thumbnails_in_tables_save} 
+                        ~checked={current_settings.render_thumbnails_in_tables} 
+                    />
+                    <div class="setting-actions">
+                        if should_show_undo!(render_thumbnails_in_tables, current_settings, initial_settings) {
+                            <span 
+                                class="clickable" title="Undo"
+                                onclick={render_thumbnails_in_tables_undo}
+                            >{"↩️"}</span>
+                        }
+                        if should_show_reset!(render_thumbnails_in_tables, current_settings, settings_context) {
+                            <span 
+                                class="clickable" title="Reset to default"
+                                onclick={render_thumbnails_in_tables_reset}
+                            >{"🔄"}</span>
+                        }
+                    </div>
+                }
             </fieldset>
             <fieldset>
                 <legend>{"Thumbnail generator"}</legend>
@@ -329,7 +356,6 @@ pub fn SettingsModal() -> Html {
                     oninput={baseurl_oninput} 
                     onkeydown={thumbgen_api_base_url_revert} 
                     onchange={thumbgen_api_base_url_save} 
-                    ref={thumbgen_api_base_url_ref}
                     ~value={current_settings.thumbgen_api_base_url.to_string()} 
                 />
                 <div class="setting-actions">

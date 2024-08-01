@@ -203,16 +203,39 @@ body {
       width: min($max-width, calc($max-height / 9 * 16));
     }
   }
+}
 
-  .thumbnail-container {
-    @extend %flex-column;
-    @extend %flex-center;
+.thumbnail-container {
+  position: relative;
+  @extend %flex-column;
+  @extend %flex-center;
+
+  .detail-table :is(&, .thumbnail-header) {
+    width: 15vw;
+  }
+
+  .detail-table & {
+    height: 5rem;
+  }
+
+  > .thumbnail {
+    min-width: 0;
+    min-height: 0;
+    flex-shrink: 1;
+    flex-grow: 1;
+  }
+
+  > .thumbnail-caption {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    color: $white;
+    text-align: center;
 
     > * {
-      min-width: 0;
-      min-height: 0;
-      flex-shrink: 1;
-      flex-grow: 1;
+      padding: 0.25rem;
+      background-color: #0007;
     }
   }
 }
@@ -406,7 +429,7 @@ a {
   color: lightblue;
 }
 
-input, textarea {
+input:not([type="checkbox"]), textarea {
   color: $white;
   background-color: #111;
   border-color: #888;
@@ -424,6 +447,10 @@ fieldset {
 }
 
 #settings-modal {
+  h2 {
+    text-align: center;
+  }
+
   :invalid {
     border-color: red;
   }
@@ -437,6 +464,12 @@ fieldset {
     place-items: stretch;
     place-content: stretch;
     column-gap: 1rem;
+  }
+
+  input[type="checkbox"] {
+    place-self: center;
+    width: 1em;
+    height: 1em;
   }
 
   label {

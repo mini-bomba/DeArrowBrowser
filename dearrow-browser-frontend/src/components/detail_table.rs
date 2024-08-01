@@ -24,7 +24,7 @@ use web_sys::HtmlInputElement;
 use yew::{prelude::*, suspense::SuspensionResult};
 use dearrow_browser_api::unsync::*;
 
-use crate::{components::{links::*, modals::{thumbnail::ThumbnailModal, ModalMessage}, youtube::YoutubeVideoLink}, contexts::{SettingsContext, StatusContext}, hooks::{use_async_suspension, use_location_state}, pages::LocationState, settings::TableLayout, utils::{render_datetime, RcEq}, ModalRendererControls};
+use crate::{components::{links::*, modals::{thumbnail::ThumbnailModal, ModalMessage}, youtube::YoutubeVideoLink}, contexts::{SettingsContext, StatusContext}, hooks::{use_async_suspension, use_location_state}, pages::LocationState, settings::TableLayout, thumbnails::components::{ContainerType, Thumbnail, ThumbnailCaption}, utils::{render_datetime, RcEq}, ModalRendererControls};
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum DetailType {
@@ -213,8 +213,8 @@ pub struct DetailTableRendererProps {
 
 #[derive(Clone, PartialEq)]
 pub enum DetailSlice {
-    Thumbnails(Rc<[ApiThumbnail]>),
-    Titles(Rc<[ApiTitle]>),
+    Thumbnails(RcEq<[ApiThumbnail]>),
+    Titles(RcEq<[ApiTitle]>),
 }
 
 impl DetailSlice {
@@ -247,7 +247,7 @@ pub fn use_detail_slice(details: Rc<Result<DetailList, anyhow::Error>>, index: D
     (*use_memo((RcEq(details), index), |(details, index)|
         match (&**details, index) {
             (Err(_), _)                                                                 
-                => DetailSlice::Thumbnails(Rc::new([])), // dummy slice on error
+                => DetailSlice::Thumbnails((&[] as &[ApiThumbnail]).into()), // dummy slice on error
 
             (Ok(DetailList::Thumbnails(ref thumbs)), DetailIndex::Page { size, index }) 
                 => DetailSlice::Thumbnails(if size*(index+1) > thumbs.len() {thumbs.get(size*index..)} else {thumbs.get(size*index..size*(index+1))}.unwrap_or(&[]).into()),
@@ -376,18 +376,6 @@ macro_rules! score_col {
     };
 }
 
-macro_rules! original_indicator {
-    ($original:expr, $detail_name:expr) => {
-        if $original {
-            html! {
-                <span title={stringify!(This is the original video $detail_name)}>{"♻️"}</span>
-            }
-        } else {
-            html! {}
-        }
-    };
-}
-
 macro_rules! uuid_cell {
     ($uuid:expr, $multiline:expr) => {
         html! {
@@ -439,6 +427,19 @@ fn DetailTableRow(props: &DetailTableRowProps) -> Html {
     let modal_controls: ModalRendererControls = use_context().expect("ModalRendererControls should be available");
     let settings_context: SettingsContext = use_context().expect("SettingsContext should be available");
     let settings = settings_context.settings();
+    let original_thumb_indicator = html! {
+        <span title="This is the original video thumbnail">{"♻️"}</span>
+    };
+    let thumb_caption = use_memo((props.details.clone(), props.index), |(details, index)| {
+        let DetailSlice::Thumbnails(ref thumbs) = details else { return ThumbnailCaption::None };
+        let thumb = &thumbs[*index];
+        if let Some(timestamp) = thumb.timestamp {
+            ThumbnailCaption::Text(format!("{timestamp}").into())
+        } else {
+            ThumbnailCaption::Html(original_thumb_indicator.clone())
+        }
+    });
+
 
     match props.details {
         DetailSlice::Titles(ref list) => {
@@ -455,8 +456,10 @@ fn DetailTableRow(props: &DetailTableRowProps) -> Html {
                     }
                     <td class={title_column_classes}>
                         {t.title.clone()}
-                        if expanded_layout { <br /> } else {{""}}
-                        {original_indicator!(t.original, title)}
+                        if t.original {
+                            if expanded_layout { <br /> } else {{""}}
+                            <span title="This is the original video title">{"♻️"}</span>
+                        }
                     </td>
                     <td class="score-col hoverswitch-trigger">
                         {score_col!(title, t, expanded_layout)}
@@ -492,7 +495,11 @@ fn DetailTableRow(props: &DetailTableRowProps) -> Html {
                     if !props.hide_videoid {
                         <td class="monospaced"><YoutubeVideoLink videoid={t.video_id.clone()} multiline={expanded_layout} /></td>
                     }
-                    <td {onclick} class="clickable">{t.timestamp.map_or(original_indicator!(t.original, thumbnail), |ts| html! {{ts.to_string()}})}</td>
+                    if settings.render_thumbnails_in_tables {
+                        <Thumbnail video_id={t.video_id.clone()} timestamp={t.timestamp} caption={(*thumb_caption).clone()} container_type={ContainerType::td} />
+                    } else {
+                        <td {onclick} class="clickable">{t.timestamp.map_or(original_thumb_indicator, |ts| html! {{ts.to_string()}})}</td>
+                    }
                     <td class="score-col hoverswitch-trigger">
                         {score_col!(thumb, t, expanded_layout)}
                     </td>
@@ -511,6 +518,9 @@ fn DetailTableRow(props: &DetailTableRowProps) -> Html {
 
 #[function_component]
 pub fn BaseDetailTableRenderer(props: &BaseDetailTableRendererProps) -> Html {
+    let settings_context: SettingsContext = use_context().expect("SettingsContext should be available");
+    let settings = settings_context.settings();
+    let rendering_thumbnails = settings.render_thumbnails_in_tables && settings.thumbnail_table_layout == TableLayout::Expanded;
     let row_props = DetailTableRowProps {
         details: props.details.clone(),
         index: 0,
@@ -550,7 +560,11 @@ pub fn BaseDetailTableRenderer(props: &BaseDetailTableRendererProps) -> Html {
                     if !props.hide_videoid {
                         <th>{"Video ID"}</th>
                     }
-                    <th>{"Timestamp"}</th>
+                    if rendering_thumbnails {
+                        <th class="thumbnail-header">{"Thumbnail"}</th>
+                    } else {
+                        <th>{"Timestamp"}</th>
+                    }
                     <th class="score-col">{"Score"}</th>
                     <th>{"UUID"}</th>
                     if !props.hide_username {

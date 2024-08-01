@@ -184,8 +184,17 @@ impl WorkerContext {
                 return;
             }
         };
+        let ThumbnailWorkerRequestMessage { id, request } = message;
 
-        spawn_local(self.process_message(port, message));
+        // Get client, mark it as alive
+        let client = self.get_client(&port);
+        client.ping_received.set(true);
+        client.checks_since_last_ping.set(0);
+
+        spawn_local(async move {
+            let response = self.process_message(client, request).await;
+            port.reply(ThumbnailWorkerResponseMessage { id, response });
+        });
     }
 
     fn handle_message_error_event(event: MessageEvent) {
@@ -236,27 +245,22 @@ impl WorkerContext {
         client
     }
 
-    async fn process_message(&'static self, port: MessagePort, message: ThumbnailWorkerRequestMessage) {
-        // Get client, mark it as alive
-        let client = self.get_client(&port);
-        client.ping_received.set(true);
-        client.checks_since_last_ping.set(0);
-
-        // Actually process the message
-        let ThumbnailWorkerRequestMessage { id, request } = message;
+    async fn process_message(&'static self, client: Rc<RemoteClient>, request: ThumbnailWorkerRequest) -> ThumbnailWorkerResponse {
         match request {
             ThumbnailWorkerRequest::Version { version, git_hash, git_dirty } => {
                 if version != built_info::PKG_VERSION || git_hash.as_deref() != built_info::GIT_COMMIT_HASH || git_dirty != built_info::GIT_DIRTY {
                     warn!(format!("Version mismatch detected! Message (de)serialization errors may occur!\nNew client's version: {version}, git hash: {git_hash:?}, git dirty: {git_dirty:?}\nWorker version: {}, git hash: {:?}, git dirty: {:?}\nClose all DeArrow Browser windows to resolve this issue.", built_info::PKG_VERSION, built_info::GIT_COMMIT_HASH, built_info::GIT_DIRTY));
                 };
                 
-                port.reply(ThumbnailWorkerResponseMessage {
-                    id,
-                    response: ThumbnailWorkerResponse::Version { version: built_info::PKG_VERSION.to_owned(), git_hash: built_info::GIT_COMMIT_HASH.map(ToOwned::to_owned), git_dirty: built_info::GIT_DIRTY },
-                });
+                ThumbnailWorkerResponse::Version { 
+                    version: built_info::PKG_VERSION.to_owned(), 
+                    git_hash: built_info::GIT_COMMIT_HASH.map(ToOwned::to_owned),
+                    git_dirty: built_info::GIT_DIRTY
+                }
             },
             ThumbnailWorkerRequest::BlobLinkDropped { ref_id } => {
                 client.drop_ref(ref_id);
+                ThumbnailWorkerResponse::Ok
             },
             ThumbnailWorkerRequest::GetThumbnail { key } => {
                 let result = self.thumbgen.get_thumb(&key).await
@@ -267,21 +271,23 @@ impl WorkerContext {
                         }
                     })
                     .map_err(Into::into);
-                port.reply(ThumbnailWorkerResponseMessage { 
-                    id, 
-                    response: ThumbnailWorkerResponse::Thumbnail { r#ref: result }
-                });
+
+                ThumbnailWorkerResponse::Thumbnail { r#ref: result }
             },
             ThumbnailWorkerRequest::SettingUpdated { setting } => {
                 match setting {
                     worker_api::WorkerSetting::ThumbgenBaseUrl(base_url) => {
                         let mut url = match Url::parse(&base_url) {
                             Ok(url) => url,
-                            Err(e) => return error!(format!("Failed to parse new ThumbgenBaseUrl: {e}")),
+                            Err(e) => {
+                                error!(format!("Failed to parse new ThumbgenBaseUrl: {e}"));
+                                return ThumbnailWorkerResponse::Ok;
+                            },
                         };
                         {
                             let Ok(mut path) = url.path_segments_mut() else {
-                                return error!(format!("Failed to append API endpoint to new ThumbgenBaseUrl: {base_url} cannot be a base"))
+                                error!(format!("Failed to append API endpoint to new ThumbgenBaseUrl: {base_url} cannot be a base"));
+                                return ThumbnailWorkerResponse::Ok;
                             };
                             path.extend(&["api", "v1", "getThumbnail"]);
                         };
@@ -291,18 +297,26 @@ impl WorkerContext {
                         log!(format!("Cleared {errors_removed} error entries after updating thumbgen API URL"));
                     }
                 }
+
+                ThumbnailWorkerResponse::Ok
+            },
+            ThumbnailWorkerRequest::ClearErrors => {
+                self.thumbgen.clear_errors();
+                ThumbnailWorkerResponse::Ok
             },
             ThumbnailWorkerRequest::GetStats => {
-                port.reply(ThumbnailWorkerResponseMessage { id, response: ThumbnailWorkerResponse::Stats { stats: ThumbgenStats { 
-                    cache_stats: self.thumbgen.get_stats(),
-                    worker_stats: Some(WorkerStats { 
-                        clients: self.clients.borrow().len(),
-                        this_client_refs: client.held_refs.borrow().len(),
-                    }),
-                }}});
+                ThumbnailWorkerResponse::Stats { 
+                    stats: ThumbgenStats { 
+                        cache_stats: self.thumbgen.get_stats(),
+                        worker_stats: Some(WorkerStats { 
+                            clients: self.clients.borrow().len(),
+                            this_client_refs: client.held_refs.borrow().len(),
+                        }),
+                    }
+                }
             },
             ThumbnailWorkerRequest::Ping => {
-                port.reply(ThumbnailWorkerResponseMessage { id, response: ThumbnailWorkerResponse::Pong });
+                ThumbnailWorkerResponse::Ok
             },
             ThumbnailWorkerRequest::Disconnecting => {
                 // Find and drop the client
@@ -313,8 +327,10 @@ impl WorkerContext {
                 } else {
                     error!("Failed to find & remove a client that sent a Disconnecting request!");
                 }
+
+                ThumbnailWorkerResponse::Ok
             }
-        };
+        }
     }
 }
 

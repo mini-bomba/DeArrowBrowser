@@ -17,14 +17,15 @@
 */
 use std::rc::Rc;
 
+use yew::platform::spawn_local;
 use yew::prelude::*;
 use chrono::DateTime;
-use yew_hooks::use_async;
+use yew_hooks::{use_async, use_interval};
 
 use crate::contexts::{StatusContext, WindowContext};
-use crate::thumbnails::components::{Thumbgen, ThumbgenContext};
+use crate::thumbnails::components::{TRExt, Thumbgen, ThumbgenContext, ThumbgenContextExt, ThumbgenRefreshContext};
 use crate::utils::{render_datetime, RenderNumber};
-use crate::{built_info, UpdateClock};
+use crate::built_info;
 
 macro_rules! number_hoverswitch {
     ($switch_element: tt, $n: expr) => {
@@ -49,7 +50,8 @@ pub fn StatusModal() -> Html {
     let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
     let status: StatusContext = use_context().expect("StatusContext should be defined");
     let thumbgen: ThumbgenContext = use_context().expect("ThumbgenContext should be available");
-    let update_clock: UpdateClock = use_context().expect("UpdateClock should be available");
+    let thumbgen_refresh: ThumbgenRefreshContext = use_context().expect("ThumbgenRefreshContext should be available");
+    let update_clock: UseStateHandle<bool> = use_state(|| false);
 
     let errors_url: Rc<AttrValue> = use_memo(window_context, |wc| wc.origin.join("/api/errors").expect("should be able to create errors API URL").as_str().to_owned().into());
 
@@ -77,10 +79,27 @@ pub fn StatusModal() -> Html {
 
     {
         let thumbgen_stats = thumbgen_stats.clone();
-        use_memo(update_clock, |_| {
+        use_memo((*update_clock, *thumbgen_refresh), |_| {
             thumbgen_stats.run();
         });
     }
+    {
+        let update_clock = update_clock.clone();
+        use_interval(move || {
+            update_clock.set(!*update_clock);
+        }, 5*1000);
+    }
+
+    let clear_errors = use_callback(thumbgen.clone(), move |_: MouseEvent, thumbgen| {
+        let thumbgen = thumbgen.clone();
+        let thumbgen_refresh = thumbgen_refresh.clone();
+        spawn_local(async move {
+            if let Some(ref thumbgen) = thumbgen {
+                thumbgen.clear_errors().await;
+                thumbgen_refresh.trigger_refresh();
+            }
+        });
+    });
 
     html! {
         <div id="status-modal">
@@ -121,13 +140,7 @@ pub fn StatusModal() -> Html {
                 <table>
                     <tr>
                         <th>{"Status"}</th>
-                        <td>
-                            if thumbgen.is_none() {
-                                {"Initializing"}
-                            } else {
-                                {"Ready"}
-                            }
-                        </td>
+                        <td>{thumbgen.get_status()}</td>
                     </tr>
                     if let Some(r#impl) = thumbgen_impl {
                     <tr>
@@ -153,7 +166,7 @@ pub fn StatusModal() -> Html {
                         <td>{format!("{} ({} in use)", stats.cache_stats.thumbs, stats.cache_stats.in_use)}</td>
                     </tr>
                     <tr>
-                        <th>{"Cached errors"}</th>
+                        <th>{"Cached errors "}<button onclick={clear_errors}>{"Clear"}</button></th>
                         <td>{stats.cache_stats.errors}</td>
                     </tr>
                     <tr>

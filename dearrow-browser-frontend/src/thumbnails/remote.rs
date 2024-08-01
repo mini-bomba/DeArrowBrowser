@@ -94,6 +94,7 @@ struct InnerTW {
     next_id: Cell<u16>,
     keepalive_interval: OnceCell<Interval<dyn FnMut()>>,
     pagehide_listener: OnceCell<EventListener<dyn FnMut(PageTransitionEvent)>>,
+    protocol_mismatch: Cell<bool>,
 }
 
 #[derive(PartialEq)]
@@ -212,6 +213,7 @@ impl ThumbnailWorker {
                 next_id: Cell::new(0),
                 keepalive_interval: OnceCell::new(),
                 pagehide_listener: OnceCell::new(),
+                protocol_mismatch: Cell::new(false),
             }),
         };
 
@@ -297,6 +299,10 @@ impl ThumbnailWorker {
         };
         Ok(stats)
     }
+
+    pub fn is_protocol_mismatched(&self) -> bool {
+        self.inner.protocol_mismatch.get()
+    }
 }
 
 impl InnerTW {
@@ -312,12 +318,14 @@ impl InnerTW {
         let message = match bincode::deserialize::<ThumbnailWorkerResponseMessage>(&data.to_vec()).context("Failed to deserialize a message from ThumbnailWorker!") {
             Ok(msg) => msg,
             Err(error) => {
+                self.protocol_mismatch.set(true);
                 error!(format!("{error}"));
                 return;
             },
         };
         if message.id == 0 {
             if let ThumbnailWorkerResponse::DeserializationError { received_data } = message.response {
+                self.protocol_mismatch.set(true);
                 warn!("Received a DeserializationError response from ThumbnailWorker!");
                 // the message ID on the response is wrong
                 // try to deserialize the returned message as a request, and extract the request ID

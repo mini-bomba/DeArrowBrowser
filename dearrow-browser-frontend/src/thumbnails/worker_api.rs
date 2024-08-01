@@ -68,6 +68,7 @@ pub enum ThumbnailWorkerRequest {
     SettingUpdated {
         setting: WorkerSetting,
     },
+    ClearErrors,
     GetStats,
     Ping,
     Disconnecting,
@@ -89,7 +90,7 @@ pub enum ThumbnailWorkerResponse {
     Stats {
         stats: ThumbgenStats,
     },
-    Pong,
+    Ok,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

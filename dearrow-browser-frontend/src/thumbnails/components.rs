@@ -66,16 +66,54 @@ impl Thumbgen {
             Self::Local { gen, .. } => Ok(ThumbgenStats { cache_stats: gen.get_stats(), worker_stats: None }),
         }
     }
+
+    pub async fn clear_errors(&self) {
+        match self {
+            Self::Remote(worker) => drop(worker.request(ThumbnailWorkerRequest::ClearErrors).await),
+            Self::Local { gen, .. } => drop(gen.clear_errors()),
+        };
+    }
 }
 
 pub type ThumbgenContext = Option<Thumbgen>;
+pub trait ThumbgenContextExt {
+    fn get_status(&self) -> &'static str;
+}
+
+impl ThumbgenContextExt for ThumbgenContext {
+    fn get_status(&self) -> &'static str {
+        match self {
+            None => "Initializing",
+            Some(Thumbgen::Local {..}) => "Ready",
+            Some(Thumbgen::Remote(ref gen)) => {
+                if gen.is_protocol_mismatched() {
+                    "Ready (mismatched protocol)"
+                } else {
+                    "Ready"
+                }
+            }
+        }
+    }
+}
+
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct ThumbgenRefreshContext(pub u8);
+pub struct ThumbgenRefreshValue(pub u8);
 
-impl ThumbgenRefreshContext {
+impl ThumbgenRefreshValue {
     fn bump(self) -> Self {
-        ThumbgenRefreshContext(self.0.wrapping_add(1))
+        Self(self.0.wrapping_add(1))
+    }
+}
+
+pub type ThumbgenRefreshContext = UseStateHandle<ThumbgenRefreshValue>;
+pub trait TRExt {
+    fn trigger_refresh(&self);
+}
+
+impl TRExt for ThumbgenRefreshContext {
+    fn trigger_refresh(&self) {
+        self.set(self.bump());
     }
 }
 
@@ -97,7 +135,7 @@ pub fn ThumbgenProvider(props: &ThumbnailGeneratorProviderProps) -> Html {
             },
         })
     }, UseAsyncOptions::enable_auto());
-    let refresh_state = use_state(|| ThumbgenRefreshContext(0));
+    let refresh_state = use_state(|| ThumbgenRefreshValue(0));
 
     // Thumbgen API URL updates
     use_memo((thumgen_state.data.clone(), settings.thumbgen_api_base_url.clone()), |(thumbgen, api_base_url)| {
@@ -126,12 +164,12 @@ pub fn ThumbgenProvider(props: &ThumbnailGeneratorProviderProps) -> Html {
                 log!(format!("Cleared {errors_removed} error entries after updating thumbgen API URL"));
             }
         };
-        refresh_state.set(refresh_state.bump());
+        refresh_state.trigger_refresh();
     });
 
     html! {
         <ContextProvider<ThumbgenContext> context={thumgen_state.data.clone()}>
-        <ContextProvider<ThumbgenRefreshContext> context={*refresh_state}>
+        <ContextProvider<ThumbgenRefreshContext> context={refresh_state.clone()}>
             { props.children.clone() }
         </ContextProvider<ThumbgenRefreshContext>>
         </ContextProvider<ThumbgenContext>>

@@ -22,7 +22,6 @@ use reqwest::Url;
 use strum::VariantNames;
 use web_sys::{HtmlInputElement, HtmlSelectElement};
 use yew::prelude::*;
-use gloo_console::log;
 
 use crate::{contexts::SettingsContext, settings::TableLayout};
 
@@ -100,7 +99,6 @@ macro_rules! save_callback {
         move |e: Event, settings_context| {
             let target: HtmlInputElement = e.target_unchecked_into();
             if let Some(v) = $verify_func(&target) {
-                log!(format!("Saved! {v:?}"));
                 let mut settings = settings_context.settings().clone();
                 settings.$name = v;
                 settings_context.update(settings);

@@ -205,6 +205,9 @@ impl LocalThumbGenerator {
             Err(error) => LocalThumbnailState::Failed(error),
         };
         let result = if let LocalThumbnailState::Failed(ref error) = new_state {
+            if let ThumbnailGenerationError::JSError(ref err) = error {
+                error!("JSError thrown while generating a thumbnail:", err);
+            }
             Err(error.clone())
         } else {
             Ok(())

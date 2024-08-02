@@ -598,7 +598,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-browser-api"
-version = "1.10.0"
+version = "1.10.1"
 dependencies = [
  "dearrow-parser",
  "serde",
@@ -606,7 +606,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-browser-frontend"
-version = "1.10.0"
+version = "1.10.1"
 dependencies = [
  "anyhow",
  "bincode",
@@ -629,7 +629,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-browser-server"
-version = "1.10.0"
+version = "1.10.1"
 dependencies = [
  "actix-files",
  "actix-web",
@@ -652,7 +652,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-parser"
-version = "1.10.0"
+version = "1.10.1"
 dependencies = [
  "anyhow",
  "csv",
@@ -2005,9 +2005,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.10.5"
+version = "1.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b91213439dad192326a0d7c6ee3955910425f441d7038e0d6933b0aec5c4517f"
+checksum = "4219d74c6b67a3654a9fbebc4b419e22126d13d2f3c4a07ee0cb61ff79a79619"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -2380,12 +2380,13 @@ dependencies = [
 
 [[package]]
 name = "tempfile"
-version = "3.10.1"
+version = "3.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85b77fafb263dd9d05cbeac119526425676db3784113aa9295c88498cbf8bff1"
+checksum = "b8fcd239983515c23a32fb82099f97d0b11b8c72f654ed659363a95c3dad7a53"
 dependencies = [
  "cfg-if",
  "fastrand",
+ "once_cell",
  "rustix",
  "windows-sys 0.52.0",
 ]
@@ -3078,18 +3079,18 @@ dependencies = [
 
 [[package]]
 name = "zstd-safe"
-version = "7.2.0"
+version = "7.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa556e971e7b568dc775c136fc9de8c779b1c2fc3a63defaafadffdbd3181afa"
+checksum = "54a3ab4db68cea366acc5c897c7b4d4d1b8994a9cd6e6f841f8964566a419059"
 dependencies = [
  "zstd-sys",
 ]
 
 [[package]]
 name = "zstd-sys"
-version = "2.0.12+zstd.1.5.6"
+version = "2.0.13+zstd.1.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a4e40c320c3cb459d9a9ff6de98cff88f4751ee9275d140e2be94a2b74e4c13"
+checksum = "38ff0f21cfee8f97d94cef41359e0c89aa6113028ab0291aa8ca0038995a95aa"
 dependencies = [
  "cc",
  "pkg-config",

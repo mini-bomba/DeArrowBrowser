@@ -19,7 +19,7 @@
 use std::{cell::{Cell, OnceCell, RefCell}, collections::HashMap, rc::Rc};
 
 use futures::{future::{LocalBoxFuture, Shared}, FutureExt};
-use gloo_console::{debug, error};
+use gloo_console::{debug, error, log};
 use reqwest::Url;
 use wasm_bindgen::{closure::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
@@ -28,6 +28,11 @@ use web_sys::{js_sys::{Error, Object, Reflect}, Blob};
 use super::{common::{CacheStats, ThumbnailKey}, utils::*, worker_api::RemoteThumbnailGenerationError};
 
 const SWEEP_INTERVAL: i32 = 30_000;
+const ASYNCGEN_ERROR_MSG: &str = "Thumbnail not generated yet";
+const ASYNCGEN_RETRY_DELAY: u32 = 20_000;
+const TIMEOUT_ERROR_MSG: &str = "Failed to generate thumbnail due to timeout";
+const TIMEOUT_RETRY_DELAY: u32 = 5_000;
+const MAX_RETRIES: u8 = 3;
 
 /// Represents ownership of the underlying object URL (aka bloblink)
 ///
@@ -196,13 +201,33 @@ impl LocalThumbGenerator {
     ///
     /// Errors are directly returned, but the thumbnail must be manually retrieved from the cache
     async fn generate_thumb(self, key: ThumbnailKey) -> Result<(), ThumbnailGenerationError> {
-        let url = self.inner.api_base_url.borrow().clone();
-        let new_state = match generate_thumb(url, &key).await {
-            Ok(thumb) => LocalThumbnailState::Ready {
-                thumbnail: thumb.into(),
-                eviction_timer: 0,
-            },
-            Err(error) => LocalThumbnailState::Failed(error),
+        let mut retries_left = MAX_RETRIES;
+        let new_state = loop {
+            let url = self.inner.api_base_url.borrow().clone();
+            let new_state = match generate_thumb(url, &key).await {
+                Ok(thumb) => LocalThumbnailState::Ready {
+                    thumbnail: thumb.into(),
+                    eviction_timer: 0,
+                },
+                Err(error) => LocalThumbnailState::Failed(error),
+            };
+            if retries_left == 0 {
+                break new_state;
+            }
+            if let LocalThumbnailState::Failed(ThumbnailGenerationError::ServerError(ref err)) = new_state {
+                if &**err == ASYNCGEN_ERROR_MSG {
+                    log!("Retrying after an asyncgen response");
+                    retries_left = retries_left.saturating_sub(1);
+                    sleep(ASYNCGEN_RETRY_DELAY).await;
+                    continue;
+                } else if &**err == TIMEOUT_ERROR_MSG {
+                    log!("Retrying after a timeout response");
+                    retries_left = retries_left.saturating_sub(1);
+                    sleep(TIMEOUT_RETRY_DELAY).await;
+                    continue;
+                }
+            }
+            break new_state;
         };
         let result = if let LocalThumbnailState::Failed(ref error) = new_state {
             if let ThumbnailGenerationError::JSError(ref err) = error {

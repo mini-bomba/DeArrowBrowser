@@ -221,6 +221,8 @@ body {
   > .thumbnail {
     min-width: 0;
     min-height: 0;
+    max-width: 100%;
+    max-height: 100%;
     flex-shrink: 1;
     flex-grow: 1;
   }

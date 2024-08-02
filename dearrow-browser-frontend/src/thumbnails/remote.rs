@@ -106,6 +106,8 @@ pub enum Error {
     ProtocolError,
     /// timed out waiting for the worker to respond
     WorkerInitializationTimeout,
+    /// shared worker impl disabled via settings
+    ConfigDisabled,
     /// error from the thumbnail worker
     Remote(RemoteThumbnailGenerationError),
 }
@@ -113,12 +115,8 @@ pub enum Error {
 impl Error {
     pub fn log(&self, context: &str) {
         match self {
-            Self::Bincode(RcEq(err)) => error!(context, format!("Message serialization failed: {err:?}")),
             Self::JS(err) => error!(context, err),
-            Self::Cancelled(err) => error!(context, format!("Waiting for response got cancelled: {err:?}")),
-            Self::ProtocolError => error!(context, "Window-worker protocol mismatch"),
-            Self::WorkerInitializationTimeout => error!(context, "Timed out waiting for the worker to initialize"),
-            Self::Remote(err) => error!(context, format!("Thumbnail generation failed: {err}")),
+            other => error!(context, format!("{other:?}")),
         }
     }
 }
@@ -130,6 +128,7 @@ impl Display for Error {
             Self::Cancelled(err) => write!(f, "Waiting for response got cancelled: {err:?}"),
             Self::ProtocolError => write!(f, "Window-worker protocol mismatch"),
             Self::WorkerInitializationTimeout => write!(f, "Timed out waiting for the worker to initialize"),
+            Self::ConfigDisabled => write!(f, "SW impl disabled in settings"),
             Self::Remote(err) => write!(f, "Thumbnail generation failed: {err}"),
             Self::JS(err) => {
                 if let Some(err) = err.dyn_ref::<web_sys::js_sys::Error>() {

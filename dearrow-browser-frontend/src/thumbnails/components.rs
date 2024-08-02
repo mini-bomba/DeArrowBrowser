@@ -126,14 +126,22 @@ pub struct ThumbnailGeneratorProviderProps {
 pub fn ThumbgenProvider(props: &ThumbnailGeneratorProviderProps) -> Html {
     let settings_context: SettingsContext = use_context().expect("ThumbnailProvider must be placed under a SettingsContext provider");
     let settings = settings_context.settings();
+    let disable_sharedworker = settings.disable_sharedworker;
     let thumgen_state: UseAsyncHandle<Thumbgen, ()> = use_async_with_options(async move {
-        Ok(match ThumbnailWorker::new().await {
-            Ok(worker) => Thumbgen::Remote(worker),
-            Err(err) => Thumbgen::Local {
-                gen: LocalThumbGenerator::new(),
-                error: RcEq::new(err),
-            },
-        })
+        if disable_sharedworker {
+            Ok(Thumbgen::Local { 
+                gen: LocalThumbGenerator::new(), 
+                error: RcEq::new(Error::ConfigDisabled), 
+            })
+        } else {
+            Ok(match ThumbnailWorker::new().await {
+                Ok(worker) => Thumbgen::Remote(worker),
+                Err(err) => Thumbgen::Local {
+                    gen: LocalThumbGenerator::new(),
+                    error: RcEq::new(err),
+                },
+            })
+        }
     }, UseAsyncOptions::enable_auto());
     let refresh_state = use_state(|| ThumbgenRefreshValue(0));
 

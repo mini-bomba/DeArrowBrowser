@@ -29,6 +29,7 @@ pub struct Settings {
     pub title_table_layout: TableLayout,
     pub thumbnail_table_layout: TableLayout,
     pub render_thumbnails_in_tables: bool,
+    pub disable_sharedworker: bool,
 }
 
 impl Default for Settings {
@@ -39,6 +40,7 @@ impl Default for Settings {
             title_table_layout: TableLayout::Expanded,
             thumbnail_table_layout: TableLayout::Expanded,
             render_thumbnails_in_tables: false,
+            disable_sharedworker: false,
         }
     }
 }

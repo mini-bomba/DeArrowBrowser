@@ -26,6 +26,8 @@ use gloo_console::log;
 
 use crate::{contexts::SettingsContext, settings::TableLayout};
 
+const DISABLE_SW_TITLE: &str = "This is meant for debugging only - this disables sharing the thumbnail cache between all open tabs and makes the current tab handle all thumbnail fetching on it's own. Changes require a refresh to apply";
+
 /// Generator macro for a revert callback (Esc key pressed)
 ///
 /// Takes in the name of the settings field and a function to verify the input field's value
@@ -229,18 +231,22 @@ pub fn SettingsModal() -> Html {
     let title_table_layout_save           = use_callback(settings_context.clone(), save_callback!(title_table_layout, fromstr_verify));
     let thumbnail_table_layout_save       = use_callback(settings_context.clone(), save_callback!(thumbnail_table_layout, fromstr_verify));
     let render_thumbnails_in_tables_save  = use_callback(settings_context.clone(), save_callback!(render_thumbnails_in_tables, checkbox_verify));
+    let disable_sharedworker_save         = use_callback(settings_context.clone(), save_callback!(disable_sharedworker, checkbox_verify));
 
     let entries_per_page_undo             = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(entries_per_page));
     let thumbgen_api_base_url_undo        = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(thumbgen_api_base_url));
     let title_table_layout_undo           = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(title_table_layout));
     let thumbnail_table_layout_undo       = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(thumbnail_table_layout));
     let render_thumbnails_in_tables_undo  = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(render_thumbnails_in_tables));
+    let disable_sharedworker_undo         = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(disable_sharedworker));
 
     let entries_per_page_reset            = use_callback(settings_context.clone(), reset_callback!(entries_per_page));
     let thumbgen_api_base_url_reset       = use_callback(settings_context.clone(), reset_callback!(thumbgen_api_base_url));
     let title_table_layout_reset          = use_callback(settings_context.clone(), reset_callback!(title_table_layout));
     let thumbnail_table_layout_reset      = use_callback(settings_context.clone(), reset_callback!(thumbnail_table_layout));
     let render_thumbnails_in_tables_reset = use_callback(settings_context.clone(), reset_callback!(render_thumbnails_in_tables));
+    let disable_sharedworker_reset        = use_callback(settings_context.clone(), reset_callback!(disable_sharedworker));
+
 
     // ~value doesnt work for <select>
     use_effect_with((title_table_layout_ref.clone(), current_settings.title_table_layout), update_select);
@@ -369,6 +375,29 @@ pub fn SettingsModal() -> Html {
                         <span 
                             class="clickable" title="Reset to default"
                             onclick={thumbgen_api_base_url_reset}
+                        >{"🔄"}</span>
+                    }
+                </div>
+                <label for="disable_sharedworker" title={DISABLE_SW_TITLE}>{"Disable SharedWorker implementation: "}</label>
+                <input 
+                    class={setting_class!(initial_settings, current_settings, disable_sharedworker)} 
+                    id="disable_sharedworker" 
+                    title={DISABLE_SW_TITLE}
+                    type="checkbox"
+                    onchange={disable_sharedworker_save} 
+                    ~checked={current_settings.disable_sharedworker} 
+                />
+                <div class="setting-actions">
+                    if should_show_undo!(disable_sharedworker, current_settings, initial_settings) {
+                        <span 
+                            class="clickable" title="Undo"
+                            onclick={disable_sharedworker_undo}
+                        >{"↩️"}</span>
+                    }
+                    if should_show_reset!(disable_sharedworker, current_settings, settings_context) {
+                        <span 
+                            class="clickable" title="Reset to default"
+                            onclick={disable_sharedworker_reset}
                         >{"🔄"}</span>
                     }
                 </div>

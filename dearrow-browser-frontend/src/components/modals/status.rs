@@ -154,9 +154,7 @@ pub fn StatusModal() -> Html {
                         <td>{reason}</td>
                     </tr>
                     }
-                    if thumbgen_stats.loading {
-                    <em>{"Loading..."}</em>
-                    } else if let Some(ref stats) = thumbgen_stats.data {
+                    if let Some(ref stats) = thumbgen_stats.data {
                     <tr>
                         <th>{"Cached entries"}</th>
                         <td>{stats.cache_stats.total}</td>
@@ -183,6 +181,8 @@ pub fn StatusModal() -> Html {
                         <td>{worker_stats.this_client_refs}</td>
                     </tr>
                     }
+                    } else if thumbgen_stats.loading {
+                    <em>{"Loading..."}</em>
                     }
                 </table>
             </div>

@@ -17,9 +17,11 @@
 
 # Using alpine:edge instead of rust:alpine to get access to packages from testing
 # also prebuilt trunk is available which reduces initial container build times
-FROM docker.io/library/alpine:edge AS alpine-builder
+FROM docker.io/library/alpine:edge AS builder-base
 RUN echo https://dl-cdn.alpinelinux.org/alpine/edge/testing >> /etc/apk/repositories
 RUN apk --no-cache add git rust rust-wasm binaryen dart-sass trunk pkgconfig openssl-dev
+
+FROM builder-base AS builder
 ADD . /source
 WORKDIR /source
 # Bring back .dockerignored files to avoid triggering "uncommited changes" labels in info menus
@@ -29,9 +31,9 @@ WORKDIR /source/dearrow-browser-frontend
 RUN --mount=type=cache,target=/root/.cargo,id=alpine_cargo_dir --mount=type=cache,target=/source/target,id=dearrow_browser_target touch /source/add_metadata.rs && trunk build --release --locked --offline --minify
 
 
-FROM docker.io/library/alpine:latest
+FROM docker.io/library/alpine:latest AS full-server
 RUN apk --no-cache add libgcc
-COPY --from=alpine-builder /source/dearrow-browser-frontend/dist/ /static/
-COPY --from=alpine-builder /dearrow-browser-server /usr/bin/dearrow-browser-server
+COPY --from=builder /source/dearrow-browser-frontend/dist/ /static/
+COPY --from=builder /dearrow-browser-server /usr/bin/dearrow-browser-server
 WORKDIR /
 CMD ["/usr/bin/dearrow-browser-server"]

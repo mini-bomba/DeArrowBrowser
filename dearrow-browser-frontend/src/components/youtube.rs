@@ -21,7 +21,7 @@ use gloo_console::error;
 use reqwest::Url;
 use yew::prelude::*;
 
-use crate::{components::links::videoid_link, hooks::use_async_suspension, utils::ReqwestUrlExt, innertube};
+use crate::{components::links::videoid_link, hooks::use_async_suspension, innertube::{self, youtu_be_link}, utils::ReqwestUrlExt};
 
 #[derive(Properties, PartialEq, Clone)]
 pub struct YoutubeProps {
@@ -31,7 +31,7 @@ pub struct YoutubeProps {
 #[function_component]
 pub fn YoutubeIframe(props: &YoutubeProps) -> Html {
     let embed_url: Rc<AttrValue> = use_memo(props.videoid.clone(), |vid| {
-        let mut url = Url::parse("https://www.youtube-nocookie.com/embed/").unwrap();
+        let mut url = YOUTUBE_EMBED_URL.with(Clone::clone);
         url.extend_segments(&[vid]).unwrap();
         return AttrValue::Rc(url.as_str().into())
     });
@@ -63,9 +63,10 @@ pub struct VideoLinkProps {
 
 #[function_component]
 pub fn YoutubeVideoLink(props: &VideoLinkProps) -> Html {
+    let youtube_url: Rc<AttrValue> = use_memo(props.videoid.clone(), |vid| AttrValue::Rc(youtu_be_link(vid).as_str().into()));
     html!{
         <>
-            <a href={format!("https://youtu.be/{}", props.videoid)} title="View this video on YouTube" target="_blank">{props.videoid.clone()}</a>
+            <a href={&*youtube_url} title="View this video on YouTube" target="_blank">{props.videoid.clone()}</a>
             if props.multiline {
                 <br />
             } else {
@@ -74,4 +75,8 @@ pub fn YoutubeVideoLink(props: &VideoLinkProps) -> Html {
             {videoid_link(props.videoid.clone())}
         </>
     }
+}
+
+thread_local! {
+    static YOUTUBE_EMBED_URL: Url = Url::parse("https://www.youtube-nocookie.com/embed/").expect("should be able to parse the youtube embed url");
 }

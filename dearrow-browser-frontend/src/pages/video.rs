@@ -24,7 +24,7 @@ use reqwest::StatusCode;
 use yew::prelude::*;
 use yew_hooks::{use_async_with_options, UseAsyncHandle, UseAsyncOptions};
 
-use crate::{components::{detail_table::*, youtube::{OriginalTitle, YoutubeIframe}}, contexts::WindowContext, hooks::use_location_state, innertube::youtu_be_link, thumbnails::components::{Thumbnail, ThumbnailCaption}, utils::{get_reqwest_client, RcEq}};
+use crate::{components::{detail_table::*, youtube::{OriginalTitle, YoutubeIframe}}, contexts::WindowContext, hooks::use_location_state, innertube::youtu_be_link, thumbnails::components::{Thumbnail, ThumbnailCaption}, utils::{get_reqwest_client, sbb_video_link, RcEq}};
 
 #[derive(Properties, PartialEq)]
 struct VideoDetailsTableProps {
@@ -36,6 +36,7 @@ struct VideoDetailsTableProps {
 #[function_component]
 fn VideoDetailsTable(props: &VideoDetailsTableProps) -> Html {
     let youtube_url: Rc<AttrValue> = use_memo(props.videoid.clone(), |vid| AttrValue::Rc(youtu_be_link(vid).as_str().into()));
+    let sbb_url: Rc<AttrValue> = use_memo(props.videoid.clone(), |vid| AttrValue::Rc(sbb_video_link(vid).as_str().into()));
     let fallback = html!{
         <span><em>{"Loading..."}</em></span>
     };
@@ -76,6 +77,7 @@ fn VideoDetailsTable(props: &VideoDetailsTableProps) -> Html {
             } 
             
             <div><a href={&*youtube_url}>{"View on YouTube"}</a></div>
+            <div><a href={&*sbb_url}>{"View on SB Browser"}</a></div>
         </div>
     }
 }

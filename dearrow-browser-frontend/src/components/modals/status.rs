@@ -53,7 +53,7 @@ pub fn StatusModal() -> Html {
     let thumbgen_refresh: ThumbgenRefreshContext = use_context().expect("ThumbgenRefreshContext should be available");
     let update_clock: UseStateHandle<bool> = use_state(|| false);
 
-    let errors_url: Rc<AttrValue> = use_memo(window_context, |wc| wc.origin.join("/api/errors").expect("should be able to create errors API URL").as_str().to_owned().into());
+    let errors_url: Rc<AttrValue> = use_memo(window_context, |wc| wc.origin_join_segments(&["api", "errors"]).as_str().to_owned().into());
 
     let thumbgen_impl = match &thumbgen {
         None => None,

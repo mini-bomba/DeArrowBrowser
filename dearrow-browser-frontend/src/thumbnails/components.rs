@@ -23,7 +23,7 @@ use reqwest::Url;
 use yew::prelude::*;
 use yew_hooks::{use_async_with_options, UseAsyncHandle, UseAsyncOptions};
 
-use crate::{components::modals::{thumbnail::ThumbnailModal, ModalMessage}, hooks::use_async_suspension, thumbnails::worker_api::{ThumbnailWorkerRequest, WorkerSetting}, utils::RcEq, ModalRendererControls, SettingsContext};
+use crate::{components::modals::{thumbnail::ThumbnailModal, ModalMessage}, hooks::use_async_suspension, innertube, thumbnails::worker_api::{ThumbnailWorkerRequest, WorkerSetting}, utils::RcEq, ModalRendererControls, SettingsContext};
 
 use super::{common::{ThumbgenStats, ThumbnailKey}, local::{LocalBlobLink, LocalThumbGenerator}, remote::{Error, RemoteBlobLink, ThumbnailWorker}};
 
@@ -207,9 +207,9 @@ pub struct UnwrappedThumbnailProps {
 pub fn UnwrappedThumbnail(props: &UnwrappedThumbnailProps) -> Html {
     let timestamp: Rc<Rc<str>> = use_memo(props.clone(), |props| {
         match props.timestamp {
-            None => format!("https://img.youtube.com/vi/{}/maxresdefault.jpg", props.video_id),
-            Some(t) => format!("{t}"),
-        }.into()
+            None => innertube::original_thumbnail_url(&props.video_id).as_str().into(),
+            Some(t) => format!("{t}").into(),
+        }
     });
     if props.timestamp.is_none() {
         html! {

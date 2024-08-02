@@ -234,8 +234,21 @@ impl ReqwestUrlExt for Url {
 
 thread_local! {
     static REQWEST_CLIENT: Client = Client::new();
+    static SBB_BASE: Url = Url::parse("https://sb.ltn.fi/").expect("should be able to parse sb.ltn.fi base URL");
 }
 
 pub fn get_reqwest_client() -> Client {
     REQWEST_CLIENT.with(Clone::clone)
+}
+
+pub fn sbb_video_link(vid: &str) -> Url {
+    let mut url = SBB_BASE.with(Clone::clone);
+    url.extend_segments(&["video", vid]).expect("https://sb.ltn.fi/ should be a valid base");
+    url
+}
+
+pub fn sbb_userid_link(uid: &str) -> Url {
+    let mut url = SBB_BASE.with(Clone::clone);
+    url.extend_segments(&["userid", uid]).expect("https://sb.ltn.fi/ should be a valid base");
+    url
 }

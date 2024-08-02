@@ -20,7 +20,7 @@ use std::rc::Rc;
 use dearrow_browser_api::unsync::User;
 use yew::prelude::*;
 
-use crate::{components::detail_table::*, contexts::{StatusContext, WindowContext}, hooks::{use_async_suspension, use_location_state}, utils::get_reqwest_client};
+use crate::{components::detail_table::*, contexts::{StatusContext, WindowContext}, hooks::{use_async_suspension, use_location_state}, utils::{get_reqwest_client, sbb_userid_link}};
 
 #[derive(Properties, PartialEq)]
 struct UserDetailsProps {
@@ -35,6 +35,7 @@ fn UserDetails(props: &UserDetailsProps) -> HtmlResult {
     let result: Rc<Result<User, anyhow::Error>> = use_async_suspension(|(url, _)| async move {
         Ok(get_reqwest_client().get((url).clone()).send().await?.json().await?)
     }, (url, status.map(|s| s.last_updated)))?;
+    let sbb_url: Rc<AttrValue> = use_memo(props.userid.clone(), |uid| AttrValue::Rc(sbb_userid_link(uid).as_str().into()));
 
     Ok(match *result {
         Ok(ref user) => html! {
@@ -56,10 +57,14 @@ fn UserDetails(props: &UserDetailsProps) -> HtmlResult {
                 </div>
                 <div>{format!("Titles: {}", user.title_count)}</div>
                 <div>{format!("Thumbnails: {}", user.thumbnail_count)}</div>
+                <div><a href={&*sbb_url}>{"View on SB Browser"}</a></div>
             </>
         },
         Err(ref e) => html! {
-            <div>{"Failed to fetch user data"}<br/><pre>{format!("{e:?}")}</pre></div>
+            <>
+                <div>{"Failed to fetch user data"}<br/><pre>{format!("{e:?}")}</pre></div>
+                <div><a href={&*sbb_url}>{"View on SB Browser"}</a></div>
+            </>
         }
     })
 }

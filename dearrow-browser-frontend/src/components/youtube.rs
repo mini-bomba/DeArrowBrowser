@@ -21,7 +21,7 @@ use gloo_console::error;
 use reqwest::Url;
 use yew::prelude::*;
 
-use crate::{components::links::videoid_link, hooks::use_async_suspension, utils::{self, ReqwestUrlExt}};
+use crate::{components::links::videoid_link, hooks::use_async_suspension, utils::ReqwestUrlExt, innertube};
 
 #[derive(Properties, PartialEq, Clone)]
 pub struct YoutubeProps {
@@ -42,7 +42,7 @@ pub fn YoutubeIframe(props: &YoutubeProps) -> Html {
 #[function_component]
 pub fn OriginalTitle(props: &YoutubeProps) -> HtmlResult {
     let title = use_async_suspension(|vid| async move {
-        let result = utils::get_original_title(&vid).await;
+        let result = innertube::get_original_title(&vid).await;
         if let Err(ref e) = result {
             error!(format!("Failed to fetch original title for video {vid}: {e:?}"));
         }

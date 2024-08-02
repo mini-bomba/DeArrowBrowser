@@ -17,10 +17,8 @@
 */
 use std::{ops::Deref, rc::Rc};
 
-use anyhow::Context;
 use chrono::{DateTime, Utc, NaiveDateTime};
-use reqwest::Url;
-use serde::Deserialize;
+use reqwest::{Client, Url};
 
 const TIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
@@ -156,22 +154,6 @@ define_big_render_number!(signed, i64);
 define_big_render_number!(signed, i128);
 define_big_render_number!(signed, isize);
 
-
-#[derive(Deserialize)]
-struct OEmbedResponse {
-    title: Option<String>,
-}
-
-pub async fn get_original_title(vid: &str) -> Result<String, anyhow::Error> {
-    let url = Url::parse_with_params(
-        "https://www.youtube-nocookie.com/oembed", 
-        &[("url", &youtu_be_link(vid))]
-    ).context("Failed to construct an oembed request URL")?;
-    let resp: OEmbedResponse = reqwest::get(url).await.context("Failed to send oembed request")?
-        .json().await.context("Failed to deserialize oembed response")?;
-    resp.title.context("oembed response contained no title")
-}
-
 /// Wrapper type for comparing Rc's via their addresses
 pub struct RcEq<T: ?Sized>(pub Rc<T>);
 
@@ -250,8 +232,10 @@ impl ReqwestUrlExt for Url {
     }
 }
 
-pub fn youtu_be_link(vid: &str) -> Url {
-    let mut url = Url::parse("https://youtu.be/").expect("should be able to parse youtu.be base URL");
-    url.extend_segments(&[vid]).expect("https://youtu.be/ should be a valid base");
-    url
+thread_local! {
+    static REQWEST_CLIENT: Client = Client::new();
+}
+
+pub fn get_reqwest_client() -> Client {
+    REQWEST_CLIENT.with(Clone::clone)
 }

@@ -24,7 +24,7 @@ use web_sys::HtmlInputElement;
 use yew::{prelude::*, suspense::SuspensionResult};
 use dearrow_browser_api::unsync::*;
 
-use crate::{components::{links::*, modals::{thumbnail::ThumbnailModal, ModalMessage}, youtube::YoutubeVideoLink}, contexts::{SettingsContext, StatusContext}, hooks::{use_async_suspension, use_location_state}, pages::LocationState, settings::TableLayout, thumbnails::components::{ContainerType, Thumbnail, ThumbnailCaption}, utils::{render_datetime, RcEq}, ModalRendererControls};
+use crate::{components::{links::*, modals::{thumbnail::ThumbnailModal, ModalMessage}, youtube::YoutubeVideoLink}, contexts::{SettingsContext, StatusContext}, hooks::{use_async_suspension, use_location_state}, pages::LocationState, settings::TableLayout, thumbnails::components::{ContainerType, Thumbnail, ThumbnailCaption}, utils::{get_reqwest_client, render_datetime, RcEq}, ModalRendererControls};
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum DetailType {
@@ -168,7 +168,7 @@ impl DetailList {
 pub fn use_detail_download(url: Rc<Url>, mode: DetailType, sort: bool) -> SuspensionResult<Rc<Result<DetailList, anyhow::Error>>> {
     let status: StatusContext = use_context().expect("StatusResponse should be defined");
     use_async_suspension(|(mode, url, sort, _)| async move {
-        let request = reqwest::get((*url).clone()).await?;
+        let request = get_reqwest_client().get((*url).clone()).send().await?;
         let mut result = match mode {
             DetailType::Thumbnail => DetailList::Thumbnails(request.json().await?),
             DetailType::Title => DetailList::Titles(request.json().await?),

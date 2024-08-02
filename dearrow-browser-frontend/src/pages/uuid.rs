@@ -24,7 +24,7 @@ use dearrow_browser_api::unsync::{ApiThumbnail, ApiTitle};
 use reqwest::StatusCode;
 use yew::prelude::*;
 
-use crate::{components::{links::userid_link, youtube::{OriginalTitle, YoutubeIframe, YoutubeVideoLink}}, hooks::use_async_suspension, thumbnails::components::{Thumbnail, ThumbnailCaption}, utils::{render_datetime, RcEq}, WindowContext};
+use crate::{components::{links::userid_link, youtube::{OriginalTitle, YoutubeIframe, YoutubeVideoLink}}, hooks::use_async_suspension, thumbnails::components::{Thumbnail, ThumbnailCaption}, utils::{get_reqwest_client, render_datetime, RcEq}, WindowContext};
 
 #[derive(Properties, PartialEq, Clone)]
 pub struct UUIDPageProps {
@@ -55,7 +55,7 @@ fn UUIDTitle(props: &UUIDPageProps) -> HtmlResult {
     let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
     let title = use_async_suspension(|(wc, uuid)| async move {
         let url = wc.origin_join_segments(&["api", "titles", "uuid", &uuid]);
-        let resp = reqwest::get(url).await.context("API request failed")?;
+        let resp = get_reqwest_client().get(url).send().await.context("API request failed")?;
         if resp.status() == StatusCode::NOT_FOUND {
             return Ok(None);
         }
@@ -138,7 +138,7 @@ fn UUIDThumbnail(props: &UUIDPageProps) -> HtmlResult {
     let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
     let thumbnail = use_async_suspension(|(wc, uuid)| async move {
         let url = wc.origin_join_segments(&["api", "thumbnails", "uuid", &uuid]);
-        let resp = reqwest::get(url).await.context("API request failed")?;
+        let resp = get_reqwest_client().get(url).send().await.context("API request failed")?;
         if resp.status() == StatusCode::NOT_FOUND {
             return Ok(None);
         }

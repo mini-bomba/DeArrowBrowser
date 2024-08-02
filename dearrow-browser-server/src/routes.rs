@@ -25,7 +25,12 @@ use dearrow_browser_api::sync::*;
 use log::warn;
 use serde::Deserialize;
 
-use crate::{built_info, middleware::ETagCache, state::*, utils};
+use crate::{built_info, middleware::ETagCache, sbserver_emulation::get_random_time_for_video, state::*, utils};
+
+const SS_READ_ERR:  &str = "Failed to acquire StringSet for reading";
+const SS_WRITE_ERR: &str = "Failed to acquire StringSet for writing";
+const DB_READ_ERR:  &str = "Failed to acquire DatabaseState for reading";
+const DB_WRITE_ERR: &str = "Failed to acquire DatabaseState for writing";
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(helo)
@@ -39,6 +44,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
        .service(get_thumbnails_by_video_id)
        .service(get_thumbnails_by_user_id)
        .service(get_user_by_userid)
+       .service(get_video)
        .service(get_status)
        .service(get_errors)
        .service(request_reload);
@@ -74,7 +80,7 @@ async fn get_status(db_lock: DBLock, string_set: StringSetLock, config: web::Dat
         Err(_) => None,
         Ok(set) => Some(set.set.len()),
     };
-    let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
+    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
     Ok(web::Json(StatusResponse {
         last_updated: db.last_updated,
         last_modified: db.last_modified,
@@ -102,21 +108,21 @@ struct Auth {
 
 fn do_reload(db_lock: DBLock, string_set_lock: StringSetLock, config: web::Data<AppConfig>) -> anyhow::Result<()> {
     {
-        let mut db_state = db_lock.write().map_err(|_| anyhow!("Failed to acquire DatabaseState for writing"))?;
+        let mut db_state = db_lock.write().map_err(|_| anyhow!(DB_WRITE_ERR))?;
         if db_state.updating_now {
             bail!("Already updating!");
         }
         db_state.updating_now = true;
     }
     warn!("Reload requested");
-    let mut string_set_clone = string_set_lock.read().map_err(|_| anyhow!("Failed to acquire StringSet for reading"))?.clone();
+    let mut string_set_clone = string_set_lock.read().map_err(|_| anyhow!(SS_READ_ERR))?.clone();
     let (mut new_db, errors) = DearrowDB::load_dir(config.mirror_path.as_path(), &mut string_set_clone)?;
     new_db.sort();
     let last_updated = Utc::now().timestamp_millis();
     let last_modified = utils::get_mtime(&config.mirror_path.join("titles.csv"));
     {
-        let mut string_set = string_set_lock.write().map_err(|_| anyhow!("Failed to acquire StringSet for writing"))?;
-        let mut db_state = db_lock.write().map_err(|_| anyhow!("Failed to acquire DatabaseState for writing"))?;
+        let mut string_set = string_set_lock.write().map_err(|_| anyhow!(SS_WRITE_ERR))?;
+        let mut db_state = db_lock.write().map_err(|_| anyhow!(DB_WRITE_ERR))?;
         *string_set = string_set_clone;
         *db_state = DatabaseState {
             db: new_db,
@@ -152,7 +158,7 @@ async fn request_reload(db_lock: DBLock, string_set_lock: StringSetLock, config:
 
 #[get("/errors")]
 async fn get_errors(db_lock: DBLock) -> JsonResult<ErrorList> {
-    let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
+    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
     Ok(web::Json(db.errors.iter().map(|e| format!("{e:?}")).collect()))
 }
 
@@ -164,7 +170,7 @@ async fn get_titles(db_lock: DBLock, query: web::Query<MainEndpointURLParams>) -
                 .set_status(StatusCode::BAD_REQUEST)
         );
     }
-    let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
+    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
     Ok(web::Json(
         db.db.titles.iter().rev().skip(query.offset).take(query.count)
             .map(|t| t.into_with_db(&db.db)).collect::<Vec<_>>()
@@ -173,7 +179,7 @@ async fn get_titles(db_lock: DBLock, query: web::Query<MainEndpointURLParams>) -
 
 #[get("/titles/unverified", wrap = "ETagCache")]
 async fn get_unverified_titles(db_lock: DBLock) -> JsonResult<Vec<ApiTitle>> {
-    let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
+    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
     Ok(web::Json(
         db.db.titles.iter().rev()
             .filter(|t| t.flags.contains(TitleFlags::Unverified) && !t.flags.intersects(TitleFlags::Locked | TitleFlags::ShadowHidden | TitleFlags::Removed) && t.votes-t.downvotes > -1)
@@ -183,11 +189,11 @@ async fn get_unverified_titles(db_lock: DBLock) -> JsonResult<Vec<ApiTitle>> {
 
 #[get("/titles/uuid/{uuid}", wrap = "ETagCache")]
 async fn get_title_by_uuid(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> JsonResult<ApiTitle> {
-    let Some(uuid) = string_set.read().map_err(|_| anyhow!("Failed to acquire StringSet for reading"))?
+    let Some(uuid) = string_set.read().map_err(|_| anyhow!(SS_READ_ERR))?
             .set.get(path.into_inner().as_str()).cloned() else {
         return Err(utils::Error::EmptyStatus(StatusCode::NOT_FOUND));
     };
-    let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
+    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
     Ok(web::Json(
         db.db.titles.iter().find(|t| Arc::ptr_eq(&t.uuid, &uuid))
             .map(|t| t.into_with_db(&db.db))
@@ -197,9 +203,9 @@ async fn get_title_by_uuid(db_lock: DBLock, string_set: StringSetLock, path: web
 
 #[get("/titles/video_id/{video_id}", wrap = "ETagCache")]
 async fn get_titles_by_video_id(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> CustomizedJsonResult<Vec<ApiTitle>> {
-    let video_id = string_set.read().map_err(|_| anyhow!("Failed to acquire StringSet for reading"))?
+    let video_id = string_set.read().map_err(|_| anyhow!(SS_READ_ERR))?
         .set.get(path.into_inner().as_str()).cloned();
-    let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
+    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
     let titles = match video_id {
         None => vec![],
         Some(id) => db.db.titles.iter().rev()
@@ -217,9 +223,9 @@ async fn get_titles_by_video_id(db_lock: DBLock, string_set: StringSetLock, path
 
 #[get("/titles/user_id/{user_id}", wrap = "ETagCache")]
 async fn get_titles_by_user_id(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> CustomizedJsonResult<Vec<ApiTitle>> {
-    let user_id = string_set.read().map_err(|_| anyhow!("Failed to acquire StringSet for reading"))?
+    let user_id = string_set.read().map_err(|_| anyhow!(SS_READ_ERR))?
         .set.get(path.into_inner().as_str()).cloned();
-    let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
+    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
     let titles = match user_id {
         None => vec![],
         Some(id) => db.db.titles.iter().rev()
@@ -243,7 +249,7 @@ async fn get_thumbnails(db_lock: DBLock, query: web::Query<MainEndpointURLParams
                 .set_status(StatusCode::BAD_REQUEST)
         );
     }
-    let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
+    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
     Ok(web::Json(
         db.db.thumbnails.iter().rev().skip(query.offset).take(query.count)
             .map(|t| t.into_with_db(&db.db)).collect::<Vec<_>>()
@@ -252,11 +258,11 @@ async fn get_thumbnails(db_lock: DBLock, query: web::Query<MainEndpointURLParams
 
 #[get("/thumbnails/uuid/{uuid}", wrap = "ETagCache")]
 async fn get_thumbnail_by_uuid(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> JsonResult<ApiThumbnail> {
-    let Some(uuid) = string_set.read().map_err(|_| anyhow!("Failed to acquire StringSet for reading"))?
+    let Some(uuid) = string_set.read().map_err(|_| anyhow!(SS_READ_ERR))?
             .set.get(path.into_inner().as_str()).cloned() else {
         return Err(utils::Error::EmptyStatus(StatusCode::NOT_FOUND));
     };
-    let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
+    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
     Ok(web::Json(
         db.db.thumbnails.iter().find(|t| Arc::ptr_eq(&t.uuid, &uuid))
             .map(|t| t.into_with_db(&db.db))
@@ -266,9 +272,9 @@ async fn get_thumbnail_by_uuid(db_lock: DBLock, string_set: StringSetLock, path:
 
 #[get("/thumbnails/video_id/{video_id}", wrap = "ETagCache")]
 async fn get_thumbnails_by_video_id(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> CustomizedJsonResult<Vec<ApiThumbnail>> {
-    let video_id = string_set.read().map_err(|_| anyhow!("Failed to acquire StringSet for reading"))?
+    let video_id = string_set.read().map_err(|_| anyhow!(SS_READ_ERR))?
         .set.get(path.into_inner().as_str()).cloned();
-    let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
+    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
     let titles = match video_id {
         None => vec![],
         Some(id) => db.db.thumbnails.iter().rev()
@@ -286,9 +292,9 @@ async fn get_thumbnails_by_video_id(db_lock: DBLock, string_set: StringSetLock, 
 
 #[get("/thumbnails/user_id/{video_id}", wrap = "ETagCache")]
 async fn get_thumbnails_by_user_id(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> CustomizedJsonResult<Vec<ApiThumbnail>> {
-    let user_id = string_set.read().map_err(|_| anyhow!("Failed to acquire StringSet for reading"))?
+    let user_id = string_set.read().map_err(|_| anyhow!(SS_READ_ERR))?
         .set.get(path.into_inner().as_str()).cloned();
-    let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
+    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
     let titles = match user_id {
         None => vec![],
         Some(id) => db.db.thumbnails.iter().rev()
@@ -306,9 +312,9 @@ async fn get_thumbnails_by_user_id(db_lock: DBLock, string_set: StringSetLock, p
 
 #[get("/users/user_id/{user_id}", wrap = "ETagCache")]
 async fn get_user_by_userid(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> JsonResult<User> {
-    let user_id = string_set.read().map_err(|_| anyhow!("Failed to acquire StringSet for reading"))?
+    let user_id = string_set.read().map_err(|_| anyhow!(SS_READ_ERR))?
         .set.get(path.as_str()).cloned();
-    let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
+    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
     Ok(web::Json(match user_id {
         None => User {
             user_id: path.into_inner().into(),
@@ -332,3 +338,36 @@ async fn get_user_by_userid(db_lock: DBLock, string_set: StringSetLock, path: we
     }))
 }
 
+
+fn unknown_video(video_id: Arc<str>) -> Video {
+    Video { 
+        random_thumbnail: get_random_time_for_video(&video_id, None),
+        video_id,
+        duration: None,
+        fraction_unmarked: 1.,
+        has_outro: false,
+    }
+}
+
+#[get("/videos/{video_id}", wrap = "ETagCache")]
+async fn get_video(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> JsonResult<Video> {
+    let video_id = string_set.read().map_err(|_| anyhow!(SS_READ_ERR))?
+        .set.get(path.as_str()).cloned();
+    Ok(web::Json(match video_id {
+        None => unknown_video(path.as_str().into()),
+        Some(video_id) => {
+            let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+            let video_info = db.db.get_video_info(&video_id);
+            match video_info {
+                None => unknown_video(video_id),
+                Some(video_info) => Video { 
+                    random_thumbnail: get_random_time_for_video(&video_id, Some(video_info)),
+                    video_id,
+                    duration: Some(video_info.video_duration),
+                    fraction_unmarked: video_info.uncut_segments.iter().map(|s| s.length).sum(),
+                    has_outro: video_info.has_outro,
+                }
+            }
+        },
+    }))
+}

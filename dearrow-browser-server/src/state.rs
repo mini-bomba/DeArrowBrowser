@@ -28,14 +28,15 @@ pub type DBLock = web::Data<RwLock<DatabaseState>>;
 pub type StringSetLock = web::Data<RwLock<StringSet>>;
 
 #[derive(Serialize, Deserialize)]
+#[serde(default)]
 pub struct AppConfig {
     pub mirror_path: PathBuf,
     pub static_content_path: PathBuf,
     pub listen: ListenConfig,
     pub auth_secret: String,
-    #[serde(default)]
     pub enable_sbserver_emulation: bool,
-    #[serde(skip, default="Utc::now")]
+    pub enable_innertube_proxying: bool,
+    #[serde(skip)]
     pub startup_timestamp: DateTime<Utc>
 }
 
@@ -49,6 +50,7 @@ impl Default for AppConfig {
             listen: ListenConfig::default(),
             auth_secret: URL_SAFE_NO_PAD.encode(buffer),
             enable_sbserver_emulation: false,
+            enable_innertube_proxying: true,
             startup_timestamp: Utc::now(),
         }
     }

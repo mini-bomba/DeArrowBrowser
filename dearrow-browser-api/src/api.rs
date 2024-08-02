@@ -87,3 +87,18 @@ pub struct User {
     pub title_count: u64,
     pub thumbnail_count: u64,
 }
+
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
+pub struct Video {
+    pub video_id: RcStr,
+    pub random_thumbnail: f64,
+    pub duration: Option<f64>,
+    pub fraction_unmarked: f64,
+    pub has_outro: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct InnertubeVideo {
+    pub video_id: RcStr,
+    pub duration: u64,
+}

@@ -126,7 +126,7 @@ struct SBApiVideo {
 }
 
 // https://github.com/ajayyy/SponsorBlockServer/blob/af31f511a53a7e30ad27123656a911393200672b/src/routes/getBranding.ts#L233
-fn get_random_time_for_video(video_id: &str, video_info: Option<&VideoInfo>) -> f64 {
+pub fn get_random_time_for_video(video_id: &str, video_info: Option<&VideoInfo>) -> f64 {
     let random_time = Alea::new(video_id).random();
 
     if let Some(video_info) = video_info {

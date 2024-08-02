@@ -29,6 +29,7 @@ mod routes;
 mod state;
 mod sbserver_emulation;
 mod middleware;
+mod innertube;
 use state::*;
 
 const CONFIG_PATH: &str = "config.toml";
@@ -88,6 +89,7 @@ async fn main() -> anyhow::Result<()> {
                 .app_data(config.clone())
                 .app_data(db.clone())
                 .app_data(string_set.clone())
+                .app_data(web::Data::new(reqwest::Client::new()))
                 .service(web::scope("/api")
                     .configure(routes::configure)
                 );
@@ -98,6 +100,15 @@ async fn main() -> anyhow::Result<()> {
             } else {
                 app = app.service(web::scope("/sbserver")
                     .configure(sbserver_emulation::configure_disabled)
+                );
+            }
+            if config.enable_innertube_proxying {
+                app = app.service(web::scope("/innertube")
+                    .configure(innertube::configure_enabled)
+                );
+            } else {
+                app = app.service(web::scope("/innertube")
+                    .configure(innertube::configure_disabled)
                 );
             }
             app.service(

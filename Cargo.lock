@@ -644,6 +644,7 @@ dependencies = [
  "futures",
  "getrandom",
  "log",
+ "reqwest",
  "serde",
  "sha2",
  "toml",

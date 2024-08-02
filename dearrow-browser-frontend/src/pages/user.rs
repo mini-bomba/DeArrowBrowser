@@ -20,7 +20,7 @@ use std::rc::Rc;
 use dearrow_browser_api::unsync::User;
 use yew::prelude::*;
 
-use crate::{contexts::{WindowContext, StatusContext}, hooks::{use_async_suspension, use_location_state}, components::detail_table::*};
+use crate::{components::detail_table::*, contexts::{StatusContext, WindowContext}, hooks::{use_async_suspension, use_location_state}, utils::get_reqwest_client};
 
 #[derive(Properties, PartialEq)]
 struct UserDetailsProps {
@@ -33,7 +33,7 @@ fn UserDetails(props: &UserDetailsProps) -> HtmlResult {
     let status: StatusContext = use_context().expect("StatusResponse should be defined");
     let url = window_context.origin_join_segments(&["api","users","user_id", &props.userid]);
     let result: Rc<Result<User, anyhow::Error>> = use_async_suspension(|(url, _)| async move {
-        Ok(reqwest::get((url).clone()).await?.json().await?)
+        Ok(get_reqwest_client().get((url).clone()).send().await?.json().await?)
     }, (url, status.map(|s| s.last_updated)))?;
 
     Ok(match *result {

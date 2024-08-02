@@ -19,7 +19,7 @@
 # also prebuilt trunk is available which reduces initial container build times
 FROM docker.io/library/alpine:edge AS alpine-builder
 RUN echo https://dl-cdn.alpinelinux.org/alpine/edge/testing >> /etc/apk/repositories
-RUN apk --no-cache add git rust rust-wasm binaryen dart-sass trunk
+RUN apk --no-cache add git rust rust-wasm binaryen dart-sass trunk pkgconfig openssl-dev
 ADD . /source
 WORKDIR /source
 # Bring back .dockerignored files to avoid triggering "uncommited changes" labels in info menus

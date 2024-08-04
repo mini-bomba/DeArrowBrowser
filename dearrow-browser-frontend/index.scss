@@ -43,7 +43,7 @@ $white: #eee;
   cursor: help;
 }
 
-a [title] {
+a [title], .clickable [title] {
   cursor: pointer;
 }
 
@@ -71,7 +71,7 @@ body {
   flex-direction: row;
   gap: 2rem;
   
-  > img {
+  > a, > a > img {
     height: 100%;
   }
   
@@ -367,7 +367,7 @@ body {
   }
 }
 
-.icon-link, .icon-link a, a:has(> .icon:only-child) {
+.undecorated-link, .undecorated-link a {
   text-decoration: none;
   color: inherit;
 }

@@ -17,7 +17,7 @@
 */
 use chrono::DateTime;
 use yew::prelude::*;
-use yew_router::hooks::use_navigator;
+use yew_router::prelude::Link;
 
 use crate::components::modals::{settings::SettingsModal, status::StatusModal, ModalMessage};
 use crate::components::icon::*;
@@ -27,23 +27,16 @@ use crate::utils::render_datetime_with_delta;
 
 #[function_component]
 pub fn Header() -> Html {
-    let navigator = use_navigator().expect("navigator should exist");
     let modal_controls: ModalRendererControls = use_context().expect("Header should be placed inside a ModalRenderer");
     let open_settings_modal = use_callback(modal_controls, |_, modal_controls| {
         modal_controls.emit(ModalMessage::Open(html! {<SettingsModal />}));
     });
 
-    let go_home = {
-        Callback::from(move |_| {
-            navigator.push(&MainRoute::Home);
-        })
-    };
-
     html! {
         <div id="header">
-            <img src="/icon/logo.svg" class="clickable" onclick={go_home.clone()} />
+            <Link<MainRoute> to={MainRoute::Home}><img src="/icon/logo.svg" /></Link<MainRoute>>
             <div>
-                <h1 class="clickable" onclick={go_home}>{"DeArrow Browser"}</h1>
+                <h1 class="undecorated-link"><Link<MainRoute> to={MainRoute::Home}>{"DeArrow Browser"}</Link<MainRoute>></h1>
                 <span id="settings-button" class="clickable" onclick={open_settings_modal}><Icon r#type={IconType::Settings} tooltip={"Open settings"} /></span>
             </div>
         </div>

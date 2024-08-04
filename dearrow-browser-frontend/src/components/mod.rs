@@ -21,3 +21,4 @@ pub mod modals;
 pub mod searchbar;
 pub mod youtube;
 pub mod links;
+pub mod icon;

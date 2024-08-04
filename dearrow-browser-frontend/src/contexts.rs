@@ -28,7 +28,6 @@ use crate::{settings::Settings, utils::ReqwestUrlExt};
 #[derive(Clone, PartialEq)]
 pub struct WindowContext {
     pub origin: Url,
-    pub logo_url: Option<AttrValue>,
 }
 
 impl WindowContext {

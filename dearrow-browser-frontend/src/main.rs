@@ -45,10 +45,6 @@ fn App() -> Html {
             origin: Url::parse(
                 window.location().origin().expect("window.location.origin should exist").as_str()
             ).expect("window.location.origin should be a valid URL"),
-            logo_url: window.document()
-                .and_then(|d| d.query_selector("link[rel=icon]").ok().flatten())
-                .and_then(|el| el.get_attribute("href"))
-                .map(AttrValue::from),
         }
     });
     let update_clock = use_state(|| UpdateClock(false));

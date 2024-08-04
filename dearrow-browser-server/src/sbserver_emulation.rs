@@ -140,7 +140,7 @@ pub fn get_random_time_for_video(video_id: &str, video_info: Option<&VideoInfo>)
         random_time *= video_info.uncut_segments.iter().map(|s| s.length).sum::<f64>();
 
         // Then map it to the unmarked segments
-        for segment in video_info.uncut_segments.iter() {
+        for segment in &video_info.uncut_segments {
             if random_time <= segment.length {
                 random_time += segment.offset;
                 break;
@@ -191,7 +191,7 @@ async fn get_video_branding(db_lock: DBLock, string_set: StringSetLock, query: w
                             Arc::ptr_eq(&t.video_id, &video_id) 
                             && t.votes > -1 
                             && t.votes.saturating_sub(t.downvotes) > -2 
-                            && !t.flags.intersects(TitleFlags::Removed | TitleFlags::ShadowHidden)
+                            && !t.flags.intersects(TitleFlags::Removed | TitleFlags::ShadowHidden | TitleFlags::MissingVotes)
                         )
                         .map(|t| SBApiTitle::from_db(t, query.0.returnUserID))
                         .filter(|t| query.0.fetchAll || t.votes >= 0 || t.locked)
@@ -205,7 +205,7 @@ async fn get_video_branding(db_lock: DBLock, string_set: StringSetLock, query: w
                             Arc::ptr_eq(&t.video_id, &video_id) 
                             && t.votes > -1 
                             && t.votes.saturating_sub(t.downvotes) > -2 
-                            && !t.flags.intersects(ThumbnailFlags::Removed | ThumbnailFlags::ShadowHidden)
+                            && !t.flags.intersects(ThumbnailFlags::Removed | ThumbnailFlags::ShadowHidden | ThumbnailFlags::MissingVotes | ThumbnailFlags::MissingTimestamp)
                         )
                         .map(|t| SBApiThumbnail::from_db(t, query.0.returnUserID))
                         .filter(|t| query.0.fetchAll || t.votes >= 0 || t.locked)
@@ -257,7 +257,7 @@ async fn get_chunk_branding(db_lock: DBLock, query: web::Query<ChunkBrandingPara
         .filter(|t|
             t.hash_prefix == hash_prefix
             && t.votes > -1 
-            && !t.flags.intersects(TitleFlags::Removed | TitleFlags::ShadowHidden)
+            && !t.flags.intersects(TitleFlags::Removed | TitleFlags::ShadowHidden | TitleFlags::MissingVotes)
             && t.votes.saturating_sub(t.downvotes) > -2 
             && (query.0.fetchAll || t.flags.contains(TitleFlags::Locked) || t.votes.saturating_sub(t.downvotes) >= t.flags.contains(TitleFlags::Unverified).into())
         )
@@ -273,7 +273,7 @@ async fn get_chunk_branding(db_lock: DBLock, query: web::Query<ChunkBrandingPara
         .filter(|t|
             t.hash_prefix == hash_prefix
             && t.votes > -1 
-            && !t.flags.intersects(ThumbnailFlags::Removed | ThumbnailFlags::ShadowHidden)
+            && !t.flags.intersects(ThumbnailFlags::Removed | ThumbnailFlags::ShadowHidden | ThumbnailFlags::MissingVotes | ThumbnailFlags::MissingTimestamp)
             && t.votes.saturating_sub(t.downvotes) >= if query.0.fetchAll || t.flags.contains(ThumbnailFlags::Locked) { -1 } else { 0 } 
         )
         .for_each(|t| match thumbnails.get_mut(&t.video_id) {

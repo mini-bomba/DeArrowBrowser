@@ -79,7 +79,9 @@ The `sync` implementation is enabled by default.
 
 ## Credits
 
-The DeArrow Browser logo is a combination of the DeArrow logo (which is based on Twemoji) and the magnifying glass emoji from [Twemoji](https://github.com/twitter/twemoji) and is licensed under the CC-BY 4.0 license.
+The DeArrow Browser logo is a combination of the DeArrow logo (which is based on Twemoji) and the magnifying glass emoji from [Twemoji](https://github.com/twitter/twemoji) and is licensed under the [CC-BY 4.0 license](https://github.com/mini-bomba/DeArrowBrowser/blob/master/dearrow-browser-frontend/icon/LICENSE-CC-BY-4.0.txt).
+
+Images located in the [`/dearrow-browser-frontend/icon/`](https://github.com/mini-bomba/DeArrowBrowser/tree/master/dearrow-browser-frontend/icon) directory are either based on or directly copied icons from [Twemoji](https://github.com/twitter/twemoji) and are licensed under the [CC-BY 4.0 license](https://github.com/mini-bomba/DeArrowBrowser/blob/master/dearrow-browser-frontend/icon/LICENSE-CC-BY-4.0.txt).
 
 The DeArrow Browser source code is licensed under the [GNU Affero General Public License version 3](https://github.com/mini-bomba/DeArrowBrowser/blob/master/LICENSE).
 

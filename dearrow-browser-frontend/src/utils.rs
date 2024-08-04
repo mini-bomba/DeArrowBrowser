@@ -19,6 +19,7 @@ use std::{ops::Deref, rc::Rc};
 
 use chrono::{DateTime, Utc, NaiveDateTime};
 use reqwest::{Client, Url};
+use yew::Html;
 
 const TIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
@@ -251,4 +252,12 @@ pub fn sbb_userid_link(uid: &str) -> Url {
     let mut url = SBB_BASE.with(Clone::clone);
     url.extend_segments(&["userid", uid]).expect("https://sb.ltn.fi/ should be a valid base");
     url
+}
+
+/// Stupid recursive function for counting elements in a `VNode` tree
+pub fn html_length(html: &Html) -> usize {
+    match html {
+        Html::VList(ref list) => list.iter().map(html_length).sum(),
+        _ => 1,
+    }
 }

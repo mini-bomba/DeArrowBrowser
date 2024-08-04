@@ -24,7 +24,13 @@ use dearrow_browser_api::unsync::{ApiThumbnail, ApiTitle};
 use reqwest::StatusCode;
 use yew::prelude::*;
 
-use crate::{components::{links::userid_link, youtube::{OriginalTitle, YoutubeIframe, YoutubeVideoLink}}, hooks::use_async_suspension, thumbnails::components::{Thumbnail, ThumbnailCaption}, utils::{get_reqwest_client, render_datetime, RcEq}, WindowContext};
+use crate::components::icon::*;
+use crate::components::links::userid_link;
+use crate::components::youtube::{OriginalTitle, YoutubeIframe, YoutubeVideoLink};
+use crate::hooks::use_async_suspension;
+use crate::thumbnails::components::{Thumbnail, ThumbnailCaption};
+use crate::utils::{get_reqwest_client, html_length, render_datetime, RcEq};
+use crate::WindowContext;
 
 #[derive(Properties, PartialEq, Clone)]
 pub struct UUIDPageProps {
@@ -47,6 +53,14 @@ pub fn UUIDPage(props: &UUIDPageProps) -> Html {
                 <UUIDThumbnail ..props.clone() />
             </Suspense>
         </>
+    }
+}
+
+fn flags_entry(html: Html) -> Html {
+    if html_length(&html) == 0 {
+        html! {{"No flags"}}
+    } else {
+        html
     }
 }
 
@@ -81,39 +95,49 @@ fn UUIDTitle(props: &UUIDPageProps) -> HtmlResult {
                     <div>{"Video ID: "}<YoutubeVideoLink videoid={title.video_id.clone()} multiline={false} /></div>
                     <div>{"Title: "}{title.title.clone()}</div>
                     <div>{"Original title: "}<Suspense fallback={inline_placeholder}><OriginalTitle videoid={title.video_id.clone()} /></Suspense></div>
-                    <div>{format!("Score: {} upvotes, {} downvotes; Final score: {}", title.votes, title.downvotes, title.score)}</div>
                     <div>
-                        {"Flags: "}
-                        if title.original {
-                            <br />{"♻️  - Original title"}
-                        }
-                        if title.unverified {
-                            <br />{"❓ - Submitted by an unverified user (-1 score)"}
-                        }
-                        if title.locked {
-                            <br />{"🔒 - Locked by a VIP"}
-                        }
-                        if title.vip {
-                            <br />{"👑 - Submitted by a VIP"}
-                        }
-                        if !(title.original || title.unverified || title.locked || title.vip) {
-                            {"No flags"}
+                        if title.votes_missing {
+                            {"Score: No data"}
+                        } else {
+                            {format!("Score: {} upvotes, {} downvotes; Final score: {}", title.votes, title.downvotes, title.score)}
                         }
                     </div>
                     <div>
+                        {"Flags: "}
+                        {flags_entry(html!{<>
+                        if title.votes_missing {
+                            <br /><Icon r#type={IconType::VotesMissing} />{" - Broken entry: Missing an entry in the votes table"}
+                        }
+                        if title.original {
+                            <br /><Icon r#type={IconType::Original} />{" - Original title"}
+                        }
+                        if title.unverified {
+                            <br /><Icon r#type={IconType::Unverified} />{" - Submitted by an unverified user (-1 score)"}
+                        }
+                        if title.locked {
+                            <br /><Icon r#type={IconType::Locked} />{" - Locked by a VIP"}
+                        }
+                        if title.vip {
+                            <br /><Icon r#type={IconType::VIP} />{" - Submitted by a VIP"}
+                        }
+                        </>})}
+                    </div>
+                    <div>
                         {"Visibility: "}
-                        if title.removed {
-                            {"❌ Removed by VIP"}
+                        if title.votes_missing {
+                            <Icon r#type={IconType::VotesMissing} />{" Effectively hidden due to missing the votes table entry"}
+                        } else if title.removed {
+                            <Icon r#type={IconType::Removed} />{" Removed by VIP"}
                         } else if title.shadow_hidden {
-                            {"🚫 Hidden by VIP using batch actions (shadowhidden)"}
+                            <Icon r#type={IconType::ShadowHidden} />{" Hidden by VIP using batch actions (shadowhidden)"}
                         } else if title.votes - title.downvotes < -1 {
-                            {"👎 Removed by downvotes"}
+                            <Icon r#type={IconType::Downvote} />{" Removed by downvotes"}
                         } else if title.votes < 0 {
-                            {"🔄 Replaced by submitter"}
+                            <Icon r#type={IconType::Replaced} />{" Replaced by submitter"}
                         } else if title.score < 0 {
-                            <span class="grayscale">{"👎"}</span>{" Partially hidden - Only visible in submission menus"}
+                            <Icon r#type={IconType::PartiallyHidden} />{" Partially hidden - Only visible in submission menus"}
                         } else {
-                            {"👍 Fully visible"}
+                            <Icon r#type={IconType::Upvote} />{" Fully visible"}
                         }
                     </div>
                     <div>{"Submitted at: "}{DateTime::from_timestamp_millis(title.time_submitted).map_or(title.time_submitted.to_string(), render_datetime)}</div>
@@ -174,41 +198,56 @@ fn UUIDThumbnail(props: &UUIDPageProps) -> HtmlResult {
                 <div class="info-table">
                     <div>{"Video ID: "}<YoutubeVideoLink videoid={thumbnail.video_id.clone()} multiline={false} /></div>
                     <div>{"Timestamp: "}
-                        if let Some(time) = thumbnail.timestamp {
+                        if thumbnail.timestamp_missing {
+                            {" Custom thumbnail without a timestamp"}
+                        } else if let Some(time) = thumbnail.timestamp {
                             {time}
                         } else {
                             {"Original thumbnail"}
                         }
                     </div>
                     <div>{"Original title: "}<Suspense fallback={inline_placeholder}><OriginalTitle videoid={thumbnail.video_id.clone()} /></Suspense></div>
-                    <div>{format!("Score: {} upvotes, {} downvotes; Final score: {}", thumbnail.votes, thumbnail.downvotes, thumbnail.score)}</div>
                     <div>
-                        {"Flags: "}
-                        if thumbnail.original {
-                            <br />{"♻️  - Original thumbnail"}
-                        }
-                        if thumbnail.locked {
-                            <br />{"🔒 - Locked by a VIP"}
-                        }
-                        if thumbnail.vip {
-                            <br />{"👑 - Submitted by a VIP"}
-                        }
-                        if !(thumbnail.original || thumbnail.locked || thumbnail.vip) {
-                            {"No flags"}
+                        if thumbnail.votes_missing {
+                            {"Score: No data"}
+                        } else {
+                            {format!("Score: {} upvotes, {} downvotes; Final score: {}", thumbnail.votes, thumbnail.downvotes, thumbnail.score)}
                         }
                     </div>
                     <div>
+                        {"Flags: "}
+                        {flags_entry(html!{<>
+                        if thumbnail.timestamp_missing {
+                            <br /><Icon r#type={IconType::TimestampMissing} />{" - Broken entry: Missing a timestamp value"}
+                        }
+                        if thumbnail.votes_missing {
+                            <br /><Icon r#type={IconType::VotesMissing} />{" - Broken entry: Missing an entry in the votes table"}
+                        }
+                        if thumbnail.original {
+                            <br /><Icon r#type={IconType::Original} />{" - Original thumbnail"}
+                        }
+                        if thumbnail.locked {
+                            <br /><Icon r#type={IconType::Locked} />{" - Locked by a VIP"}
+                        }
+                        if thumbnail.vip {
+                            <br /><Icon r#type={IconType::VIP} />{" - Submitted by a VIP"}
+                        }
+                        </>})}
+                    </div>
+                    <div>
                         {"Visibility: "}
-                        if thumbnail.removed {
-                            {"❌ Removed by VIP"}
+                        if thumbnail.votes_missing {
+                            <Icon r#type={IconType::VotesMissing} />{" Effectively hidden due to missing the votes table entry"}
+                        } else if thumbnail.removed {
+                            <Icon r#type={IconType::Removed} />{" Removed by VIP"}
                         } else if thumbnail.shadow_hidden {
-                            {"🚫 Hidden by VIP using batch actions (shadowhidden)"}
+                            <Icon r#type={IconType::ShadowHidden} />{" Hidden by VIP using batch actions (shadowhidden)"}
                         } else if thumbnail.votes - thumbnail.downvotes < -1 {
-                            {"👎 Removed by downvotes"}
+                            <Icon r#type={IconType::Downvote} />{" Removed by downvotes"}
                         } else if thumbnail.score < 0 {
-                            <span class="grayscale">{"👎"}</span>{" Partially hidden - Only visible in submission menus"}
+                            <Icon r#type={IconType::PartiallyHidden} />{" Partially hidden - Only visible in submission menus"}
                         } else {
-                            {"👍 Fully visible"}
+                            <Icon r#type={IconType::Upvote} />{" Fully visible"}
                         }
                     </div>
                     <div>{"Submitted at: "}{DateTime::from_timestamp_millis(thumbnail.time_submitted).map_or(thumbnail.time_submitted.to_string(), render_datetime)}</div>
@@ -222,7 +261,9 @@ fn UUIDThumbnail(props: &UUIDPageProps) -> HtmlResult {
                         }
                     </div>
                 </div>
-                <Thumbnail video_id={thumbnail.video_id.clone()} timestamp={thumbnail.timestamp} caption={(*caption).clone()} />
+                if !thumbnail.timestamp_missing {
+                    <Thumbnail video_id={thumbnail.video_id.clone()} timestamp={thumbnail.timestamp} caption={(*caption).clone()} />
+                }
                 <YoutubeIframe videoid={thumbnail.video_id.clone()} />
             </div>
         },

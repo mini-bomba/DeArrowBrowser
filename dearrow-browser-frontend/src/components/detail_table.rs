@@ -24,7 +24,16 @@ use web_sys::HtmlInputElement;
 use yew::{prelude::*, suspense::SuspensionResult};
 use dearrow_browser_api::unsync::*;
 
-use crate::{components::{links::*, modals::{thumbnail::ThumbnailModal, ModalMessage}, youtube::YoutubeVideoLink}, contexts::{SettingsContext, StatusContext}, hooks::{use_async_suspension, use_location_state}, pages::LocationState, settings::TableLayout, thumbnails::components::{ContainerType, Thumbnail, ThumbnailCaption}, utils::{get_reqwest_client, render_datetime, RcEq}, ModalRendererControls};
+use crate::components::icon::*;
+use crate::components::links::*;
+use crate::components::modals::{thumbnail::ThumbnailModal, ModalMessage};
+use crate::components::youtube::YoutubeVideoLink;
+use crate::contexts::{SettingsContext, StatusContext, ModalRendererControls};
+use crate::hooks::{use_async_suspension, use_location_state};
+use crate::pages::LocationState;
+use crate::settings::TableLayout;
+use crate::thumbnails::components::{ContainerType, Thumbnail, ThumbnailCaption};
+use crate::utils::{get_reqwest_client, html_length, render_datetime, RcEq};
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum DetailType {
@@ -265,28 +274,31 @@ pub fn use_detail_slice(details: Rc<Result<DetailList, anyhow::Error>>, index: D
 fn title_flags(title: &ApiTitle) -> Html {
     html! {
         <>
+            if title.votes_missing {
+                <Icon r#type={IconType::VotesMissing} tooltip="Vote data is missing for this title - this title is hidden from the extension, attempting to vote on this title may cause server errors. DAB assumes the value of 0 or false for the missing fields." />
+            }
             if title.removed || title.shadow_hidden {
                 if title.removed {
-                    <span title="This title was removed by a VIP">{"❌"}</span>
+                    <Icon r#type={IconType::Removed} tooltip="This title was removed by a VIP" />
                 }
                 if title.shadow_hidden {
-                    <span title="This title is shadowhidden">{"🚫"}</span>
+                    <Icon r#type={IconType::ShadowHidden} tooltip="This title is shadowhidden" />
                 }
             } else if title.votes - title.downvotes < -1 {
-                <span title="This title was removed by the downvotes">{"👎"}</span>
+                <Icon r#type={IconType::Downvote} tooltip="This title was removed by the downvotes" />
             } else if title.votes < 0 {
-                <span title="This title was replaced by the submitter">{"👎"}</span>
+                <Icon r#type={IconType::Replaced} tooltip="This title was replaced by the submitter" />
             } else if title.score < 0 {
-                <span title="This title should only appear in submission menus (score below 0)" class="grayscale">{"👎"}</span>
+                <Icon r#type={IconType::PartiallyHidden} tooltip="This title should only appear in submission menus (score below 0)" />
             }
             if title.unverified {
-                <span title="This title was submitted by an unverified user (-1 score)">{"❓"}</span>
+                <Icon r#type={IconType::Unverified} tooltip="This title was submitted by an unverified user (-1 score)" />
             }
             if title.locked {
-                <span title="This title was locked by a VIP">{"🔒"}</span>
+                <Icon r#type={IconType::Locked} tooltip="This title was locked by a VIP" />
             }
             if title.vip {
-                <span title="This title was submitted by a VIP">{"👑"}</span>
+                <Icon r#type={IconType::VIP} tooltip="This title was submitted by a VIP" />
             }
         </>
     }
@@ -295,33 +307,31 @@ fn title_flags(title: &ApiTitle) -> Html {
 fn thumbnail_flags(thumb: &ApiThumbnail) -> Html {
     html! {
         <>
+            if thumb.votes_missing {
+                <Icon r#type={IconType::VotesMissing} tooltip="Vote data is missing for this thumbnail - this thumbnail is hidden from the extension, attempting to vote on this thumbnail may cause server errors. DAB assumes the value of 0 or false for the missing fields." />
+            }
+            if thumb.timestamp_missing {
+                <Icon r#type={IconType::TimestampMissing} tooltip="This thumbnail is missing a timestamp despite being a custom thumbnail - this thumbnail will appear glitched in the voting menu of the extension." />
+            }
             if thumb.removed || thumb.shadow_hidden {
                 if thumb.removed {
-                    <span title="This thumbnail was removed by a VIP">{"❌"}</span>
+                    <Icon r#type={IconType::Removed} tooltip="This thumbnail was removed by a VIP" />
                 }
                 if thumb.shadow_hidden {
-                    <span title="This thumbnail is shadowhidden">{"🚫"}</span>
+                    <Icon r#type={IconType::ShadowHidden} tooltip="This thumbnail is shadowhidden" />
                 }
             } else if thumb.votes - thumb.downvotes < -1 {
-                <span title="This thumbnail was removed by the downvotes">{"👎"}</span>
+                <Icon r#type={IconType::Downvote} tooltip="This thumbnail was removed by the downvotes" />
             } else if thumb.score < 0 {
-                <span title="This thumbnail should only appear in submission menus (score below 0)" class="grayscale">{"👎"}</span>
+                <Icon r#type={IconType::PartiallyHidden} tooltip="This thumbnail should only appear in submission menus (score below 0)" />
             }
             if thumb.locked {
-                <span title="This thumbnail was locked by a VIP">{"🔒"}</span>
+                <Icon r#type={IconType::Locked} tooltip="This thumbnail was locked by a VIP" />
             }
             if thumb.vip {
-                <span title="This thumbnail was submitted by a VIP">{"👑"}</span>
+                <Icon r#type={IconType::VIP} tooltip="This thumbnail was submitted by a VIP" />
             }
         </>
-    }
-}
-
-/// Stupid recursive function for counting elements in a `VNode` tree
-fn html_length(html: &Html) -> usize {
-    match html {
-        Html::VList(ref list) => list.iter().map(html_length).sum(),
-        _ => 1,
     }
 }
 
@@ -354,21 +364,30 @@ macro_rules! detail_flags {
 
 macro_rules! score_col {
     ($type:tt, $detail:expr, $expanded:expr) => {
-        if $expanded {
+        if $detail.votes_missing {
+            html! {
+                <>
+                    <em>{"No data"}</em>
+                    if $expanded {<br />} else {{" | "}}
+                    {detail_flags!($type, $detail)}
+                </>
+            }   
+        } else if $expanded {
             html! {
                 <>
                     <span class="hoverswitch">
                         <span>{$detail.score}</span>
-                        <span>{format!("👍 {} | {} 👎", $detail.votes, $detail.downvotes)}</span>
+                        <span><Icon r#type={IconType::Upvote} />{format!(" {} | {} ", $detail.votes, $detail.downvotes)}<Icon r#type={IconType::Downvote} /></span>
                     </span>
                     <br />
                     {detail_flags!($type, $detail)}
                 </>
             }
+            
         } else {
             html! {
                 <>
-                    {format!("{} | 👍 {} | {} 👎", $detail.score, $detail.votes, $detail.downvotes)}
+                    {format!("{} | ", $detail.score)}<Icon r#type={IconType::Upvote} />{format!(" {} | {} ", $detail.votes, $detail.downvotes)}<Icon r#type={IconType::Downvote} />
                     {bar_prepender_if_not_empty(detail_flags!($type, $detail))}
                 </>
             }
@@ -428,7 +447,7 @@ fn DetailTableRow(props: &DetailTableRowProps) -> Html {
     let settings_context: SettingsContext = use_context().expect("SettingsContext should be available");
     let settings = settings_context.settings();
     let original_thumb_indicator = html! {
-        <span title="This is the original video thumbnail">{"♻️"}</span>
+        <Icon r#type={IconType::Original} tooltip="This is the original video thumbnail" />
     };
     let thumb_caption = use_memo((props.details.clone(), props.index), |(details, index)| {
         let DetailSlice::Thumbnails(ref thumbs) = details else { return ThumbnailCaption::None };
@@ -458,7 +477,7 @@ fn DetailTableRow(props: &DetailTableRowProps) -> Html {
                         {t.title.clone()}
                         if t.original {
                             if expanded_layout { <br /> } else {{""}}
-                            <span title="This is the original video title">{"♻️"}</span>
+                            <Icon r#type={IconType::Original} tooltip="This is the original video title" />
                         }
                     </td>
                     <td class="score-col hoverswitch-trigger">
@@ -479,6 +498,7 @@ fn DetailTableRow(props: &DetailTableRowProps) -> Html {
             let expanded_layout = settings.thumbnail_table_layout == TableLayout::Expanded;
             let compressed_layout = settings.thumbnail_table_layout == TableLayout::Compressed;
             let rows = if compressed_layout { "1" } else { "2" }; 
+            let render_thumbnails = settings.render_thumbnails_in_tables && expanded_layout;
             let onclick = {
                 let list = list.clone();
                 let index = props.index;
@@ -495,7 +515,9 @@ fn DetailTableRow(props: &DetailTableRowProps) -> Html {
                     if !props.hide_videoid {
                         <td class="monospaced"><YoutubeVideoLink videoid={t.video_id.clone()} multiline={expanded_layout} /></td>
                     }
-                    if settings.render_thumbnails_in_tables {
+                    if t.timestamp_missing {
+                        <td><Icon r#type={IconType::TimestampMissing} tooltip="This thumbnail entry is missing a timestamp and cannot be rendered" /></td>
+                    } else if render_thumbnails {
                         <Thumbnail video_id={t.video_id.clone()} timestamp={t.timestamp} caption={(*thumb_caption).clone()} container_type={ContainerType::td} />
                     } else {
                         <td {onclick} class="clickable">{t.timestamp.map_or(original_thumb_indicator, |ts| html! {{ts.to_string()}})}</td>

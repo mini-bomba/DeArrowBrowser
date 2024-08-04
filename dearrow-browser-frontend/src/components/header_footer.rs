@@ -15,18 +15,19 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use std::rc::Rc;
-
 use chrono::DateTime;
 use yew::prelude::*;
 use yew_router::hooks::use_navigator;
 
-use crate::{components::modals::{settings::SettingsModal, status::StatusModal, ModalMessage}, contexts::*, pages::MainRoute, utils::render_datetime_with_delta};
+use crate::components::modals::{settings::SettingsModal, status::StatusModal, ModalMessage};
+use crate::components::icon::*;
+use crate::contexts::*;
+use crate::pages::MainRoute;
+use crate::utils::render_datetime_with_delta;
 
 #[function_component]
 pub fn Header() -> Html {
     let navigator = use_navigator().expect("navigator should exist");
-    let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
     let modal_controls: ModalRendererControls = use_context().expect("Header should be placed inside a ModalRenderer");
     let open_settings_modal = use_callback(modal_controls, |_, modal_controls| {
         modal_controls.emit(ModalMessage::Open(html! {<SettingsModal />}));
@@ -40,12 +41,10 @@ pub fn Header() -> Html {
 
     html! {
         <div id="header">
-            if let Some(url) = &window_context.logo_url {
-                <img src={url} class="clickable" onclick={go_home.clone()} />
-            }
+            <img src="/icon/logo.svg" class="clickable" onclick={go_home.clone()} />
             <div>
                 <h1 class="clickable" onclick={go_home}>{"DeArrow Browser"}</h1>
-                <span id="settings-button" class="clickable" onclick={open_settings_modal}>{"⚙️"}</span>
+                <span id="settings-button" class="clickable" onclick={open_settings_modal}><Icon r#type={IconType::Settings} tooltip={"Open settings"} /></span>
             </div>
         </div>
     }
@@ -74,7 +73,7 @@ pub fn Footer() -> Html {
             <table class="clickable" onclick={open_version_modal}>
                 <tr>
                     <td>{"Last update:"}</td>
-                    <td>{last_updated} if status.map(|s| s.updating_now).unwrap_or_default() { <b>{", update in progress"}</b> }</td>
+                    <td>{last_updated} if status.is_some_and(|s| s.updating_now) { <b>{", update in progress"}</b> }</td>
                 </tr>
                 <tr>
                     <td>{"Database snapshot taken at:"}</td>

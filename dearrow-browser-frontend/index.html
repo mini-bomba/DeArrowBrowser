@@ -21,11 +21,12 @@
     <head>
         <meta charset="utf-8" />
         <title>DeArrow Browser</title>
-        <link data-trunk rel="icon" href="../logo.svg">
+        <link rel="icon" href="/icon/logo.svg">
         <link data-trunk rel="scss" href="index.scss">
         <link data-trunk rel="rust" data-bin="app" data-type="main" data-reference-types="true" data-initializer="initializer.mjs" data-bindgen-target="web">
         <link data-trunk rel="rust" data-bin="thumbnails_worker" data-type="worker" data-reference-types="true" data-bindgen-target="web">
         <link data-trunk rel="copy-file" href="src/thumbnails/worker_loader.mjs" data-target-path="thumbnails">
+        <link data-trunk rel="copy-dir" href="icon">
     </head>
     <body>
         <div id="loading">

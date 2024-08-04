@@ -15,7 +15,8 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use std::{sync::Arc, fmt::Display, collections::{HashSet, HashMap}, path::{Path, PathBuf}, fs::File, usize};
+use std::{sync::Arc, fmt::Display, collections::{HashSet, HashMap}, path::{Path, PathBuf}, fs::File};
+use csv_data::WithWarnings;
 use enumflags2::{bitflags, BitFlags};
 use anyhow::{Result, Context, Error};
 use log::info;
@@ -29,6 +30,8 @@ pub enum ThumbnailFlags {
     Locked,
     ShadowHidden,
     Removed,
+    MissingVotes,
+    MissingTimestamp,
 }
 
 #[bitflags]
@@ -40,6 +43,7 @@ pub enum TitleFlags {
     ShadowHidden,
     Unverified,
     Removed,
+    MissingVotes,
 }
 
 #[derive(Clone, Debug)]
@@ -86,7 +90,7 @@ pub struct UncutSegment {
 pub struct VideoInfo {
     pub video_id: Arc<str>,
     pub video_duration: f64,
-    /// Sorted slice of UncutSegments
+    /// Sorted slice of `UncutSegments`
     pub uncut_segments: Box<[UncutSegment]>,
     pub has_outro: bool,
 }
@@ -199,8 +203,8 @@ pub struct DearrowDB {
     pub thumbnails: Vec<Thumbnail>,
     pub usernames: HashMap<Arc<str>, Username>,
     pub vip_users: HashSet<Arc<str>>,
-    /// VideoInfos are grouped by hashprefix (a u16 value)
-    /// Use .get_video_info() to get a specific VideoInfo object
+    /// `VideoInfos` are grouped by hashprefix (a u16 value)
+    /// Use `.get_video_info()` to get a specific `VideoInfo` object
     pub video_infos: Box<[Box<[VideoInfo]>]>,
 }
 
@@ -318,12 +322,17 @@ impl DearrowDB {
                 Ok(mut thumb) => {
                     thumb.dedupe(string_set);
                     let timestamp = thumbnail_timestamps.get(&thumb.uuid);
-                    let Some(votes) = thumbnail_votes.get(&thumb.uuid) 
-                    else {
-                        errors.push(Error::new(ParseError(ObjectKind::Thumbnail, Box::new(ParseErrorKind::MissingSubobject { struct_name: "ThumbnailVotes", uuid: thumb.uuid.clone() }))));
-                        return None;
-                    };
-                    thumb.try_merge(timestamp, votes).map_err(|e| errors.push(e.into())).ok()
+                    let votes = thumbnail_votes.get(&thumb.uuid);
+                    match thumb.try_merge(timestamp, votes) {
+                        Ok(WithWarnings { obj, warnings }) => {
+                            errors.extend(warnings.into_iter().map(Into::into));
+                            Some(obj)
+                        },
+                        Err(err) => {
+                            errors.push(err.into());
+                            None
+                        }
+                    }
                 },
                 Err(error) => {
                     errors.push(error);
@@ -355,12 +364,17 @@ impl DearrowDB {
             .filter_map(|result| match result.context("Error while deserializing titles") {
                 Ok(mut title) => {
                     title.dedupe(string_set);
-                    let Some(votes) = title_votes.get(&title.uuid) 
-                    else {
-                        errors.push(Error::new(ParseError(ObjectKind::Title, Box::new(ParseErrorKind::MissingSubobject { struct_name: "TitleVotes", uuid: title.uuid.clone() }))));
-                        return None;
-                    };
-                    title.try_merge(votes).map_err(|e| errors.push(e.into())).ok()
+                    let votes = title_votes.get(&title.uuid);
+                    match title.try_merge(votes) {
+                        Ok(WithWarnings { obj, warnings }) => {
+                            errors.extend(warnings.into_iter().map(Into::into));
+                            Some(obj)
+                        },
+                        Err(err) => {
+                            errors.push(err.into());
+                            None
+                        }
+                    }
                 },
                 Err(error) => {
                     errors.push(error);
@@ -514,12 +528,18 @@ pub fn compute_hashprefix(s: &str) -> u16 {
 }
 
 mod csv_data {
-    use std::sync::Arc;
+    use std::sync::{Arc, LazyLock};
     use serde::Deserialize;
     use enumflags2::BitFlag;
     use super::{ParseError, ObjectKind, ParseErrorKind, ThumbnailFlags, TitleFlags, StringSet, Dedupe, compute_hashprefix};
 
     type Result<T> = std::result::Result<T, ParseError>;
+    type ResultWithWarnings<T> = std::result::Result<WithWarnings<T>, ParseError>;
+
+    pub struct WithWarnings<T> {
+        pub obj: T,
+        pub warnings: Vec<ParseError>,
+    }
 
     #[derive(Deserialize)]
     pub struct Thumbnail {
@@ -543,7 +563,7 @@ mod csv_data {
         timestamp: f64,
     }
 
-    #[derive(Deserialize)]
+    #[derive(Deserialize, Default)]
     pub struct ThumbnailVotes {
         #[serde(rename="UUID")]
         pub uuid: Arc<str>,
@@ -553,6 +573,14 @@ mod csv_data {
         shadow_hidden: i8,
         downvotes: i8,
         removed: i8,
+    }
+
+    static DEFAULT_THUMBNAIL_VOTES: LazyLock<&'static ThumbnailVotes> = LazyLock::new(|| Box::leak(Box::new(ThumbnailVotes::default())));
+
+    impl<'a> Default for &'a ThumbnailVotes {
+        fn default() -> Self {
+            &DEFAULT_THUMBNAIL_VOTES
+        }
     }
 
     #[derive(Deserialize)]
@@ -571,7 +599,7 @@ mod csv_data {
         pub hashed_video_id: String,
     }
 
-    #[derive(Deserialize)]
+    #[derive(Deserialize, Default)]
     pub struct TitleVotes {
         #[serde(rename="UUID")]
         pub uuid: Arc<str>,
@@ -582,6 +610,14 @@ mod csv_data {
         verification: i8,
         downvotes: i8,
         removed: i8,
+    }
+
+    static DEFAULT_TITLE_VOTES: LazyLock<&'static TitleVotes> = LazyLock::new(|| Box::leak(Box::new(TitleVotes::default())));
+
+    impl<'a> Default for &'a TitleVotes {
+        fn default() -> Self {
+            &DEFAULT_TITLE_VOTES
+        }
     }
 
     #[derive(Deserialize)]
@@ -666,65 +702,90 @@ mod csv_data {
 
 
     impl Thumbnail {
-        pub fn try_merge(self, timestamps: Option<&ThumbnailTimestamps>, votes: &ThumbnailVotes) -> Result<super::Thumbnail> {
+        pub fn try_merge(self, timestamps: Option<&ThumbnailTimestamps>, votes: Option<&ThumbnailVotes>) -> ResultWithWarnings<super::Thumbnail> {
             match &timestamps {
                 Some(timestamp) if self.uuid != timestamp.uuid => {
-                    return Err(ParseError(ObjectKind::Thumbnail, Box::new(ParseErrorKind::MismatchedUUIDs { struct_name: "ThumbnailTimestamps", uuid_main: self.uuid, uuid_struct: timestamps.unwrap().uuid.clone() })));
+                    return Err(ParseError(ObjectKind::Thumbnail, Box::new(ParseErrorKind::MismatchedUUIDs { struct_name: "ThumbnailTimestamps", uuid_main: self.uuid, uuid_struct: timestamp.uuid.clone() })));
                 },
                 _ => {},
             };
-            if self.uuid != votes.uuid {
-                return Err(ParseError(ObjectKind::Thumbnail, Box::new(ParseErrorKind::MismatchedUUIDs { struct_name: "ThumbnailVotes", uuid_main: self.uuid, uuid_struct: votes.uuid.clone() })));
-            }
+            match &votes {
+                Some(votes) if self.uuid != votes.uuid => {
+                    return Err(ParseError(ObjectKind::Thumbnail, Box::new(ParseErrorKind::MismatchedUUIDs { struct_name: "ThumbnailVotes", uuid_main: self.uuid, uuid_struct: votes.uuid.clone() })));
+                },
+                _ => {},
+            };
+            let mut warnings = Vec::new();
             let mut flags = ThumbnailFlags::empty();
+            if votes.is_none() {
+                warnings.push(ParseError(ObjectKind::Thumbnail, Box::new(ParseErrorKind::MissingSubobject { struct_name: "ThumbnailVotes", uuid: self.uuid.clone() })));
+                flags.set(ThumbnailFlags::MissingVotes, true);
+            }
+            let votes = votes.unwrap_or_default();
             flags.set(ThumbnailFlags::Original, intbool!(thumb self, original));
             flags.set(ThumbnailFlags::Locked, intbool!(thumb votes, locked));
             flags.set(ThumbnailFlags::ShadowHidden, intbool!(thumb votes, shadow_hidden));
             flags.set(ThumbnailFlags::Removed, intbool!(thumb votes, removed));
             if !flags.contains(ThumbnailFlags::Original) && timestamps.is_none() {
-                return Err(ParseError(ObjectKind::Thumbnail, Box::new(ParseErrorKind::MissingSubobject { struct_name: "ThumbnailTimestamps", uuid: self.uuid })));
+                warnings.push(ParseError(ObjectKind::Thumbnail, Box::new(ParseErrorKind::MissingSubobject { struct_name: "ThumbnailTimestamps", uuid: self.uuid.clone() })));
+                flags.set(ThumbnailFlags::MissingTimestamp, true);
             }
-            Ok(super::Thumbnail{
-                uuid: self.uuid,
-                user_id: self.user_id,
-                time_submitted: self.time_submitted,
-                timestamp: timestamps.map(|t| t.timestamp),
-                votes: votes.votes,
-                downvotes: votes.downvotes,
-                flags,
-                hash_prefix: match u16::from_str_radix(&self.hashed_video_id[..4], 16) {
-                    Ok(n) => n,
-                    Err(_) => compute_hashprefix(&self.video_id),
+            Ok(WithWarnings { 
+                obj: super::Thumbnail{
+                    uuid: self.uuid,
+                    user_id: self.user_id,
+                    time_submitted: self.time_submitted,
+                    timestamp: timestamps.map(|t| t.timestamp),
+                    votes: votes.votes,
+                    downvotes: votes.downvotes,
+                    flags,
+                    hash_prefix: match u16::from_str_radix(&self.hashed_video_id[..4], 16) {
+                        Ok(n) => n,
+                        Err(_) => compute_hashprefix(&self.video_id),
+                    },
+                    video_id: self.video_id,
                 },
-                video_id: self.video_id,
+                warnings,
             })
         }
     }
 
     impl Title {
-        pub fn try_merge(self, votes: &TitleVotes) -> Result<super::Title> {
-            if self.uuid != votes.uuid {
-                return Err(ParseError(ObjectKind::Title, Box::new(ParseErrorKind::MismatchedUUIDs { struct_name: "TitleVotes", uuid_main: self.uuid, uuid_struct: votes.uuid.clone() })));
-            }
+        pub fn try_merge(self, votes: Option<&TitleVotes>) -> ResultWithWarnings<super::Title> {
+            match &votes {
+                Some(votes) if self.uuid != votes.uuid => {
+                    return Err(ParseError(ObjectKind::Title, Box::new(ParseErrorKind::MismatchedUUIDs { struct_name: "TitleVotes", uuid_main: self.uuid, uuid_struct: votes.uuid.clone() })));
+                },
+                _ => {},
+            };
+            let mut warnings = Vec::new();
             let mut flags = TitleFlags::empty();
+            if votes.is_none() {
+                warnings.push(ParseError(ObjectKind::Title, Box::new(ParseErrorKind::MissingSubobject { struct_name: "TitleVotes", uuid: self.uuid.clone() })));
+                flags.set(TitleFlags::MissingVotes, true);
+            }
+            let votes = votes.unwrap_or_default();
             flags.set(TitleFlags::Original, intbool!(title self, original));
             flags.set(TitleFlags::Locked, intbool!(title votes, locked));
             flags.set(TitleFlags::ShadowHidden, intbool!(title votes, shadow_hidden));
             flags.set(TitleFlags::Unverified, intbool!(title votes, verification, 0, -1));
             flags.set(TitleFlags::Removed, intbool!(title votes, removed));
-            Ok(super::Title{
-                uuid: self.uuid,
-                title: self.title,
-                user_id: self.user_id,
-                time_submitted: self.time_submitted,
-                votes: votes.votes,
-                downvotes: votes.downvotes,
-                flags,
-                hash_prefix: match u16::from_str_radix(&self.hashed_video_id[..4], 16) {
-                    Ok(n) => n,
-                    Err(_) => compute_hashprefix(&self.video_id),
+            Ok(WithWarnings { 
+                obj: super::Title{
+                    uuid: self.uuid,
+                    title: self.title,
+                    user_id: self.user_id,
+                    time_submitted: self.time_submitted,
+                    votes: votes.votes,
+                    downvotes: votes.downvotes,
+                    flags,
+                    hash_prefix: match u16::from_str_radix(&self.hashed_video_id[..4], 16) {
+                        Ok(n) => n,
+                        Err(_) => compute_hashprefix(&self.video_id),
+                    },
+                    video_id: self.video_id,
                 },
-                video_id: self.video_id,
+                warnings,
             })
         }
     }

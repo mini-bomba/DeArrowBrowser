@@ -43,6 +43,10 @@ $white: #eee;
   cursor: help;
 }
 
+a [title] {
+  cursor: pointer;
+}
+
 .monospaced {
   font-family: monospace;
 }
@@ -363,22 +367,22 @@ body {
   }
 }
 
-.icon-link, .icon-link a {
+.icon-link, .icon-link a, a:has(> .icon:only-child) {
   text-decoration: none;
   color: inherit;
 }
 
 .hoverswitch {
-  :nth-child(2) {
+  > :nth-child(2) {
     display: none;
   }
 
   &:hover, .hoverswitch-trigger:hover & {
-    :first-child {
+    > :first-child {
       display: none;
     }
 
-    :nth-child(2) {
+    > :nth-child(2) {
       display: unset;
     }
   }
@@ -543,4 +547,55 @@ fieldset {
   to {
     opacity: 1;
   }
+}
+
+
+// Icons & stuff
+.icon {
+  height: 1em;
+  width: 1em;
+  display: inline-block;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.icon-dablogo {
+  background-image: url("/icon/logo.svg");
+}
+.icon-downvote {
+  background-image: url("/icon/downvote.svg");
+}
+.icon-locked {
+  background-image: url("/icon/locked.svg");
+}
+.icon-original {
+  background-image: url("/icon/original.svg");
+}
+.icon-removed {
+  background-image: url("/icon/removed.svg");
+}
+.icon-replaced {
+  background-image: url("/icon/replaced.svg");
+}
+.icon-settings {
+  background-image: url("/icon/settings.svg");
+}
+.icon-shadowhidden {
+  background-image: url("/icon/shadowhidden.svg");
+}
+.icon-timestamp-missing {
+  background-image: url("/icon/timestamp_missing.svg");
+}
+.icon-unverified {
+  background-image: url("/icon/unverified.svg");
+}
+.icon-upvote {
+  background-image: url("/icon/upvote.svg");
+}
+.icon-vip {
+  background-image: url("/icon/vip.svg");
+}
+.icon-votes-missing {
+  background-image: url("/icon/votes_missing.svg");
 }

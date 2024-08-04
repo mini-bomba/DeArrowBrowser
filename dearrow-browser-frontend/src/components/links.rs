@@ -19,27 +19,28 @@ use yew::prelude::*;
 use yew_router::prelude::*;
 
 use crate::MainRoute;
+use super::icon::*;
 
 pub fn videoid_link(video_id: AttrValue) -> Html {
     html! {
-        <span class="icon-link" title="View this video in DeArrow Browser">
-            <Link<MainRoute> to={MainRoute::Video { id: video_id }}>{"🔍"}</Link<MainRoute>>
-        </span>
+        <Link<MainRoute> to={MainRoute::Video { id: video_id }}>
+            <Icon r#type={IconType::DABLogo} tooltip="View this video in DeArrow Browser"/>
+        </Link<MainRoute>>
     }
 }
 
 pub fn userid_link(user_id: AttrValue) -> Html {
     html! {
-        <span class="icon-link" title="View this user in DeArrow Browser">
-            <Link<MainRoute> to={MainRoute::User { id: user_id }}>{"🔍"}</Link<MainRoute>>
-        </span>
+        <Link<MainRoute> to={MainRoute::User { id: user_id }}>
+            <Icon r#type={IconType::DABLogo} tooltip="View this user in DeArrow Browser"/>
+        </Link<MainRoute>>
     }
 }
 
 pub fn uuid_link(uuid: AttrValue) -> Html {
     html! {
-        <span class="icon-link" title="View this detail in DeArrow Browser">
-            <Link<MainRoute> to={MainRoute::UUID { id: uuid }}>{"🔍"}</Link<MainRoute>>
-        </span>
+        <Link<MainRoute> to={MainRoute::UUID { id: uuid }}>
+            <Icon r#type={IconType::DABLogo} tooltip="View this detail in DeArrow Browser"/>
+        </Link<MainRoute>>
     }
 }

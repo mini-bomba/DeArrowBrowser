@@ -24,7 +24,12 @@ use reqwest::StatusCode;
 use yew::prelude::*;
 use yew_hooks::{use_async_with_options, UseAsyncHandle, UseAsyncOptions};
 
-use crate::{components::{detail_table::*, youtube::{OriginalTitle, YoutubeIframe}}, contexts::WindowContext, hooks::use_location_state, innertube::youtu_be_link, thumbnails::components::{Thumbnail, ThumbnailCaption}, utils::{get_reqwest_client, sbb_video_link, RcEq}};
+use crate::components::{detail_table::*, youtube::{OriginalTitle, YoutubeIframe}};
+use crate::contexts::WindowContext;
+use crate::hooks::use_location_state;
+use crate::innertube::youtu_be_link;
+use crate::thumbnails::components::{Thumbnail, ThumbnailCaption};
+use crate::utils::{get_reqwest_client, sbb_video_link, RcEq};
 
 #[derive(Properties, PartialEq)]
 struct VideoDetailsTableProps {

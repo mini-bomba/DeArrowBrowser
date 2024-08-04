@@ -19,7 +19,8 @@ use std::rc::Rc;
 
 use yew::prelude::*;
 
-use crate::{contexts::WindowContext, components::detail_table::*};
+use crate::contexts::WindowContext;
+use crate::components::detail_table::*;
 
 #[function_component]
 pub fn UnverifiedPage() -> Html {

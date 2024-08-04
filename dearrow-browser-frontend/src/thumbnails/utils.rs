@@ -19,7 +19,8 @@
 use std::cell::OnceCell;
 
 use gloo_console::error;
-use web_sys::{js_sys::{global, Function, JsString, Promise, Reflect}, window, AbortController, AbortSignal, AddEventListenerOptions, EventTarget, Response, Window, WorkerGlobalScope};
+use web_sys::{window, AbortController, AbortSignal, AddEventListenerOptions, EventTarget, Response, Window, WorkerGlobalScope};
+use web_sys::js_sys::{global, Function, JsString, Promise, Reflect};
 use wasm_bindgen::{closure::Closure, prelude::wasm_bindgen, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 

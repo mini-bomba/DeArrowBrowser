@@ -24,9 +24,11 @@ use futures::{channel::oneshot::*, select_biased, future::FutureExt};
 use wasm_bindgen::{closure::Closure, JsCast, JsValue};
 use web_sys::{js_sys::{Array, Object, Uint8Array}, window, MessageEvent, PageTransitionEvent, SharedWorker, WorkerOptions};
 
-use super::{common::{ThumbgenStats, ThumbnailKey}, utils::{make_jsstring, sleep, EventCellsExt, EventListener, Interval}};
-use super::worker_api::*;
 use crate::{built_info, utils::RcEq};
+
+use super::common::{ThumbgenStats, ThumbnailKey};
+use super::utils::{make_jsstring, sleep, EventCellsExt, EventListener, Interval};
+use super::worker_api::*;
 
 const WORKER_INIT_TIMEOUT: u32 = 30_000; // 0.5 min
 const WORKER_KEEPALIVE_INTERVAL: i32 = 20_000;

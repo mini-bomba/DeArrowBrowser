@@ -25,7 +25,9 @@ use wasm_bindgen::{closure::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{js_sys::{Error, Object, Reflect}, Blob};
 
-use super::{common::{CacheStats, ThumbnailKey}, utils::*, worker_api::RemoteThumbnailGenerationError};
+use super::common::{CacheStats, ThumbnailKey};
+use super::utils::*;
+use super::worker_api::RemoteThumbnailGenerationError;
 
 const SWEEP_INTERVAL: i32 = 30_000;
 const ASYNCGEN_ERROR_MSG: &str = "Thumbnail not generated yet";

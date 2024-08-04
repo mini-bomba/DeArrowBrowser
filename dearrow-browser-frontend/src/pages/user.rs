@@ -20,7 +20,10 @@ use std::rc::Rc;
 use dearrow_browser_api::unsync::User;
 use yew::prelude::*;
 
-use crate::{components::detail_table::*, contexts::{StatusContext, WindowContext}, hooks::{use_async_suspension, use_location_state}, utils::{get_reqwest_client, sbb_userid_link}};
+use crate::components::detail_table::*;
+use crate::contexts::{StatusContext, WindowContext};
+use crate::hooks::{use_async_suspension, use_location_state};
+use crate::utils::{get_reqwest_client, sbb_userid_link};
 
 #[derive(Properties, PartialEq)]
 struct UserDetailsProps {

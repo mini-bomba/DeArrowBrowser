@@ -21,7 +21,10 @@ use gloo_console::error;
 use reqwest::Url;
 use yew::prelude::*;
 
-use crate::{components::links::videoid_link, hooks::use_async_suspension, innertube::{self, youtu_be_link}, utils::ReqwestUrlExt};
+use crate::components::links::videoid_link;
+use crate::hooks::use_async_suspension;
+use crate::innertube::{self, youtu_be_link};
+use crate::utils::ReqwestUrlExt;
 
 #[derive(Properties, PartialEq, Clone)]
 pub struct YoutubeProps {

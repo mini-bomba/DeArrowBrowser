@@ -19,7 +19,10 @@ use std::rc::Rc;
 
 use yew::prelude::*;
 
-use crate::{components::{detail_table::*, searchbar::Searchbar}, contexts::{StatusContext, WindowContext, SettingsContext}, hooks::use_location_state};
+use crate::components::detail_table::*;
+use crate::components::searchbar::Searchbar;
+use crate::contexts::{StatusContext, WindowContext, SettingsContext};
+use crate::hooks::use_location_state;
 
 #[function_component]
 pub fn HomePage() -> Html {

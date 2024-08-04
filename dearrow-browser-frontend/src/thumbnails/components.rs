@@ -23,9 +23,15 @@ use reqwest::Url;
 use yew::prelude::*;
 use yew_hooks::{use_async_with_options, UseAsyncHandle, UseAsyncOptions};
 
-use crate::{components::modals::{thumbnail::ThumbnailModal, ModalMessage}, hooks::use_async_suspension, innertube, thumbnails::worker_api::{ThumbnailWorkerRequest, WorkerSetting}, utils::RcEq, ModalRendererControls, SettingsContext};
+use crate::components::modals::{thumbnail::ThumbnailModal, ModalMessage};
+use crate::hooks::use_async_suspension;
+use crate::{innertube, ModalRendererControls, SettingsContext};
+use crate::utils::RcEq;
 
-use super::{common::{ThumbgenStats, ThumbnailKey}, local::{LocalBlobLink, LocalThumbGenerator}, remote::{Error, RemoteBlobLink, ThumbnailWorker}};
+use super::common::{ThumbgenStats, ThumbnailKey};
+use super::local::{LocalBlobLink, LocalThumbGenerator};
+use super::remote::{Error, RemoteBlobLink, ThumbnailWorker};
+use super::worker_api::{ThumbnailWorkerRequest, WorkerSetting};
 
 #[derive(Clone, Eq, PartialEq)]
 pub enum Thumbgen {

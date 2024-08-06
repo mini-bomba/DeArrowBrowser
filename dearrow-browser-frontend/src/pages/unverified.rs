@@ -35,6 +35,7 @@ pub fn UnverifiedPage() -> Html {
     
     html! {
         <>
+            <h2>{"Unverified titles"}</h2>
             if let Some(count) = *entry_count {
                 <span>
                     if count == 1 {

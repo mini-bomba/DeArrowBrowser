@@ -41,6 +41,7 @@ pub fn BrokenPage() -> Html {
     
     html! {
         <>
+            <h2>{"Broken database entries"}</h2>
             <TableModeSwitch entry_count={*entry_count} />
             <Suspense fallback={table_fallback}>
                 <PaginatedDetailTableRenderer mode={state.detail_table_mode} {url} {entry_count} />

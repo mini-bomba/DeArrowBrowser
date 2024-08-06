@@ -27,7 +27,7 @@ pub fn UnverifiedPage() -> Html {
     let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
     let entry_count = use_state_eq(|| None);
 
-    let url = window_context.origin.join("/api/titles/unverified").expect("Should be able to create an API url");
+    let url = use_memo((), |()| window_context.origin_join_segments(&["api", "titles", "unverified"]));
 
     let fallback = html! {
         <center><b>{"Loading..."}</b></center>
@@ -45,7 +45,7 @@ pub fn UnverifiedPage() -> Html {
                 </span>
             }
             <Suspense {fallback}>
-                <PaginatedDetailTableRenderer mode={DetailType::Title} url={Rc::new(url)} {entry_count} />
+                <PaginatedDetailTableRenderer mode={DetailType::Title} {url} {entry_count} />
             </Suspense>
         </>
     }

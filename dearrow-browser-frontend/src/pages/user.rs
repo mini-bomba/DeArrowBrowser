@@ -84,10 +84,10 @@ pub fn UserPage(props: &UserPageProps) -> Html {
     // let table_mode = use_state_eq(|| DetailType::Title);
     let entry_count = use_state_eq(|| None);
 
-    let url = match state.detail_table_mode {
-        DetailType::Title => window_context.origin_join_segments(&["api", "titles", "user_id", &props.userid]),
-        DetailType::Thumbnail => window_context.origin_join_segments(&["api", "thumbnails", "user_id", &props.userid]),
-    };
+    let url = use_memo((state.detail_table_mode, props.userid.clone()), |(dtm, userid)| match dtm {
+        DetailType::Title => window_context.origin_join_segments(&["api", "titles", "user_id", userid]),
+        DetailType::Thumbnail => window_context.origin_join_segments(&["api", "thumbnails", "user_id", userid]),
+    });
 
     let details_fallback = html! {
         <div><b>{"Loading..."}</b></div>
@@ -105,7 +105,7 @@ pub fn UserPage(props: &UserPageProps) -> Html {
             </div>
             <TableModeSwitch entry_count={*entry_count} />
             <Suspense fallback={table_fallback}>
-                <PaginatedDetailTableRenderer mode={state.detail_table_mode} url={Rc::new(url)} {entry_count} hide_userid=true hide_username=true />
+                <PaginatedDetailTableRenderer mode={state.detail_table_mode} {url} {entry_count} hide_userid=true hide_username=true />
             </Suspense>
         </>
     }

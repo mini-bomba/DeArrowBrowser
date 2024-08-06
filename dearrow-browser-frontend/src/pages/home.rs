@@ -33,14 +33,16 @@ pub fn HomePage() -> Html {
     let entries_per_page: usize = settings.entries_per_page.into();
     let state = use_location_state().get_state();
 
-    let mut url = match state.detail_table_mode {
-        DetailType::Title => window_context.origin.join("/api/titles"),
-        DetailType::Thumbnail => window_context.origin.join("/api/thumbnails"),
-    }.expect("Should be able to create an API url");
-
-    url.query_pairs_mut()
-        .append_pair("offset", &format!("{}", state.detail_table_page*entries_per_page))
-        .append_pair("count", &entries_per_page.to_string());
+    let url = use_memo((state.detail_table_mode, entries_per_page, state.detail_table_page), |(dtm, entries_per_page, page)| {
+        let mut url = match dtm {
+            DetailType::Title => window_context.origin_join_segments(&["api", "titles"]),
+            DetailType::Thumbnail => window_context.origin_join_segments(&["api", "thumbnails"]),
+        };
+        url.query_pairs_mut()
+            .append_pair("offset", &(page*entries_per_page).to_string())
+            .append_pair("count", &entries_per_page.to_string());
+        url
+    });
 
     let fallback = html! {
         <center><b>{"Loading..."}</b></center>
@@ -61,7 +63,7 @@ pub fn HomePage() -> Html {
             </div>
             <TableModeSwitch entry_count={detail_count} />
             <Suspense {fallback}>
-                <UnpaginatedDetailTableRenderer mode={state.detail_table_mode} url={Rc::new(url)} sort=false />
+                <UnpaginatedDetailTableRenderer mode={state.detail_table_mode} {url} sort=false />
             </Suspense>
             if let Some(page_count) = page_count {
                 <PageSelect  {page_count} />

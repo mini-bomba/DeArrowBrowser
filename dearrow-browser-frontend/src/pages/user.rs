@@ -23,7 +23,7 @@ use yew::prelude::*;
 use crate::components::detail_table::*;
 use crate::contexts::{StatusContext, WindowContext};
 use crate::hooks::{use_async_suspension, use_location_state};
-use crate::utils::{get_reqwest_client, sbb_userid_link};
+use crate::utils::{api_request, sbb_userid_link};
 
 #[derive(Properties, PartialEq)]
 struct UserDetailsProps {
@@ -36,7 +36,7 @@ fn UserDetails(props: &UserDetailsProps) -> HtmlResult {
     let status: StatusContext = use_context().expect("StatusResponse should be defined");
     let url = window_context.origin_join_segments(&["api","users","user_id", &props.userid]);
     let result: Rc<Result<User, anyhow::Error>> = use_async_suspension(|(url, _)| async move {
-        Ok(get_reqwest_client().get((url).clone()).send().await?.json().await?)
+        api_request(url.clone()).await
     }, (url, status.map(|s| s.last_updated)))?;
     let sbb_url: Rc<AttrValue> = use_memo(props.userid.clone(), |uid| AttrValue::Rc(sbb_userid_link(uid).as_str().into()));
 

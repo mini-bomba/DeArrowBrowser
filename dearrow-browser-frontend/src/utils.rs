@@ -15,10 +15,11 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use std::{ops::Deref, rc::Rc};
+use std::{fmt::Display, ops::Deref, rc::Rc};
 
+use anyhow::Context;
 use chrono::{DateTime, Utc, NaiveDateTime};
-use reqwest::{Client, Url};
+use reqwest::{Client, StatusCode, Url};
 use yew::Html;
 
 const TIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
@@ -233,6 +234,46 @@ impl ReqwestUrlExt for Url {
     }
 }
 
+#[derive(Debug)]
+pub enum RequestError {
+    StatusCode {
+        status: StatusCode,
+        body: String,
+    },
+    Reqwest(reqwest::Error),
+}
+
+impl Display for RequestError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RequestError::StatusCode {status, body} => write!(f, "The server returned a {status} status code: {body}"),
+            RequestError::Reqwest(err) => write!(f, "{err}"),
+        }
+    }
+}
+impl std::error::Error for RequestError {}
+impl From<reqwest::Error> for RequestError {
+    fn from(value: reqwest::Error) -> Self {
+        RequestError::Reqwest(value)
+    }
+}
+
+pub trait ReqwestResponseExt: Sized {
+    #[allow(async_fn_in_trait)]  // this is for local use
+    async fn check_status(self) -> Result<Self, RequestError>;
+}
+
+impl ReqwestResponseExt for reqwest::Response {
+    async fn check_status(self) -> Result<Self, RequestError> {
+        let status = self.status();
+        if !status.is_success() {
+            let body = self.text().await?;
+            return Err(RequestError::StatusCode { status, body })
+        }
+        Ok(self)
+    }
+}
+
 thread_local! {
     static REQWEST_CLIENT: Client = Client::new();
     static SBB_BASE: Url = Url::parse("https://sb.ltn.fi/").expect("should be able to parse sb.ltn.fi base URL");
@@ -240,6 +281,18 @@ thread_local! {
 
 pub fn get_reqwest_client() -> Client {
     REQWEST_CLIENT.with(Clone::clone)
+}
+
+pub async fn api_request<U,R>(url: U) -> anyhow::Result<R>
+where 
+    U: reqwest::IntoUrl,
+    R: serde::de::DeserializeOwned,
+{
+    get_reqwest_client()
+        .get(url)
+        .send().await.context("Failed to send the request")?
+        .check_status().await?
+        .json().await.context("Failed to deserialize response")
 }
 
 pub fn sbb_video_link(vid: &str) -> Url {

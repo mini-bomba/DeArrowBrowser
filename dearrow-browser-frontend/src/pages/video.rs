@@ -17,19 +17,19 @@
 */
 use std::rc::Rc;
 
-use anyhow::{bail, Context};
+use anyhow::Context;
 use dearrow_browser_api::unsync::{InnertubeVideo, Video};
 use gloo_console::error;
-use reqwest::StatusCode;
 use yew::prelude::*;
 use yew_hooks::{use_async_with_options, UseAsyncHandle, UseAsyncOptions};
 
-use crate::components::{detail_table::*, youtube::{OriginalTitle, YoutubeIframe}};
+use crate::components::detail_table::*;
+use crate::components::youtube::{OriginalTitle, YoutubeIframe};
 use crate::contexts::WindowContext;
 use crate::hooks::use_location_state;
 use crate::innertube::youtu_be_link;
 use crate::thumbnails::components::{Thumbnail, ThumbnailCaption};
-use crate::utils::{get_reqwest_client, sbb_video_link, RcEq};
+use crate::utils::{api_request, sbb_video_link, RcEq};
 
 #[derive(Properties, PartialEq)]
 struct VideoDetailsTableProps {
@@ -104,19 +104,12 @@ pub fn VideoPage(props: &VideoPageProps) -> Html {
         use_async_with_options(async move {
             async move {
                 let dab_api_url = window_context.origin_join_segments(&["api", "videos", &video_id]);
-                let mut video: Video = get_reqwest_client().get(dab_api_url).send().await.context("Failed to make the metadata request")?
-                    .json().await.context("Failed to deserialize metadata response")?;
+                let mut video: Video = api_request(dab_api_url).await.context("Metadata request failed")?;
 
                 if video.duration.is_none() {
-                    let it_duration = async move {
+                    let it_duration: anyhow::Result<u64> = async move {
                         let it_dab_url = window_context.origin_join_segments(&["innertube", "video", &video_id]);
-                        let request = get_reqwest_client().get(it_dab_url).send().await.context("Failed to make the proxied innertube request")?;
-                        let status = request.status();
-                        if status != StatusCode::OK {
-                            let reason = request.text().await.context("Failed to receive the failure reason for the proxied innertube request")?;
-                            bail!("Proxied innertube request failed: {status}, {reason}");
-                        }
-                        let it_video: InnertubeVideo = request.json().await.context("Failed to decode the proxied innertube response")?;
+                        let it_video: InnertubeVideo = api_request(it_dab_url).await.context("Proxied innertube request failed")?;
                         Ok(it_video.duration)
                     }.await;
                     match it_duration {

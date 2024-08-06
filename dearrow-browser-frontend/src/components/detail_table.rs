@@ -33,7 +33,7 @@ use crate::hooks::{use_async_suspension, use_location_state};
 use crate::pages::LocationState;
 use crate::settings::TableLayout;
 use crate::thumbnails::components::{ContainerType, Thumbnail, ThumbnailCaption};
-use crate::utils::{get_reqwest_client, html_length, render_datetime, RcEq};
+use crate::utils::{api_request, html_length, render_datetime, RcEq};
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum DetailType {
@@ -177,10 +177,9 @@ impl DetailList {
 pub fn use_detail_download(url: Rc<Url>, mode: DetailType, sort: bool) -> SuspensionResult<Rc<Result<DetailList, anyhow::Error>>> {
     let status: StatusContext = use_context().expect("StatusResponse should be defined");
     use_async_suspension(|(mode, url, sort, _)| async move {
-        let request = get_reqwest_client().get((*url).clone()).send().await?;
         let mut result = match mode {
-            DetailType::Thumbnail => DetailList::Thumbnails(request.json().await?),
-            DetailType::Title => DetailList::Titles(request.json().await?),
+            DetailType::Thumbnail => DetailList::Thumbnails(api_request((*url).clone()).await?),
+            DetailType::Title => DetailList::Titles(api_request((*url).clone()).await?),
         };
         if sort {
         // Sort by time submited, most to least recent

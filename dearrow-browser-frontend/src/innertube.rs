@@ -20,7 +20,7 @@ use anyhow::Context;
 use reqwest::Url;
 use serde::Deserialize;
 
-use crate::utils::{get_reqwest_client, ReqwestUrlExt};
+use crate::utils::{api_request, ReqwestUrlExt};
 
 
 #[derive(Deserialize)]
@@ -33,8 +33,7 @@ pub async fn get_original_title(vid: &str) -> Result<String, anyhow::Error> {
     url.query_pairs_mut()
         .clear()
         .append_pair("url", youtu_be_link(vid).as_str());
-    let resp: OEmbedResponse = get_reqwest_client().get(url).send().await.context("Failed to send oembed request")?
-        .json().await.context("Failed to deserialize oembed response")?;
+    let resp: OEmbedResponse = api_request(url).await.context("oembed request failed")?;
     resp.title.context("oembed response contained no title")
 }
 

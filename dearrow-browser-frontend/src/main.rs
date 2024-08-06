@@ -20,7 +20,7 @@ use dearrow_browser_api::unsync::StatusResponse;
 use gloo_console::error;
 use reqwest::Url;
 use thumbnails::components::ThumbgenProvider;
-use utils::get_reqwest_client;
+use utils::api_request;
 use yew::prelude::*;
 use yew_hooks::{use_async_with_options, use_interval, UseAsyncOptions};
 use yew_router::prelude::*;
@@ -50,16 +50,12 @@ fn App() -> Html {
     let update_clock = use_state(|| UpdateClock(false));
 
     let status = {
-        let window_context = window_context.clone();
+        let status_url = use_memo(window_context.clone(), |wc| wc.origin_join_segments(&["api", "status"]));
         use_async_with_options::<_, Rc<StatusResponse>, Rc<anyhow::Error>>(async move { 
-            async { 
-                Ok(get_reqwest_client()
-                    .get(window_context.origin_join_segments(&["api", "status"]))
-                    .send().await?
-                    .json().await?
-                )
-            }.await.map(Rc::new).map_err(Rc::new)
+            api_request::<_, StatusResponse>((*status_url).clone()).await
+                .map(Rc::new)
                 .inspect_err(|err| error!(format!("Failed to fetch status: {err:?}")))
+                .map_err(Rc::new)
         }, UseAsyncOptions::enable_auto())
     };
     {

@@ -17,7 +17,7 @@
 */
 #![allow(clippy::needless_pass_by_value)]
 use std::sync::Arc;
-use actix_web::{Responder, get, post, web, http::StatusCode, CustomizeResponder, HttpResponse, rt::task::spawn_blocking};
+use actix_web::{Responder, get, post, web, http::StatusCode, HttpResponse, rt::task::spawn_blocking};
 use anyhow::{anyhow, bail};
 use chrono::{Utc, DateTime};
 use dearrow_parser::{DearrowDB, ThumbnailFlags, TitleFlags};
@@ -53,7 +53,6 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
 }
 
 type JsonResult<T> = utils::Result<web::Json<T>>;
-type CustomizedJsonResult<T> = utils::Result<CustomizeResponder<web::Json<T>>>;
 
 #[derive(Deserialize)]
 #[serde(default)]
@@ -214,7 +213,7 @@ async fn get_title_by_uuid(db_lock: DBLock, string_set: StringSetLock, path: web
 }
 
 #[get("/titles/video_id/{video_id}", wrap = "ETagCache")]
-async fn get_titles_by_video_id(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> CustomizedJsonResult<Vec<ApiTitle>> {
+async fn get_titles_by_video_id(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> JsonResult<Vec<ApiTitle>> {
     let video_id = string_set.read().map_err(|_| anyhow!(SS_READ_ERR))?
         .set.get(path.into_inner().as_str()).cloned();
     let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
@@ -225,16 +224,11 @@ async fn get_titles_by_video_id(db_lock: DBLock, string_set: StringSetLock, path
             .map(|t| t.into_with_db(&db.db))
             .collect(),
     };
-    let status = if titles.is_empty() {
-        StatusCode::NOT_FOUND
-    } else {
-        StatusCode::OK
-    };
-    Ok(web::Json(titles).customize().with_status(status))
+    Ok(web::Json(titles))
 }
 
 #[get("/titles/user_id/{user_id}", wrap = "ETagCache")]
-async fn get_titles_by_user_id(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> CustomizedJsonResult<Vec<ApiTitle>> {
+async fn get_titles_by_user_id(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> JsonResult<Vec<ApiTitle>> {
     let user_id = string_set.read().map_err(|_| anyhow!(SS_READ_ERR))?
         .set.get(path.into_inner().as_str()).cloned();
     let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
@@ -245,12 +239,7 @@ async fn get_titles_by_user_id(db_lock: DBLock, string_set: StringSetLock, path:
             .map(|t| t.into_with_db(&db.db))
             .collect(),
     };
-    let status = if titles.is_empty() {
-        StatusCode::NOT_FOUND
-    } else {
-        StatusCode::OK
-    };
-    Ok(web::Json(titles).customize().with_status(status))
+    Ok(web::Json(titles))
 }
 
 #[get("/thumbnails", wrap = "ETagCache")]
@@ -294,7 +283,7 @@ async fn get_thumbnail_by_uuid(db_lock: DBLock, string_set: StringSetLock, path:
 }
 
 #[get("/thumbnails/video_id/{video_id}", wrap = "ETagCache")]
-async fn get_thumbnails_by_video_id(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> CustomizedJsonResult<Vec<ApiThumbnail>> {
+async fn get_thumbnails_by_video_id(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> JsonResult<Vec<ApiThumbnail>> {
     let video_id = string_set.read().map_err(|_| anyhow!(SS_READ_ERR))?
         .set.get(path.into_inner().as_str()).cloned();
     let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
@@ -305,16 +294,11 @@ async fn get_thumbnails_by_video_id(db_lock: DBLock, string_set: StringSetLock, 
             .map(|t| t.into_with_db(&db.db))
             .collect(),
     };
-    let status = if titles.is_empty() {
-        StatusCode::NOT_FOUND
-    } else {
-        StatusCode::OK
-    };
-    Ok(web::Json(titles).customize().with_status(status))
+    Ok(web::Json(titles))
 }
 
 #[get("/thumbnails/user_id/{video_id}", wrap = "ETagCache")]
-async fn get_thumbnails_by_user_id(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> CustomizedJsonResult<Vec<ApiThumbnail>> {
+async fn get_thumbnails_by_user_id(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> JsonResult<Vec<ApiThumbnail>> {
     let user_id = string_set.read().map_err(|_| anyhow!(SS_READ_ERR))?
         .set.get(path.into_inner().as_str()).cloned();
     let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
@@ -325,12 +309,7 @@ async fn get_thumbnails_by_user_id(db_lock: DBLock, string_set: StringSetLock, p
             .map(|t| t.into_with_db(&db.db))
             .collect(),
     };
-    let status = if titles.is_empty() {
-        StatusCode::NOT_FOUND
-    } else {
-        StatusCode::OK
-    };
-    Ok(web::Json(titles).customize().with_status(status))
+    Ok(web::Json(titles))
 }
 
 #[get("/users/user_id/{user_id}", wrap = "ETagCache")]

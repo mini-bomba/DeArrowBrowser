@@ -29,7 +29,7 @@ use crate::components::links::userid_link;
 use crate::components::youtube::{OriginalTitle, YoutubeIframe, YoutubeVideoLink};
 use crate::hooks::use_async_suspension;
 use crate::thumbnails::components::{Thumbnail, ThumbnailCaption};
-use crate::utils::{get_reqwest_client, html_length, render_datetime, RcEq};
+use crate::utils::{get_reqwest_client, html_length, render_datetime, RcEq, ReqwestResponseExt};
 use crate::WindowContext;
 
 #[derive(Properties, PartialEq, Clone)]
@@ -73,8 +73,8 @@ fn UUIDTitle(props: &UUIDPageProps) -> HtmlResult {
         if resp.status() == StatusCode::NOT_FOUND {
             return Ok(None);
         }
-        resp.error_for_status_ref().context("API request failed")?;
-        resp.json::<ApiTitle>().await.context("Failed to deserialize API response").map(Some)
+        resp.check_status().await?
+            .json::<ApiTitle>().await.context("Failed to deserialize API response").map(Some)
     }, (window_context, props.uuid.clone()))?;
 
     let inline_placeholder = html! {<span>{"Loading..."}</span>};
@@ -166,8 +166,8 @@ fn UUIDThumbnail(props: &UUIDPageProps) -> HtmlResult {
         if resp.status() == StatusCode::NOT_FOUND {
             return Ok(None);
         }
-        resp.error_for_status_ref().context("API request failed")?;
-        resp.json::<ApiThumbnail>().await.context("Failed to deserialize API response").map(Some)
+        resp.check_status().await?
+            .json::<ApiThumbnail>().await.context("Failed to deserialize API response").map(Some)
     }, (window_context, props.uuid.clone()))?;
     let caption: Rc<ThumbnailCaption> = use_memo(RcEq(thumbnail.clone()), |thumbnail| {
         if let Ok(Some(ref thumbnail)) = **thumbnail {

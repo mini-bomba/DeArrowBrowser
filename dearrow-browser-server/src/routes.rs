@@ -20,7 +20,7 @@ use std::sync::Arc;
 use actix_web::{Responder, get, post, web, http::StatusCode, CustomizeResponder, HttpResponse, rt::task::spawn_blocking};
 use anyhow::{anyhow, bail};
 use chrono::{Utc, DateTime};
-use dearrow_parser::{DearrowDB, TitleFlags};
+use dearrow_parser::{DearrowDB, ThumbnailFlags, TitleFlags};
 use dearrow_browser_api::sync::*;
 use log::warn;
 use serde::Deserialize;
@@ -36,10 +36,12 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(helo)
        .service(get_titles)
        .service(get_unverified_titles)
+       .service(get_broken_titles)
        .service(get_title_by_uuid)
        .service(get_titles_by_video_id)
        .service(get_titles_by_user_id)
        .service(get_thumbnails)
+       .service(get_broken_thumbnails)
        .service(get_thumbnail_by_uuid)
        .service(get_thumbnails_by_video_id)
        .service(get_thumbnails_by_user_id)
@@ -187,6 +189,16 @@ async fn get_unverified_titles(db_lock: DBLock) -> JsonResult<Vec<ApiTitle>> {
     ))
 }
 
+#[get("/titles/broken", wrap = "ETagCache")]
+async fn get_broken_titles(db_lock: DBLock) -> JsonResult<Vec<ApiTitle>> {
+    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+    Ok(web::Json(
+        db.db.titles.iter().rev()
+            .filter(|t| t.flags.contains(TitleFlags::MissingVotes))
+            .map(|t| t.into_with_db(&db.db)).collect::<Vec<_>>()
+    ))
+}
+
 #[get("/titles/uuid/{uuid}", wrap = "ETagCache")]
 async fn get_title_by_uuid(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> JsonResult<ApiTitle> {
     let Some(uuid) = string_set.read().map_err(|_| anyhow!(SS_READ_ERR))?
@@ -255,6 +267,17 @@ async fn get_thumbnails(db_lock: DBLock, query: web::Query<MainEndpointURLParams
             .map(|t| t.into_with_db(&db.db)).collect::<Vec<_>>()
     ))
 }
+
+#[get("/thumbnails/broken", wrap = "ETagCache")]
+async fn get_broken_thumbnails(db_lock: DBLock) -> JsonResult<Vec<ApiThumbnail>> {
+    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+    Ok(web::Json(
+        db.db.thumbnails.iter().rev()
+            .filter(|t| t.flags.intersects(ThumbnailFlags::MissingVotes | ThumbnailFlags::MissingTimestamp))
+            .map(|t| t.into_with_db(&db.db)).collect::<Vec<_>>()
+    ))
+}
+
 
 #[get("/thumbnails/uuid/{uuid}", wrap = "ETagCache")]
 async fn get_thumbnail_by_uuid(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> JsonResult<ApiThumbnail> {

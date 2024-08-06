@@ -147,7 +147,7 @@ body {
     }
   }
 
-  &[data-route="Home"], &[data-route="Video"], &[data-route="User"], &[data-route="Unverified"], &[data-route="UUID"] {
+  &:not(&[data-route="NotFound"], &[data-route="NotImplemented"]) {
     @extend %flex-column;
     justify-content: flex-start;
     align-items: stretch;

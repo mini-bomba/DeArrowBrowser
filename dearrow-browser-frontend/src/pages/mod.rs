@@ -24,12 +24,14 @@ use crate::components::detail_table::DetailType;
 use crate::components::header_footer::*;
 use crate::components::modals::ModalRenderer;
 
+mod broken;
 mod home;
 mod unverified;
 mod user;
 mod video;
 mod uuid;
 
+use broken::BrokenPage;
 use home::HomePage;
 use unverified::UnverifiedPage;
 use user::UserPage;
@@ -42,6 +44,8 @@ pub enum MainRoute {
     Home,
     #[at("/unverified")]
     Unverified,
+    #[at("/broken")]
+    Broken,
     #[at("/video_id/:id")]
     Video { id: AttrValue },
     #[at("/user_id/:id")]
@@ -68,6 +72,7 @@ pub fn render_main_route(route: MainRoute) -> Html {
     document.set_title(match &route {
         MainRoute::Home => "DeArrow Browser".to_string(),
         MainRoute::Unverified => "Unverified titles - DeArrow Browser".to_string(),
+        MainRoute::Broken => "Broken entries - DeArrow Browser".to_string(),
         MainRoute::NotFound => "Page not found - DeArrow Browser".to_string(),
         MainRoute::NotImplemented => "Not implemented - DeArrow Browser".to_string(),
         MainRoute::Video { ref id } => format!("VideoID {id} - DeArrow Browser"),
@@ -77,6 +82,7 @@ pub fn render_main_route(route: MainRoute) -> Html {
     let route_html = match route {
         MainRoute::Home => html! {<HomePage/>},
         MainRoute::Unverified => html! {<UnverifiedPage/>},
+        MainRoute::Broken => html! {<BrokenPage/>},
         MainRoute::Video { ref id } => html! {<VideoPage videoid={id.clone()} />},
         MainRoute::User { ref id } => html! {<UserPage userid={id.clone()} />},
         MainRoute::UUID { ref id } => html! {<UUIDPage uuid={id.clone()} />},

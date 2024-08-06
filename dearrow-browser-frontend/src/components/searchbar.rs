@@ -18,7 +18,7 @@
 use reqwest::Url;
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
-use yew_router::hooks::use_navigator;
+use yew_router::{hooks::use_navigator, prelude::Link};
 
 use crate::pages::MainRoute;
 
@@ -78,6 +78,13 @@ pub fn Searchbar() -> Html {
             {search_block!("uuid_search", "UUID", uuid_search)}
             {search_block!("vid_search", "Video ID", vid_search)}
             {search_block!("uid_search", "User ID", uid_search)}
+            <fieldset>
+                <legend>{"Filtered views"}</legend>
+                <ul>
+                    <li><Link<MainRoute> to={MainRoute::Unverified}>{"Unverified titles"}</Link<MainRoute>></li>
+                    <li><Link<MainRoute> to={MainRoute::Broken}>{"Broken entries"}</Link<MainRoute>></li>
+                </ul>
+            </fieldset>
         </div>
     }
 }

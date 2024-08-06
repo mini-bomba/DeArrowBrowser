@@ -441,13 +441,17 @@ a {
   color: lightblue;
 }
 
-input:not([type="checkbox"]), textarea {
+fieldset {
   color: $white;
-  background-color: #111;
   border-color: #888;
-  appearance: none;
   border: 1px solid $gray;
   border-radius: .25rem;
+}
+
+input:not([type="checkbox"]), textarea {
+  @extend fieldset;
+  background-color: #111;
+  appearance: none;
 
   &::placeholder {
     color: #888;

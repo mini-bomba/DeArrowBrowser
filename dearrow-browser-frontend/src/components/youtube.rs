@@ -45,11 +45,11 @@ pub fn YoutubeIframe(props: &YoutubeProps) -> Html {
 #[function_component]
 pub fn OriginalTitle(props: &YoutubeProps) -> HtmlResult {
     let title = use_async_suspension(|vid| async move {
-        let result = innertube::get_original_title(&vid).await;
+        let result = innertube::get_oembed_info(&vid).await;
         if let Err(ref e) = result {
             error!(format!("Failed to fetch original title for video {vid}: {e:?}"));
         }
-        result
+        result.map(|r| r.title)
     }, props.videoid.clone())?;
     if let Ok(ref t) = *title {
         Ok(html!{<span>{t.as_str()}</span>})

@@ -3,6 +3,7 @@ static_content_path = "./static"  # path to compiled dearrow-browser-frontend
 auth_secret = "set this to something random"  # secret for authenticated enpoints (such as reload)
 enable_sbserver_emulation = false  # set to true to enable /sbserver apis
 enable_innertube_proxying = true  # set to false to disable /innertube apis - note: they are used as a fallback in the client!
+reqwest_timeout_secs = 20 # timeout for HTTP requests made by the server (such as innertube)
 
 [listen]  # either tcp or unix has to be set
 tcp = ["0.0.0.0", 9292]  # IP and port to bind to

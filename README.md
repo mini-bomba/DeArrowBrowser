@@ -4,12 +4,14 @@ Inspired by [Lartza's SBbrowser](https://github.com/Lartza/SBbrowser).
 
 Public instance available at [dearrow.minibomba.pro](https://dearrow.minibomba.pro/).
 
-This repository is split into 4 crates:
+This repository is split into 4 main crates:
 - dearrow-parser - definitions of structures in source .csv files, reading & merging those into a single structure per detail
 - dearrow-browser-server - the backend, keeps the database loaded in memory, provides data for the backend
 - dearrow-browser-api - definitions of API structures
 - dearrow-browser-frontend - the frontend, uses Yew, functions as a single page application
 
+and 1 utility crate:
+- error_handling - basically the core of anyhow, written from scratch to make errors cloneable
 
 ## SponsorBlockServer emulation
 DeArrow Browser can emulate a limited set of SponsorBlockServer endpoints, specifically used by the DeArrow extension, allowing it to be used as an API mirror.<br>

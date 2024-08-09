@@ -16,9 +16,9 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 #![allow(clippy::needless_pass_by_value)]
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 use actix_web::{Responder, get, post, web, http::StatusCode, HttpResponse, rt::task::spawn_blocking};
-use anyhow::{anyhow, bail};
+use anyhow::{anyhow, bail, Context};
 use chrono::{Utc, DateTime};
 use dearrow_parser::{DearrowDB, ThumbnailFlags, TitleFlags};
 use dearrow_browser_api::sync::*;
@@ -27,29 +27,39 @@ use serde::Deserialize;
 
 use crate::{built_info, middleware::ETagCache, sbserver_emulation::get_random_time_for_video, state::*, utils};
 
-const SS_READ_ERR:  &str = "Failed to acquire StringSet for reading";
-const SS_WRITE_ERR: &str = "Failed to acquire StringSet for writing";
-const DB_READ_ERR:  &str = "Failed to acquire DatabaseState for reading";
-const DB_WRITE_ERR: &str = "Failed to acquire DatabaseState for writing";
+pub const SS_READ_ERR:  &str = "Failed to acquire StringSet for reading";
+pub const SS_WRITE_ERR: &str = "Failed to acquire StringSet for writing";
+pub const DB_READ_ERR:  &str = "Failed to acquire DatabaseState for reading";
+pub const DB_WRITE_ERR: &str = "Failed to acquire DatabaseState for writing";
 
-pub fn configure(cfg: &mut web::ServiceConfig) {
-    cfg.service(helo)
-       .service(get_titles)
-       .service(get_unverified_titles)
-       .service(get_broken_titles)
-       .service(get_title_by_uuid)
-       .service(get_titles_by_video_id)
-       .service(get_titles_by_user_id)
-       .service(get_thumbnails)
-       .service(get_broken_thumbnails)
-       .service(get_thumbnail_by_uuid)
-       .service(get_thumbnails_by_video_id)
-       .service(get_thumbnails_by_user_id)
-       .service(get_user_by_userid)
-       .service(get_video)
-       .service(get_status)
-       .service(get_errors)
-       .service(request_reload);
+pub fn configure(app_config: web::Data<AppConfig>) -> impl FnOnce(&mut web::ServiceConfig) {
+    return move |cfg| {
+        cfg.service(helo)
+           .service(get_titles)
+           .service(get_unverified_titles)
+           .service(get_broken_titles)
+           .service(get_title_by_uuid)
+           .service(get_titles_by_video_id)
+           .service(get_titles_by_user_id)
+           .service(get_thumbnails)
+           .service(get_broken_thumbnails)
+           .service(get_thumbnail_by_uuid)
+           .service(get_thumbnails_by_video_id)
+           .service(get_thumbnails_by_user_id)
+           .service(get_user_by_userid)
+           .service(get_video)
+           .service(get_status)
+           .service(get_errors)
+           .service(request_reload);
+
+        if app_config.enable_innertube_proxying {
+            cfg.service(get_titles_by_channel)
+               .service(get_thumbnails_by_channel);
+        } else {
+            cfg.route("/titles/channel/{channel}", web::route().to(innertube_disabled))
+               .route("/titles/channel/{channel}", web::route().to(innertube_disabled));
+        }
+    };
 }
 
 type JsonResult<T> = utils::Result<web::Json<T>>;
@@ -68,6 +78,10 @@ impl Default for MainEndpointURLParams {
             count: 50,
         }
     }
+}
+
+async fn innertube_disabled() -> HttpResponse {
+    HttpResponse::NotFound().body("This endpoint requires making requests to innertube, which is disabled on this DeArrow Browser instance.")
 }
 
 #[get("/")]
@@ -132,6 +146,7 @@ fn do_reload(db_lock: DBLock, string_set_lock: StringSetLock, config: web::Data<
             last_modified,
             updating_now: false,
             etag: None,
+            channel_cache: db_state.channel_cache.reset(),
         };
         db_state.etag = Some(db_state.generate_etag());
         string_set.clean();
@@ -242,6 +257,25 @@ async fn get_titles_by_user_id(db_lock: DBLock, string_set: StringSetLock, path:
     Ok(web::Json(titles))
 }
 
+#[get("/titles/channel/{channel}", wrap = "ETagCache")]
+async fn get_titles_by_channel(db_lock: DBLock, path: web::Path<String>) -> JsonResult<Vec<ApiTitle>> {
+    let channel_cache = {
+        let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+        db.channel_cache.clone()
+    };
+    let channel_data = channel_cache.get_channel(path.into_inner().as_str()).await.context("Failed to get channel info")?;
+
+    // we only really need the string pointer's address to figure out if they're equal, thanks to
+    // the `StringSet`
+    let vid_set: HashSet<usize> = channel_data.video_ids.iter().map(utils::arc_addr).collect();
+    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+    let titles = db.db.titles.iter().rev()
+        .filter(|title| vid_set.contains(&utils::arc_addr(&title.video_id)))
+        .map(|t| t.into_with_db(&db.db))
+        .collect();
+    Ok(web::Json(titles))
+}
+
 #[get("/thumbnails", wrap = "ETagCache")]
 async fn get_thumbnails(db_lock: DBLock, query: web::Query<MainEndpointURLParams>) -> JsonResult<Vec<ApiThumbnail>> {
     if query.count > 1024 {
@@ -310,6 +344,25 @@ async fn get_thumbnails_by_user_id(db_lock: DBLock, string_set: StringSetLock, p
             .collect(),
     };
     Ok(web::Json(titles))
+}
+
+#[get("/thumbnails/channel/{channel}", wrap = "ETagCache")]
+async fn get_thumbnails_by_channel(db_lock: DBLock, path: web::Path<String>) -> JsonResult<Vec<ApiThumbnail>> {
+    let channel_cache = {
+        let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+        db.channel_cache.clone()
+    };
+    let channel_data = channel_cache.get_channel(path.into_inner().as_str()).await.context("Failed to get channel info")?;
+
+    // we only really need the string pointer's address to figure out if they're equal, thanks to
+    // the `StringSet`
+    let vid_set: HashSet<usize> = channel_data.video_ids.iter().map(utils::arc_addr).collect();
+    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+    let thumbs = db.db.thumbnails.iter().rev()
+        .filter(|thumbnail| vid_set.contains(&utils::arc_addr(&thumbnail.video_id)))
+        .map(|t| t.into_with_db(&db.db))
+        .collect();
+    Ok(web::Json(thumbs))
 }
 
 #[get("/users/user_id/{user_id}", wrap = "ETagCache")]

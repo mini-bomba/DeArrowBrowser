@@ -24,17 +24,17 @@ use crate::utils::{api_request, ReqwestUrlExt};
 
 
 #[derive(Deserialize)]
-struct OEmbedResponse {
-    title: Option<String>,
+pub struct OEmbedResponse {
+    pub title: String,
+    pub author_url: String,
 }
 
-pub async fn get_original_title(vid: &str) -> Result<String, anyhow::Error> {
+pub async fn get_oembed_info(vid: &str) -> Result<OEmbedResponse, anyhow::Error> {
     let mut url = YOUTUBE_OEMBED_URL.with(Clone::clone);
     url.query_pairs_mut()
         .clear()
         .append_pair("url", youtu_be_link(vid).as_str());
-    let resp: OEmbedResponse = api_request(url).await.context("oembed request failed")?;
-    resp.title.context("oembed response contained no title")
+    api_request(url).await.context("oembed request failed")
 }
 
 pub fn youtu_be_link(vid: &str) -> Url {

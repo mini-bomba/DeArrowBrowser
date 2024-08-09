@@ -25,6 +25,7 @@ use crate::components::header_footer::*;
 use crate::components::modals::ModalRenderer;
 
 mod broken;
+mod channel;
 mod home;
 mod unverified;
 mod user;
@@ -32,6 +33,7 @@ mod video;
 mod uuid;
 
 use broken::BrokenPage;
+use channel::ChannelPage;
 use home::HomePage;
 use unverified::UnverifiedPage;
 use user::UserPage;
@@ -48,6 +50,8 @@ pub enum MainRoute {
     Broken,
     #[at("/video_id/:id")]
     Video { id: AttrValue },
+    #[at("/channel/:id")]
+    Channel { id: AttrValue },
     #[at("/user_id/:id")]
     User { id: AttrValue },
     #[at("/uuid/:id")]
@@ -76,6 +80,7 @@ pub fn render_main_route(route: MainRoute) -> Html {
         MainRoute::NotFound => "Page not found - DeArrow Browser".to_string(),
         MainRoute::NotImplemented => "Not implemented - DeArrow Browser".to_string(),
         MainRoute::Video { ref id } => format!("VideoID {id} - DeArrow Browser"),
+        MainRoute::Channel { ref id } => format!("Channel {id} - DeArrow Browser"),
         MainRoute::User { ref id } => format!("UserID {id} - Dearrow Browser"),
         MainRoute::UUID { ref id } => format!("UUID {id} - Dearrow Browser"),
     }.as_str());
@@ -84,6 +89,7 @@ pub fn render_main_route(route: MainRoute) -> Html {
         MainRoute::Unverified => html! {<UnverifiedPage/>},
         MainRoute::Broken => html! {<BrokenPage/>},
         MainRoute::Video { ref id } => html! {<VideoPage videoid={id.clone()} />},
+        MainRoute::Channel { ref id } => html! {<ChannelPage channel={id.clone()} />},
         MainRoute::User { ref id } => html! {<UserPage userid={id.clone()} />},
         MainRoute::UUID { ref id } => html! {<UUIDPage uuid={id.clone()} />},
         MainRoute::NotFound => html! {

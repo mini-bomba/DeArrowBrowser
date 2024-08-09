@@ -56,6 +56,7 @@ pub fn Searchbar() -> Html {
         })
     };
     let vid_search = { 
+        let navigator = navigator.clone();
         Callback::from(move |e: KeyboardEvent| {
             if e.key() == "Enter" {
                 let input: HtmlInputElement = e.target_unchecked_into();
@@ -72,12 +73,29 @@ pub fn Searchbar() -> Html {
             }
         })
     };
+    let channel_search = { 
+        Callback::from(move |e: KeyboardEvent| {
+            if e.key() == "Enter" {
+                let input: HtmlInputElement = e.target_unchecked_into();
+                let value = input.value();
+                navigator.push(&MainRoute::Channel {
+                    id: if let Ok(url) = Url::parse(&value) {  // Try to parse as URL
+                        url.path_segments().and_then(|it| it.filter(|s| !s.is_empty()).last()).map(ToString::to_string)  // Grab the last non-empty path segment
+                            .unwrap_or(value) // fall back to original value
+                    } else {
+                        value  // Fall back to original value
+                    }.into()
+                });
+            }
+        })
+    };
 
     html! {
         <div id="searchbar">
             {search_block!("uuid_search", "UUID", uuid_search)}
             {search_block!("vid_search", "Video ID", vid_search)}
             {search_block!("uid_search", "User ID", uid_search)}
+            {search_block!("channel_search", "Channel", channel_search)}
             <fieldset>
                 <legend>{"Filtered views"}</legend>
                 <ul>

@@ -19,10 +19,15 @@ use actix_web::{http::header::EntityTag, web};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use chrono::{DateTime, Utc};
 use dearrow_parser::{DearrowDB, StringSet};
-use anyhow::Error;
+// use anyhow::{Error, Context};
+use error_handling::{bail, ErrorContext, ResContext};
+use futures::{future::{BoxFuture, Shared}, lock::Mutex, FutureExt};
 use getrandom::getrandom;
-use std::{path::PathBuf, sync::RwLock};
+use reqwest::Client;
+use std::{collections::HashMap, path::PathBuf, sync::{Arc, RwLock}};
 use serde::{Serialize, Deserialize};
+
+use crate::{innertube, routes};
 
 pub type DBLock = web::Data<RwLock<DatabaseState>>;
 pub type StringSetLock = web::Data<RwLock<StringSet>>;
@@ -36,6 +41,7 @@ pub struct AppConfig {
     pub auth_secret: String,
     pub enable_sbserver_emulation: bool,
     pub enable_innertube_proxying: bool,
+    pub reqwest_timeout_secs: f64,
     #[serde(skip)]
     pub startup_timestamp: DateTime<Utc>
 }
@@ -51,6 +57,7 @@ impl Default for AppConfig {
             auth_secret: URL_SAFE_NO_PAD.encode(buffer),
             enable_sbserver_emulation: false,
             enable_innertube_proxying: true,
+            reqwest_timeout_secs: 20.,
             startup_timestamp: Utc::now(),
         }
     }
@@ -75,11 +82,12 @@ impl Default for ListenConfig {
 
 pub struct DatabaseState {
     pub db: DearrowDB,
-    pub errors: Box<[Error]>,
+    pub errors: Box<[anyhow::Error]>,
     pub last_updated: i64,
     pub last_modified: i64,
     pub updating_now: bool,
-    pub etag: Option<EntityTag>
+    pub etag: Option<EntityTag>,
+    pub channel_cache: ChannelCache,
 }
 
 impl DatabaseState {
@@ -110,5 +118,94 @@ impl DatabaseState {
             self.video_info_count(),
             self.uncut_segment_count(),
         ))
+    }
+}
+
+type UCIDFutureResult = Result<Arc<str>, ErrorContext>;
+type SharedUCIDFuture = Shared<BoxFuture<'static, UCIDFutureResult>>;
+
+type ChannelFutureResult = Result<Arc<ChannelData>, ErrorContext>;
+type SharedChannelFuture = Shared<BoxFuture<'static, ChannelFutureResult>>;
+
+#[derive(Clone)]
+pub struct ChannelCache {
+    /// NOTE: Keas of this hashmap and results from these futures are NOT stored in the `StringSet`!
+    handle_to_ucid_cache: Arc<Mutex<HashMap<Arc<str>, SharedUCIDFuture>>>,
+    /// NOTE: Keys of this hashmap are NOT stored in the `StringSet`!
+    data_cache: Arc<Mutex<HashMap<Arc<str>, SharedChannelFuture>>>,
+    string_set: Arc<RwLock<StringSet>>,
+    client: Arc<reqwest::Client>,
+}
+
+#[derive(Debug)]
+pub struct ChannelData {
+    pub channel_name: Box<str>,
+    /// only contains video ids found in the `StringSet` at the time of creation
+    pub video_ids: Box<[Arc<str>]>,
+    pub total_videos: usize,
+}
+
+impl ChannelCache {
+    pub fn new(string_set: Arc<RwLock<StringSet>>, client: Arc<Client>) -> ChannelCache {
+        ChannelCache { 
+            handle_to_ucid_cache: Arc::default(),
+            data_cache: Arc::default(), 
+            string_set,
+            client,
+        }
+    }
+
+    pub fn reset(&self) -> ChannelCache {
+        ChannelCache { 
+            handle_to_ucid_cache: Arc::default(),
+            data_cache: Arc::default(), 
+            string_set: self.string_set.clone(),
+            client: self.client.clone(),
+        }
+    }
+
+    async fn handle_to_ucid(client: Arc<Client>, handle: Arc<str>) -> UCIDFutureResult {
+        innertube::handle_to_ucid(&client, &handle).await.map(Into::into)
+    }
+
+    async fn ucid_to_channel(client: Arc<Client>, string_set_lock: Arc<RwLock<StringSet>>, ucid: Arc<str>) -> ChannelFutureResult {
+        let it_res = innertube::get_channel(&client, &ucid).await?;
+        let string_set = string_set_lock.read().map_err(|_| ErrorContext::new(routes::SS_READ_ERR))?;
+        Ok(Arc::new(ChannelData {
+            channel_name: it_res.name.into(),
+            total_videos: it_res.video_ids.len(),
+            video_ids: it_res.video_ids.into_iter().filter_map(|vid| string_set.set.get(vid.as_str()).cloned()).collect(),
+        }))
+    }
+
+    pub async fn get_channel(&self, handle: &str) -> ChannelFutureResult {
+        let ucid = if innertube::UCID_REGEX.is_match(handle) {
+            handle.into()
+        } else {
+            let handle = handle.to_lowercase();
+            let handle = if innertube::HANDLE_REGEX.is_match(&handle) {
+                handle.into()
+            } else {
+                let maybe_handle = format!("@{handle}");
+                if !innertube::HANDLE_REGEX.is_match(&maybe_handle) {
+                    bail!("Invalid handle/UCID!")
+                }
+                maybe_handle.into()
+            };
+
+            let ucid_future = {
+                let mut ucid_cache = self.handle_to_ucid_cache.lock().await;
+                ucid_cache.entry(handle).or_insert_with_key(|handle| Self::handle_to_ucid(self.client.clone(), handle.clone()).boxed().shared()).clone()
+            };
+
+            ucid_future.await.context("Failed to convert handle to UCID")?
+        };
+
+        let channel_data = {
+            let mut channel_data_cache = self.data_cache.lock().await;
+            channel_data_cache.entry(ucid).or_insert_with_key(|ucid| Self::ucid_to_channel(self.client.clone(), self.string_set.clone(), ucid.clone()).boxed().shared()).clone()
+        }.await.context("Failed to fetch channel data")?;
+
+        Ok(channel_data)
     }
 }

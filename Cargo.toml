@@ -1,5 +1,5 @@
 [workspace]
-members = ["dearrow-browser-server", "dearrow-browser-api", "dearrow-parser", "dearrow-browser-frontend"]
+members = ["dearrow-browser-server", "dearrow-browser-api", "dearrow-parser", "dearrow-browser-frontend", "error_handling"]
 resolver = "2"
 
 [workspace.package]

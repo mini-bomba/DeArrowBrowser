@@ -105,3 +105,9 @@ pub struct InnertubeVideo {
     pub video_id: RcStr,
     pub duration: u64,
 }
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct InnertubeChannel {
+    pub channel_name: RcStr,
+    pub total_videos: u64,
+}

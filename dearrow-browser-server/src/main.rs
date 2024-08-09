@@ -15,7 +15,7 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use std::{sync::RwLock, fs::{File, Permissions, set_permissions}, io::{Read, Write, self}, os::unix::prelude::PermissionsExt};
+use std::{fs::{set_permissions, File, Permissions}, io::{self, Read, Write}, os::unix::prelude::PermissionsExt, sync::RwLock, time::Duration};
 use actix_files::{Files, NamedFile};
 use actix_web::{HttpServer, App, web, dev::{ServiceResponse, fn_service, ServiceRequest}, middleware::NormalizePath};
 use anyhow::{Context, anyhow, bail};
@@ -30,6 +30,7 @@ mod state;
 mod sbserver_emulation;
 mod middleware;
 mod innertube;
+use reqwest::ClientBuilder;
 use state::*;
 
 const CONFIG_PATH: &str = "config.toml";
@@ -60,9 +61,10 @@ async fn main() -> anyhow::Result<()> {
         }
     });
     info!("Loading database...");
-    let string_set = web::Data::new(RwLock::new(StringSet::with_capacity(16384)));
+    let string_set_lock = web::Data::new(RwLock::new(StringSet::with_capacity(16384)));
+    let reqwest_client = web::Data::new(ClientBuilder::new().timeout(Duration::from_secs_f64(config.reqwest_timeout_secs)).build().expect("Should be able to create a reqwest Client"));
     let db: web::Data<RwLock<DatabaseState>> = {
-        let mut string_set = string_set.write().map_err(|_| anyhow!("Failed to aquire StringSet lock for writing"))?;
+        let mut string_set = string_set_lock.write().map_err(|_| anyhow!("Failed to aquire StringSet lock for writing"))?;
         let (db, errors) = DearrowDB::load_dir(&config.mirror_path, &mut string_set).context("Initial DearrowDB load failed")?;
         string_set.clean();
 
@@ -73,6 +75,7 @@ async fn main() -> anyhow::Result<()> {
             last_modified: utils::get_mtime(&config.mirror_path.join("titles.csv")),
             updating_now: false,
             etag: None,
+            channel_cache: ChannelCache::new(string_set_lock.clone().into_inner(), reqwest_client.clone().into_inner()),
         };
         db_state.db.sort();
         db_state.etag = Some(db_state.generate_etag());
@@ -88,10 +91,10 @@ async fn main() -> anyhow::Result<()> {
                 .wrap(NormalizePath::trim())
                 .app_data(config.clone())
                 .app_data(db.clone())
-                .app_data(string_set.clone())
-                .app_data(web::Data::new(reqwest::Client::new()))
+                .app_data(string_set_lock.clone())
+                .app_data(reqwest_client.clone())
                 .service(web::scope("/api")
-                    .configure(routes::configure)
+                    .configure(routes::configure(config.clone()))
                 );
             if config.enable_sbserver_emulation {
                 app = app.service(web::scope("/sbserver")

@@ -17,17 +17,20 @@
 */
 use std::rc::Rc;
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use dearrow_browser_api::unsync::{InnertubeVideo, Video};
 use gloo_console::error;
 use yew::prelude::*;
 use yew_hooks::{use_async_with_options, UseAsyncHandle, UseAsyncOptions};
+use yew_router::prelude::Link;
 
 use crate::components::detail_table::*;
+use crate::components::icon::{Icon, IconType};
 use crate::components::youtube::{OriginalTitle, YoutubeIframe};
 use crate::contexts::WindowContext;
-use crate::hooks::use_location_state;
-use crate::innertube::youtu_be_link;
+use crate::hooks::{use_async_suspension, use_location_state};
+use crate::innertube::{self, youtu_be_link};
+use crate::pages::MainRoute;
 use crate::thumbnails::components::{Thumbnail, ThumbnailCaption};
 use crate::utils::{api_request, sbb_video_link, RcEq};
 
@@ -83,8 +86,43 @@ fn VideoDetailsTable(props: &VideoDetailsTableProps) -> Html {
             
             <div><a href={&*youtube_url}>{"View on YouTube"}</a></div>
             <div><a href={&*sbb_url}>{"View on SB Browser"}</a></div>
+            <Suspense><ChannelLink videoid={props.videoid.clone()} /></Suspense>
         </div>
     }
+}
+
+#[function_component]
+fn ChannelLink(props: &VideoPageProps) -> HtmlResult {
+    let channel_handle = use_async_suspension(|vid| async move {
+        let result = innertube::get_oembed_info(&vid).await;
+        if let Err(ref e) = result {
+            error!(format!("Failed to fetch oembed info for video {vid}: {e:?}"));
+        }
+        let result = result?;
+        let url = match reqwest::Url::parse(&result.author_url) {
+            Err(e) => {
+                error!(format!("Failed to parse channel url for video {vid}: {e:?}"));
+                return Err(anyhow::Error::new(e))
+            },
+            Ok(u) => u,
+        };
+        match url.path_segments().and_then(|ps|
+            ps.filter(|s| !s.is_empty()).last()
+        ) {
+            Some(handle) => Ok(AttrValue::from(handle.to_owned())),
+            None => {
+                error!(format!("Failed to extract channel handle from url for video {vid}!"));
+                Err(anyhow!("Failed to extract channel handle"))
+            }
+        }
+    }, props.videoid.clone())?;
+
+    let Ok(ref channel_handle) = *channel_handle else { return Ok(html! {}) };
+    let route = MainRoute::Channel { id: channel_handle.clone() };
+    
+    Ok(html! {
+        <Link<MainRoute> to={route}>{"Browse this channel's page "}<Icon r#type={IconType::DABLogo} /></Link<MainRoute>>
+    })
 }
 
 #[derive(Properties, PartialEq)]

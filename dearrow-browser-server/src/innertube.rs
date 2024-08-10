@@ -24,7 +24,7 @@ use dearrow_browser_api::sync::{InnertubeChannel, InnertubeVideo};
 use regex::Regex;
 use reqwest::Client;
 
-use crate::{middleware::ETagCache, routes::DB_READ_ERR, state::DBLock, utils};
+use crate::{middleware::ETagCache, routes::DB_READ_ERR, state::{AppConfig, DBLock}, utils};
 
 type JsonResult<T> = utils::Result<web::Json<T>>;
 
@@ -53,14 +53,26 @@ async fn disabled_route() -> HttpResponse {
 
 // https://github.com/ajayyy/DeArrow/blob/c4e1375380bc3b0cb202af283f0e7b4e5e6e30f1/src/thumbnails/thumbnailData.ts#L230
 #[get("/video/{video_id}")]
-async fn get_innertube_video(path: web::Path<String>, client: web::Data<Client>) -> JsonResult<InnertubeVideo> {
+async fn get_innertube_video(path: web::Path<String>, client: web::Data<Client>, config: web::Data<AppConfig>) -> JsonResult<InnertubeVideo> {
     let vid = path.as_str();
     let url = IT_PLAYER_URL.clone();
-    let input = it::player::Input {
-        context: it::Context::default(),
-        video_id: vid,
+    let input = {
+        let mut context = it::Context::default();
+        if let Some(ref visitor_data) = config.innertube.visitor_data {
+            context.client.visitor_data = Some(visitor_data);
+        }
+        let sid = config.innertube.po_token.as_ref().map(|po_token| it::player::Sid { po_token });
+        it::player::Input {
+            context,
+            video_id: vid,
+            service_integrity_dimensions: sid,
+        }
     };
-    let resp = client.post(url).json(&input).send().await.context("Failed to send innertube request")?;
+    let mut req = client.post(url).json(&input);
+    if let Some(ref visitor_data) = config.innertube.visitor_data {
+        req = req.header("X-Goog-Visitor-Id", visitor_data);
+    }
+    let resp = req.send().await.context("Failed to send innertube request")?;
     let resp = resp.error_for_status().context("Innertube request failed")?;
     let result: it::player::out::Video = resp.json().await.context("Failed to deserialize innertube response")?;
     if result.video_details.video_id != vid {
@@ -180,39 +192,55 @@ pub async fn get_channel(client: &Client, ucid: &str) -> Result<ChannelData, Err
 
 mod it {
     use serde::Serialize;
+    use serde_with::skip_serializing_none;
+
     // https://github.com/ajayyy/DeArrow/blob/c4e1375380bc3b0cb202af283f0e7b4e5e6e30f1/src/thumbnails/thumbnailData.ts#L233
     #[derive(Serialize, Clone, Default)]
-    pub struct Context {
-        pub client: Client,
+    pub struct Context<'a> {
+        pub client: Client<'a>,
     }
 
     // https://github.com/ajayyy/DeArrow/blob/c4e1375380bc3b0cb202af283f0e7b4e5e6e30f1/src/thumbnails/thumbnailData.ts#L234
+    #[skip_serializing_none]
     #[derive(Serialize, Clone)]
-    pub struct Client {
+    pub struct Client<'a> {
         #[serde(rename="clientName")]
         pub client_name: &'static str,
         #[serde(rename="clientVersion")]
         pub client_version: &'static str,
+        #[serde(rename="visitorData")]
+        pub visitor_data: Option<&'a str>,
     }
 
-    impl Default for Client {
+    impl<'a> Default for Client<'a> {
         fn default() -> Self {
             Self {
                 client_name: "WEB",
-                client_version: "2.20230327.07.00",
+                client_version: "2.20240808.00.00",
+                visitor_data: None,
             }
         }
     }
 
     pub mod player {
         use serde::Serialize;
+        use serde_with::skip_serializing_none;
 
         // https://github.com/ajayyy/DeArrow/blob/c4e1375380bc3b0cb202af283f0e7b4e5e6e30f1/src/thumbnails/thumbnailData.ts#L232
+        #[skip_serializing_none]
         #[derive(Serialize, Clone)]
         pub struct Input<'a> {
-            pub context: super::Context,
+            pub context: super::Context<'a>,
             #[serde(rename="videoId")]
             pub video_id: &'a str,
+            #[serde(rename="serviceIntegrityDimensions")]
+            pub service_integrity_dimensions: Option<Sid<'a>>,
+        }
+
+        #[derive(Serialize, Clone)]
+        pub struct Sid<'a> {
+            #[serde(rename="poToken")]
+            pub po_token: &'a str
         }
 
         pub mod out {
@@ -246,7 +274,7 @@ mod it {
         #[skip_serializing_none]
         #[derive(Serialize, Clone)]
         pub struct Input<'a> {
-            pub context: super::Context,
+            pub context: super::Context<'a>,
             #[serde(rename="browseId")]
             pub browse_id: Option<&'a str>,
             pub continuation: Option<String>,

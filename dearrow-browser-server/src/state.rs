@@ -40,10 +40,10 @@ pub struct AppConfig {
     pub listen: ListenConfig,
     pub auth_secret: String,
     pub enable_sbserver_emulation: bool,
-    pub enable_innertube_proxying: bool,
     pub reqwest_timeout_secs: f64,
     #[serde(skip)]
-    pub startup_timestamp: DateTime<Utc>
+    pub startup_timestamp: DateTime<Utc>,
+    pub innertube: InnertubeConfig,
 }
 
 impl Default for AppConfig {
@@ -56,9 +56,27 @@ impl Default for AppConfig {
             listen: ListenConfig::default(),
             auth_secret: URL_SAFE_NO_PAD.encode(buffer),
             enable_sbserver_emulation: false,
-            enable_innertube_proxying: true,
             reqwest_timeout_secs: 20.,
             startup_timestamp: Utc::now(),
+            innertube: InnertubeConfig::default(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(default)]
+pub struct InnertubeConfig {
+    pub enable: bool,
+    pub visitor_data: Option<String>,
+    pub po_token: Option<String>,
+}
+
+impl Default for InnertubeConfig {
+    fn default() -> Self {
+        Self {
+            enable: true,
+            visitor_data: None,
+            po_token: None,
         }
     }
 }

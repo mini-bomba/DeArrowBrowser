@@ -105,7 +105,7 @@ async fn main() -> anyhow::Result<()> {
                     .configure(sbserver_emulation::configure_disabled)
                 );
             }
-            if config.enable_innertube_proxying {
+            if config.innertube.enable {
                 app = app.service(web::scope("/innertube")
                     .configure(innertube::configure_enabled)
                 );

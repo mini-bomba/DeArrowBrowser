@@ -52,7 +52,7 @@ pub fn configure(app_config: web::Data<AppConfig>) -> impl FnOnce(&mut web::Serv
            .service(get_errors)
            .service(request_reload);
 
-        if app_config.enable_innertube_proxying {
+        if app_config.innertube.enable {
             cfg.service(get_titles_by_channel)
                .service(get_thumbnails_by_channel);
         } else {

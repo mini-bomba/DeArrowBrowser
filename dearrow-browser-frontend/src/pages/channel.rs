@@ -69,7 +69,11 @@ pub fn ChannelPage(props: &ChannelPageProps) -> Html {
         <div><b>{"Loading..."}</b></div>
     };
     let table_fallback = html! {
-        <center><b>{"Loading..."}</b></center>
+        <center>
+            <b>{"Loading..."}</b><br />
+            {"Loading this page for the first time for a given channel will take a while, especially for channels with lots of videos."}<br />
+            {"Subsequent requests for this channel should be quick for everyone, until the database is reloaded."}
+        </center>
     };
     
     html! {

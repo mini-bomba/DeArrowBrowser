@@ -134,7 +134,7 @@ fn UUIDTitle(props: &UUIDPageProps) -> HtmlResult {
                             <Icon r#type={IconType::Downvote} />{" Removed by downvotes"}
                         } else if title.votes < 0 {
                             <Icon r#type={IconType::Replaced} />{" Replaced by submitter"}
-                        } else if title.score < 0 {
+                        } else if !title.locked && title.score < 0 {
                             <Icon r#type={IconType::PartiallyHidden} />{" Partially hidden - Only visible in submission menus"}
                         } else {
                             <Icon r#type={IconType::Upvote} />{" Fully visible"}
@@ -242,8 +242,10 @@ fn UUIDThumbnail(props: &UUIDPageProps) -> HtmlResult {
                             <Icon r#type={IconType::Removed} />{" Removed by VIP"}
                         } else if thumbnail.shadow_hidden {
                             <Icon r#type={IconType::ShadowHidden} />{" Hidden by VIP using batch actions (shadowhidden)"}
-                        } else if thumbnail.votes - thumbnail.downvotes < -1 {
+                        } else if thumbnail.score < -1 {
                             <Icon r#type={IconType::Downvote} />{" Removed by downvotes"}
+                        } else if thumbnail.original && !thumbnail.locked && thumbnail.score < 1 {
+                            <Icon r#type={IconType::Downvote} />{" Original thumbnail with insufficient score to be shown (requires >= 1 or lock)"}
                         } else if thumbnail.score < 0 {
                             <Icon r#type={IconType::PartiallyHidden} />{" Partially hidden - Only visible in submission menus"}
                         } else {

@@ -192,23 +192,30 @@ async fn get_video_branding(db_lock: DBLock, string_set: StringSetLock, query: w
                             && t.votes > -1 
                             && t.votes.saturating_sub(t.downvotes) > -2 
                             && !t.flags.intersects(TitleFlags::Removed | TitleFlags::ShadowHidden | TitleFlags::MissingVotes)
+                            && (
+                                query.0.fetchAll 
+                                || t.flags.contains(TitleFlags::Locked) 
+                                || t.votes.saturating_sub(t.downvotes) >= t.flags.contains(TitleFlags::Unverified).into()
+                            )
                         )
                         .map(|t| SBApiTitle::from_db(t, query.0.returnUserID))
-                        .filter(|t| query.0.fetchAll || t.votes >= 0 || t.locked)
                         .collect();
                     titles.sort_unstable_by(|a, b| a.locked.cmp(&b.locked).then(a.votes.cmp(&b.votes)).reverse());
                     titles
                 },
                 thumbnails: {
                     let mut thumbs: Vec<SBApiThumbnail> = db.db.thumbnails.iter()
-                        .filter(|t| 
+                        .filter(|t|
                             Arc::ptr_eq(&t.video_id, &video_id) 
-                            && t.votes > -1 
                             && t.votes.saturating_sub(t.downvotes) > -2 
                             && !t.flags.intersects(ThumbnailFlags::Removed | ThumbnailFlags::ShadowHidden | ThumbnailFlags::MissingVotes | ThumbnailFlags::MissingTimestamp)
+                            && (
+                                (query.0.fetchAll && !t.flags.contains(ThumbnailFlags::Original))
+                                || t.flags.contains(ThumbnailFlags::Locked)
+                                || t.votes.saturating_sub(t.downvotes) >= t.flags.contains(ThumbnailFlags::Original).into()
+                            )
                         )
                         .map(|t| SBApiThumbnail::from_db(t, query.0.returnUserID))
-                        .filter(|t| query.0.fetchAll || t.votes >= 0 || t.locked)
                         .collect();
                     thumbs.sort_unstable_by(|a, b| a.locked.cmp(&b.locked).then(a.votes.cmp(&b.votes).then(a.original.cmp(&b.original).reverse())).reverse());
                     thumbs
@@ -259,7 +266,11 @@ async fn get_chunk_branding(db_lock: DBLock, query: web::Query<ChunkBrandingPara
             && t.votes > -1 
             && !t.flags.intersects(TitleFlags::Removed | TitleFlags::ShadowHidden | TitleFlags::MissingVotes)
             && t.votes.saturating_sub(t.downvotes) > -2 
-            && (query.0.fetchAll || t.flags.contains(TitleFlags::Locked) || t.votes.saturating_sub(t.downvotes) >= t.flags.contains(TitleFlags::Unverified).into())
+            && (
+                query.0.fetchAll 
+                || t.flags.contains(TitleFlags::Locked) 
+                || t.votes.saturating_sub(t.downvotes) >= t.flags.contains(TitleFlags::Unverified).into()
+            )
         )
         .for_each(|t| match titles.get_mut(&t.video_id) {
             Some(v) => v.push(SBApiTitle::from_db(t, query.0.returnUserID)),
@@ -272,9 +283,13 @@ async fn get_chunk_branding(db_lock: DBLock, query: web::Query<ChunkBrandingPara
     db.db.thumbnails.iter()
         .filter(|t|
             t.hash_prefix == hash_prefix
-            && t.votes > -1 
             && !t.flags.intersects(ThumbnailFlags::Removed | ThumbnailFlags::ShadowHidden | ThumbnailFlags::MissingVotes | ThumbnailFlags::MissingTimestamp)
-            && t.votes.saturating_sub(t.downvotes) >= if query.0.fetchAll || t.flags.contains(ThumbnailFlags::Locked) { -1 } else { 0 } 
+            && t.votes.saturating_sub(t.downvotes) > -2 
+            && (
+                (query.0.fetchAll && !t.flags.contains(ThumbnailFlags::Original))
+                || t.flags.contains(ThumbnailFlags::Locked)
+                || t.votes.saturating_sub(t.downvotes) >= t.flags.contains(ThumbnailFlags::Original).into()
+            )
         )
         .for_each(|t| match thumbnails.get_mut(&t.video_id) {
             Some(v) => v.push(SBApiThumbnail::from_db(t, query.0.returnUserID)),

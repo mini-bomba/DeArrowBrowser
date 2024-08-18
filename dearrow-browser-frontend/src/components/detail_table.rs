@@ -287,7 +287,7 @@ fn title_flags(title: &ApiTitle) -> Html {
                 <Icon r#type={IconType::Downvote} tooltip="This title was removed by the downvotes" />
             } else if title.votes < 0 {
                 <Icon r#type={IconType::Replaced} tooltip="This title was replaced by the submitter" />
-            } else if title.score < 0 {
+            } else if !title.locked && title.score < 0 {
                 <Icon r#type={IconType::PartiallyHidden} tooltip="This title should only appear in submission menus (score below 0)" />
             }
             if title.unverified {
@@ -321,8 +321,12 @@ fn thumbnail_flags(thumb: &ApiThumbnail) -> Html {
                 }
             } else if thumb.votes - thumb.downvotes < -1 {
                 <Icon r#type={IconType::Downvote} tooltip="This thumbnail was removed by the downvotes" />
-            } else if thumb.score < 0 {
-                <Icon r#type={IconType::PartiallyHidden} tooltip="This thumbnail should only appear in submission menus (score below 0)" />
+            } else if !thumb.locked {
+                if thumb.original && thumb.score < 1 {
+                    <Icon r#type={IconType::Downvote} tooltip="This original thumbnail has insufficient score to be shown (requires >= 1 or lock)" />
+                } else if thumb.score < 0 {
+                    <Icon r#type={IconType::PartiallyHidden} tooltip="This thumbnail should only appear in submission menus (score below 0)" />
+                }
             }
             if thumb.locked {
                 <Icon r#type={IconType::Locked} tooltip="This thumbnail was locked by a VIP" />

@@ -7,7 +7,7 @@ license.workspace = true
 edition.workspace = true
 
 [dependencies]
-anyhow = {workspace = true, optional = true}
+anyhow = {version = "1.0.79", optional = true}
 serde = {workspace = true, optional = true}
 
 [lints]

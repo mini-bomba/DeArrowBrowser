@@ -17,6 +17,7 @@
 */
 use std::rc::Rc;
 use dearrow_browser_api::unsync::StatusResponse;
+use error_handling::ErrorContext;
 use gloo_console::error;
 use reqwest::Url;
 use thumbnails::components::ThumbgenProvider;
@@ -51,11 +52,10 @@ fn App() -> Html {
 
     let status = {
         let status_url = use_memo(window_context.clone(), |wc| wc.origin_join_segments(&["api", "status"]));
-        use_async_with_options::<_, Rc<StatusResponse>, Rc<anyhow::Error>>(async move { 
+        use_async_with_options::<_, Rc<StatusResponse>, ErrorContext>(async move { 
             api_request::<_, StatusResponse>((*status_url).clone()).await
                 .map(Rc::new)
                 .inspect_err(|err| error!(format!("Failed to fetch status: {err:?}")))
-                .map_err(Rc::new)
         }, UseAsyncOptions::enable_auto())
     };
     {

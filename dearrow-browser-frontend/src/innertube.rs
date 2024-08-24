@@ -16,7 +16,7 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use anyhow::Context;
+use error_handling::{ErrorContext, ResContext};
 use reqwest::Url;
 use serde::Deserialize;
 
@@ -29,7 +29,7 @@ pub struct OEmbedResponse {
     pub author_url: String,
 }
 
-pub async fn get_oembed_info(vid: &str) -> Result<OEmbedResponse, anyhow::Error> {
+pub async fn get_oembed_info(vid: &str) -> Result<OEmbedResponse, ErrorContext> {
     let mut url = YOUTUBE_OEMBED_URL.with(Clone::clone);
     url.query_pairs_mut()
         .clear()

@@ -17,7 +17,7 @@
 */
 use std::rc::Rc;
 
-use anyhow::{anyhow, Context};
+use error_handling::{anyhow, ErrContext, ErrorContext, ResContext};
 use dearrow_browser_api::unsync::{InnertubeVideo, Video};
 use gloo_console::error;
 use yew::prelude::*;
@@ -38,7 +38,7 @@ use crate::utils::{api_request, sbb_video_link, RcEq};
 struct VideoDetailsTableProps {
     videoid: AttrValue,
     mode: DetailType,
-    metadata: UseAsyncHandle<Rc<Video>, RcEq<anyhow::Error>>,
+    metadata: UseAsyncHandle<Rc<Video>, RcEq<ErrorContext>>,
 }
 
 #[function_component]
@@ -102,7 +102,7 @@ fn ChannelLink(props: &VideoPageProps) -> HtmlResult {
         let url = match reqwest::Url::parse(&result.author_url) {
             Err(e) => {
                 error!(format!("Failed to parse channel url for video {vid}: {e:?}"));
-                return Err(anyhow::Error::new(e))
+                return Err(e.context("Failed to parse channel URL"))
             },
             Ok(u) => u,
         };
@@ -136,7 +136,7 @@ pub fn VideoPage(props: &VideoPageProps) -> Html {
     let state = use_location_state().get_state();
     let entry_count = use_state_eq(|| None);
 
-    let metadata: UseAsyncHandle<Rc<Video>, RcEq<anyhow::Error>> = {
+    let metadata: UseAsyncHandle<Rc<Video>, RcEq<ErrorContext>> = {
         let video_id = props.videoid.clone();
         let window_context = window_context.clone();
         use_async_with_options(async move {
@@ -145,7 +145,7 @@ pub fn VideoPage(props: &VideoPageProps) -> Html {
                 let mut video: Video = api_request(dab_api_url).await.context("Metadata request failed")?;
 
                 if video.duration.is_none() {
-                    let it_duration: anyhow::Result<u64> = async move {
+                    let it_duration: Result<u64, ErrorContext> = async move {
                         let it_dab_url = window_context.origin_join_segments(&["innertube", "video", &video_id]);
                         let it_video: InnertubeVideo = api_request(it_dab_url).await.context("Proxied innertube request failed")?;
                         Ok(it_video.duration)

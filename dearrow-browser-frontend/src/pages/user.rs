@@ -18,6 +18,7 @@
 use std::rc::Rc;
 
 use dearrow_browser_api::unsync::User;
+use error_handling::ErrorContext;
 use yew::prelude::*;
 
 use crate::components::detail_table::*;
@@ -35,7 +36,7 @@ fn UserDetails(props: &UserDetailsProps) -> HtmlResult {
     let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
     let status: StatusContext = use_context().expect("StatusResponse should be defined");
     let url = window_context.origin_join_segments(&["api","users","user_id", &props.userid]);
-    let result: Rc<Result<User, anyhow::Error>> = use_async_suspension(|(url, _)| async move {
+    let result: Rc<Result<User, ErrorContext>> = use_async_suspension(|(url, _)| async move {
         api_request(url.clone()).await
     }, (url, status.map(|s| s.last_updated)))?;
     let sbb_url: Rc<AttrValue> = use_memo(props.userid.clone(), |uid| AttrValue::Rc(sbb_userid_link(uid).as_str().into()));

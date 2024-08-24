@@ -18,6 +18,7 @@
 use std::rc::Rc;
 
 use dearrow_browser_api::unsync::InnertubeChannel;
+use error_handling::ErrorContext;
 use yew::prelude::*;
 
 use crate::components::detail_table::*;
@@ -29,7 +30,7 @@ use crate::utils::api_request;
 fn ChannelDetails(props: &ChannelPageProps) -> HtmlResult {
     let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
     let status: StatusContext = use_context().expect("StatusResponse should be defined");
-    let result: Rc<Result<InnertubeChannel, anyhow::Error>> = use_async_suspension(|(channel, _)| async move {
+    let result: Rc<Result<InnertubeChannel, ErrorContext>> = use_async_suspension(|(channel, _)| async move {
         let url = window_context.origin_join_segments(&["innertube","channel", &channel]);
         api_request(url).await
     }, (props.channel.clone(), status.map(|s| s.last_updated)))?;

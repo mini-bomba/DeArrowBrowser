@@ -23,6 +23,7 @@ use reqwest::Url;
 use web_sys::HtmlInputElement;
 use yew::{prelude::*, suspense::SuspensionResult};
 use dearrow_browser_api::unsync::*;
+use error_handling::ErrorContext;
 
 use crate::components::icon::*;
 use crate::components::links::*;
@@ -174,7 +175,7 @@ impl DetailList {
 }
 
 #[hook]
-pub fn use_detail_download(url: Rc<Url>, mode: DetailType, sort: bool) -> SuspensionResult<Rc<Result<DetailList, anyhow::Error>>> {
+pub fn use_detail_download(url: Rc<Url>, mode: DetailType, sort: bool) -> SuspensionResult<Rc<Result<DetailList, ErrorContext>>> {
     let status: StatusContext = use_context().expect("StatusResponse should be defined");
     use_async_suspension(|(mode, url, sort, _)| async move {
         let mut result = match mode {
@@ -251,7 +252,7 @@ pub enum DetailIndex {
 }
 
 #[hook]
-pub fn use_detail_slice(details: Rc<Result<DetailList, anyhow::Error>>, index: DetailIndex) -> DetailSlice {
+pub fn use_detail_slice(details: Rc<Result<DetailList, ErrorContext>>, index: DetailIndex) -> DetailSlice {
     (*use_memo((RcEq(details), index), |(details, index)|
         match (&**details, index) {
             (Err(_), _)                                                                 

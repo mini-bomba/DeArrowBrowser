@@ -18,9 +18,9 @@
 
 use std::rc::Rc;
 
-use anyhow::Context;
 use chrono::DateTime;
 use dearrow_browser_api::unsync::{ApiThumbnail, ApiTitle};
+use error_handling::ResContext;
 use reqwest::StatusCode;
 use yew::prelude::*;
 
@@ -73,7 +73,7 @@ fn UUIDTitle(props: &UUIDPageProps) -> HtmlResult {
         if resp.status() == StatusCode::NOT_FOUND {
             return Ok(None);
         }
-        resp.check_status().await?
+        resp.check_status().await.context("API request failed")?
             .json::<ApiTitle>().await.context("Failed to deserialize API response").map(Some)
     }, (window_context, props.uuid.clone()))?;
 
@@ -166,7 +166,7 @@ fn UUIDThumbnail(props: &UUIDPageProps) -> HtmlResult {
         if resp.status() == StatusCode::NOT_FOUND {
             return Ok(None);
         }
-        resp.check_status().await?
+        resp.check_status().await.context("API request failed")?
             .json::<ApiThumbnail>().await.context("Failed to deserialize API response").map(Some)
     }, (window_context, props.uuid.clone()))?;
     let caption: Rc<ThumbnailCaption> = use_memo(RcEq(thumbnail.clone()), |thumbnail| {

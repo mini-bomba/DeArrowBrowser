@@ -652,11 +652,11 @@ dependencies = [
 name = "dearrow-browser-frontend"
 version = "1.11.0"
 dependencies = [
- "anyhow",
  "bincode",
  "built",
  "chrono",
  "dearrow-browser-api",
+ "error_handling",
  "futures",
  "gloo-console 0.3.0",
  "reqwest",

@@ -17,8 +17,8 @@
 */
 use std::{fmt::Display, ops::Deref, rc::Rc};
 
-use anyhow::Context;
 use chrono::{DateTime, Utc, NaiveDateTime};
+use error_handling::{ErrorContext, ResContext};
 use reqwest::{Client, StatusCode, Url};
 use yew::Html;
 
@@ -283,7 +283,7 @@ pub fn get_reqwest_client() -> Client {
     REQWEST_CLIENT.with(Clone::clone)
 }
 
-pub async fn api_request<U,R>(url: U) -> anyhow::Result<R>
+pub async fn api_request<U,R>(url: U) -> Result<R, ErrorContext>
 where 
     U: reqwest::IntoUrl,
     R: serde::de::DeserializeOwned,
@@ -291,7 +291,7 @@ where
     get_reqwest_client()
         .get(url)
         .send().await.context("Failed to send the request")?
-        .check_status().await?
+        .check_status().await.context("Request failed")?
         .json().await.context("Failed to deserialize response")
 }
 

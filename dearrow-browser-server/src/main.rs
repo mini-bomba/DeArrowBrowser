@@ -18,12 +18,13 @@
 use std::{fs::{set_permissions, File, Permissions}, io::{self, Read, Write}, os::unix::prelude::PermissionsExt, sync::RwLock, time::Duration};
 use actix_files::{Files, NamedFile};
 use actix_web::{HttpServer, App, web, dev::{ServiceResponse, fn_service, ServiceRequest}, middleware::NormalizePath};
-use anyhow::{Context, anyhow, bail};
+use error_handling::{bail, ErrorContext, ResContext};
 use chrono::Utc;
 use env_logger::Env;
 use log::info;
 use dearrow_parser::{DearrowDB, StringSet};
 
+mod constants;
 mod utils;
 mod routes;
 mod state;
@@ -37,7 +38,7 @@ const CONFIG_PATH: &str = "config.toml";
 
 
 #[actix_web::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Result<(), ErrorContext> {
     env_logger::init_from_env(Env::default().default_filter_or("info"));
     let config: web::Data<AppConfig> = web::Data::new(match File::open(CONFIG_PATH) {
         Ok(mut file) => {
@@ -64,7 +65,7 @@ async fn main() -> anyhow::Result<()> {
     let string_set_lock = web::Data::new(RwLock::new(StringSet::with_capacity(16384)));
     let reqwest_client = web::Data::new(ClientBuilder::new().timeout(Duration::from_secs_f64(config.reqwest_timeout_secs)).build().expect("Should be able to create a reqwest Client"));
     let db: web::Data<RwLock<DatabaseState>> = {
-        let mut string_set = string_set_lock.write().map_err(|_| anyhow!("Failed to aquire StringSet lock for writing"))?;
+        let mut string_set = string_set_lock.write().map_err(|_| constants::SS_WRITE_ERR.clone())?;
         let (db, errors) = DearrowDB::load_dir(&config.mirror_path, &mut string_set).context("Initial DearrowDB load failed")?;
         string_set.clean();
 

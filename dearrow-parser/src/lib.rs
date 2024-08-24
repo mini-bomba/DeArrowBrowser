@@ -18,9 +18,11 @@
 use std::{sync::Arc, fmt::Display, collections::{HashSet, HashMap}, path::{Path, PathBuf}, fs::File};
 use csv_data::WithWarnings;
 use enumflags2::{bitflags, BitFlags};
-use anyhow::{Result, Context, Error};
+use error_handling::{ErrContext, ErrorContext, ResContext};
 use log::info;
 use sha2::{Sha256, Digest};
+
+type Result<T> = std::result::Result<T, ErrorContext>;
 
 #[bitflags]
 #[repr(u8)]
@@ -148,7 +150,7 @@ impl Dedupe for Username {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ParseErrorKind {
     InvalidValue {
         uuid: Arc<str>,
@@ -166,14 +168,14 @@ pub enum ParseErrorKind {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum ObjectKind {
     Title,
     Thumbnail,
     Username,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ParseError(ObjectKind, Box<ParseErrorKind>);
 
 impl Display for ObjectKind {
@@ -219,7 +221,7 @@ pub struct DBPaths {
     pub sponsor_times: PathBuf,
 }
 
-pub type LoadResult = (DearrowDB, Vec<Error>);
+pub type LoadResult = (DearrowDB, Vec<ErrorContext>);
 
 impl DearrowDB {
     pub fn sort(&mut self) {
@@ -259,7 +261,7 @@ impl DearrowDB {
         File::open(&paths.sponsor_times).context("Could not open the SponsorBlock segments file")?;
 
         // Create a vec for non-fatal deserialization errors
-        let mut errors: Vec<Error> = Vec::new();
+        let mut errors: Vec<ErrorContext> = Vec::new();
         
         info!("Loading thumbnails...");
         let thumbnails = Self::load_thumbnails(paths, string_set, &mut errors)?;
@@ -280,7 +282,7 @@ impl DearrowDB {
         Ok((DearrowDB {titles, thumbnails, usernames, vip_users, video_infos}, errors))
     }
 
-    fn load_thumbnails(paths: &DBPaths, string_set: &mut StringSet, errors: &mut Vec<Error>) -> Result<Vec<Thumbnail>> {
+    fn load_thumbnails(paths: &DBPaths, string_set: &mut StringSet, errors: &mut Vec<ErrorContext>) -> Result<Vec<Thumbnail>> {
         // Load the entirety of thumbnailTimestamps and thumbnailVotes into HashMaps, while
         // deduplicating strings
         let thumbnail_timestamps: HashMap<Arc<str>, csv_data::ThumbnailTimestamps> = csv::Reader::from_path(&paths.thumbnail_timestamps)
@@ -325,11 +327,11 @@ impl DearrowDB {
                     let votes = thumbnail_votes.get(&thumb.uuid);
                     match thumb.try_merge(timestamp, votes) {
                         Ok(WithWarnings { obj, warnings }) => {
-                            errors.extend(warnings.into_iter().map(Into::into));
+                            errors.extend(warnings.into_iter().map(|e| e.context("Warning from merging thumbnail data")));
                             Some(obj)
                         },
                         Err(err) => {
-                            errors.push(err.into());
+                            errors.push(err.context("Error while merging thumbnail data"));
                             None
                         }
                     }
@@ -342,7 +344,7 @@ impl DearrowDB {
             .collect())
     }
 
-    fn load_titles(paths: &DBPaths, string_set: &mut StringSet, errors: &mut Vec<Error>) -> Result<Vec<Title>> {
+    fn load_titles(paths: &DBPaths, string_set: &mut StringSet, errors: &mut Vec<ErrorContext>) -> Result<Vec<Title>> {
         let title_votes: HashMap<Arc<str>, csv_data::TitleVotes> = csv::Reader::from_path(&paths.title_votes)
             .context("Could not initialize csv reader for title votes")?
             .into_deserialize::<csv_data::TitleVotes>()
@@ -367,11 +369,11 @@ impl DearrowDB {
                     let votes = title_votes.get(&title.uuid);
                     match title.try_merge(votes) {
                         Ok(WithWarnings { obj, warnings }) => {
-                            errors.extend(warnings.into_iter().map(Into::into));
+                            errors.extend(warnings.into_iter().map(|e| e.context("Warning from merging title data")));
                             Some(obj)
                         },
                         Err(err) => {
-                            errors.push(err.into());
+                            errors.push(err.context("Error while merging title data"));
                             None
                         }
                     }
@@ -384,14 +386,14 @@ impl DearrowDB {
             .collect())
     }
 
-    fn load_usernames(paths: &DBPaths, string_set: &mut StringSet, errors: &mut Vec<Error>) -> Result<HashMap<Arc<str>, Username>> {
+    fn load_usernames(paths: &DBPaths, string_set: &mut StringSet, errors: &mut Vec<ErrorContext>) -> Result<HashMap<Arc<str>, Username>> {
         Ok(csv::Reader::from_path(&paths.usernames)
             .context("could not initialize csv reader for usernames")?
             .into_deserialize::<csv_data::Username>()
             .filter_map(|result| match result.context("Error while deserializing titles") {
                 Ok(mut username) => {
                     username.dedupe(string_set);
-                    TryInto::<Username>::try_into(username).map_err(|e| errors.push(e.into())).ok()
+                    TryInto::<Username>::try_into(username).map_err(|e| errors.push(e.context("Error while parsing username data"))).ok()
                 },
                 Err(error) => {
                     errors.push(error);
@@ -402,7 +404,7 @@ impl DearrowDB {
             .collect())
     }
 
-    fn load_vips(paths: &DBPaths, string_set: &mut StringSet, errors: &mut Vec<Error>) -> Result<HashSet<Arc<str>>> {
+    fn load_vips(paths: &DBPaths, string_set: &mut StringSet, errors: &mut Vec<ErrorContext>) -> Result<HashSet<Arc<str>>> {
         Ok(csv::Reader::from_path(&paths.vip_users)
             .context("could not initialize csv reader for VIP users")?
             .into_deserialize::<csv_data::VIPUser>()
@@ -420,7 +422,7 @@ impl DearrowDB {
     }
 
     #[allow(clippy::float_cmp)]
-    fn load_video_info(paths: &DBPaths, string_set: &mut StringSet, errors: &mut Vec<Error>) -> Result<Box<[Box<[VideoInfo]>]>> {
+    fn load_video_info(paths: &DBPaths, string_set: &mut StringSet, errors: &mut Vec<ErrorContext>) -> Result<Box<[Box<[VideoInfo]>]>> {
         const HASHBLOCK_RANGE: std::ops::RangeInclusive<usize> = 0..=u16::MAX as usize;
         let mut segments: Box<[HashMap<Arc<str>, Vec<csv_data::TrimmedSponsorTime>>]> = HASHBLOCK_RANGE.map(|_| HashMap::new()).collect();
         let mut video_durations: Box<[HashMap<Arc<str>, csv_data::VideoDuration>]> = HASHBLOCK_RANGE.map(|_| HashMap::new()).collect();

@@ -670,7 +670,6 @@ dependencies = [
  "actix-files",
  "actix-web",
  "alea-js",
- "anyhow",
  "base64 0.21.7",
  "built",
  "chrono",
@@ -693,9 +692,9 @@ dependencies = [
 name = "dearrow-parser"
 version = "1.11.0"
 dependencies = [
- "anyhow",
  "csv",
  "enumflags2",
+ "error_handling",
  "log",
  "serde",
  "sha2",

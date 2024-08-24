@@ -18,19 +18,19 @@
 #![allow(clippy::needless_pass_by_value)]
 use std::{collections::HashSet, sync::Arc};
 use actix_web::{Responder, get, post, web, http::StatusCode, HttpResponse, rt::task::spawn_blocking};
-use anyhow::{anyhow, bail, Context};
+use error_handling::{anyhow, bail, ResContext, ErrorContext};
 use chrono::{Utc, DateTime};
 use dearrow_parser::{DearrowDB, ThumbnailFlags, TitleFlags};
 use dearrow_browser_api::sync::*;
 use log::warn;
 use serde::Deserialize;
 
-use crate::{built_info, middleware::ETagCache, sbserver_emulation::get_random_time_for_video, state::*, utils};
-
-pub const SS_READ_ERR:  &str = "Failed to acquire StringSet for reading";
-pub const SS_WRITE_ERR: &str = "Failed to acquire StringSet for writing";
-pub const DB_READ_ERR:  &str = "Failed to acquire DatabaseState for reading";
-pub const DB_WRITE_ERR: &str = "Failed to acquire DatabaseState for writing";
+use crate::built_info;
+use crate::constants::*;
+use crate::middleware::ETagCache;
+use crate::sbserver_emulation::get_random_time_for_video;
+use crate::state::*;
+use crate::utils;
 
 pub fn configure(app_config: web::Data<AppConfig>) -> impl FnOnce(&mut web::ServiceConfig) {
     return move |cfg| {
@@ -95,7 +95,7 @@ async fn get_status(db_lock: DBLock, string_set: StringSetLock, config: web::Dat
         Err(_) => None,
         Ok(set) => Some(set.set.len()),
     };
-    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     Ok(web::Json(StatusResponse {
         last_updated: db.last_updated,
         last_modified: db.last_modified,
@@ -121,23 +121,23 @@ struct Auth {
     auth: Option<String>
 }
 
-fn do_reload(db_lock: DBLock, string_set_lock: StringSetLock, config: web::Data<AppConfig>) -> anyhow::Result<()> {
+fn do_reload(db_lock: DBLock, string_set_lock: StringSetLock, config: web::Data<AppConfig>) -> Result<(), ErrorContext> {
     {
-        let mut db_state = db_lock.write().map_err(|_| anyhow!(DB_WRITE_ERR))?;
+        let mut db_state = db_lock.write().map_err(|_| DB_WRITE_ERR.clone())?;
         if db_state.updating_now {
             bail!("Already updating!");
         }
         db_state.updating_now = true;
     }
     warn!("Reload requested");
-    let mut string_set_clone = string_set_lock.read().map_err(|_| anyhow!(SS_READ_ERR))?.clone();
+    let mut string_set_clone = string_set_lock.read().map_err(|_| SS_READ_ERR.clone())?.clone();
     let (mut new_db, errors) = DearrowDB::load_dir(config.mirror_path.as_path(), &mut string_set_clone)?;
     new_db.sort();
     let last_updated = Utc::now().timestamp_millis();
     let last_modified = utils::get_mtime(&config.mirror_path.join("titles.csv"));
     {
-        let mut string_set = string_set_lock.write().map_err(|_| anyhow!(SS_WRITE_ERR))?;
-        let mut db_state = db_lock.write().map_err(|_| anyhow!(DB_WRITE_ERR))?;
+        let mut string_set = string_set_lock.write().map_err(|_| SS_WRITE_ERR.clone())?;
+        let mut db_state = db_lock.write().map_err(|_| DB_WRITE_ERR.clone())?;
         *string_set = string_set_clone;
         *db_state = DatabaseState {
             db: new_db,
@@ -174,7 +174,7 @@ async fn request_reload(db_lock: DBLock, string_set_lock: StringSetLock, config:
 
 #[get("/errors")]
 async fn get_errors(db_lock: DBLock) -> JsonResult<ErrorList> {
-    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     Ok(web::Json(db.errors.iter().map(|e| format!("{e:?}")).collect()))
 }
 
@@ -186,7 +186,7 @@ async fn get_titles(db_lock: DBLock, query: web::Query<MainEndpointURLParams>) -
                 .set_status(StatusCode::BAD_REQUEST)
         );
     }
-    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     Ok(web::Json(
         db.db.titles.iter().rev().skip(query.offset).take(query.count)
             .map(|t| t.into_with_db(&db.db)).collect::<Vec<_>>()
@@ -195,7 +195,7 @@ async fn get_titles(db_lock: DBLock, query: web::Query<MainEndpointURLParams>) -
 
 #[get("/titles/unverified", wrap = "ETagCache")]
 async fn get_unverified_titles(db_lock: DBLock) -> JsonResult<Vec<ApiTitle>> {
-    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     Ok(web::Json(
         db.db.titles.iter().rev()
             .filter(|t| t.flags.contains(TitleFlags::Unverified) && !t.flags.intersects(TitleFlags::Locked | TitleFlags::ShadowHidden | TitleFlags::Removed) && t.votes-t.downvotes > -1)
@@ -205,7 +205,7 @@ async fn get_unverified_titles(db_lock: DBLock) -> JsonResult<Vec<ApiTitle>> {
 
 #[get("/titles/broken", wrap = "ETagCache")]
 async fn get_broken_titles(db_lock: DBLock) -> JsonResult<Vec<ApiTitle>> {
-    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     Ok(web::Json(
         db.db.titles.iter().rev()
             .filter(|t| t.flags.contains(TitleFlags::MissingVotes))
@@ -215,11 +215,11 @@ async fn get_broken_titles(db_lock: DBLock) -> JsonResult<Vec<ApiTitle>> {
 
 #[get("/titles/uuid/{uuid}", wrap = "ETagCache")]
 async fn get_title_by_uuid(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> JsonResult<ApiTitle> {
-    let Some(uuid) = string_set.read().map_err(|_| anyhow!(SS_READ_ERR))?
+    let Some(uuid) = string_set.read().map_err(|_| SS_READ_ERR.clone())?
             .set.get(path.into_inner().as_str()).cloned() else {
         return Err(utils::Error::EmptyStatus(StatusCode::NOT_FOUND));
     };
-    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     Ok(web::Json(
         db.db.titles.iter().find(|t| Arc::ptr_eq(&t.uuid, &uuid))
             .map(|t| t.into_with_db(&db.db))
@@ -229,9 +229,9 @@ async fn get_title_by_uuid(db_lock: DBLock, string_set: StringSetLock, path: web
 
 #[get("/titles/video_id/{video_id}", wrap = "ETagCache")]
 async fn get_titles_by_video_id(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> JsonResult<Vec<ApiTitle>> {
-    let video_id = string_set.read().map_err(|_| anyhow!(SS_READ_ERR))?
+    let video_id = string_set.read().map_err(|_| SS_READ_ERR.clone())?
         .set.get(path.into_inner().as_str()).cloned();
-    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     let titles = match video_id {
         None => vec![],
         Some(id) => db.db.titles.iter().rev()
@@ -244,9 +244,9 @@ async fn get_titles_by_video_id(db_lock: DBLock, string_set: StringSetLock, path
 
 #[get("/titles/user_id/{user_id}", wrap = "ETagCache")]
 async fn get_titles_by_user_id(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> JsonResult<Vec<ApiTitle>> {
-    let user_id = string_set.read().map_err(|_| anyhow!(SS_READ_ERR))?
+    let user_id = string_set.read().map_err(|_| SS_READ_ERR.clone())?
         .set.get(path.into_inner().as_str()).cloned();
-    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     let titles = match user_id {
         None => vec![],
         Some(id) => db.db.titles.iter().rev()
@@ -260,7 +260,7 @@ async fn get_titles_by_user_id(db_lock: DBLock, string_set: StringSetLock, path:
 #[get("/titles/channel/{channel}", wrap = "ETagCache")]
 async fn get_titles_by_channel(db_lock: DBLock, path: web::Path<String>) -> JsonResult<Vec<ApiTitle>> {
     let channel_cache = {
-        let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+        let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
         db.channel_cache.clone()
     };
     let channel_data = channel_cache.get_channel(path.into_inner().as_str()).await.context("Failed to get channel info")?;
@@ -268,7 +268,7 @@ async fn get_titles_by_channel(db_lock: DBLock, path: web::Path<String>) -> Json
     // we only really need the string pointer's address to figure out if they're equal, thanks to
     // the `StringSet`
     let vid_set: HashSet<usize> = channel_data.video_ids.iter().map(utils::arc_addr).collect();
-    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     let titles = db.db.titles.iter().rev()
         .filter(|title| vid_set.contains(&utils::arc_addr(&title.video_id)))
         .map(|t| t.into_with_db(&db.db))
@@ -284,7 +284,7 @@ async fn get_thumbnails(db_lock: DBLock, query: web::Query<MainEndpointURLParams
                 .set_status(StatusCode::BAD_REQUEST)
         );
     }
-    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     Ok(web::Json(
         db.db.thumbnails.iter().rev().skip(query.offset).take(query.count)
             .map(|t| t.into_with_db(&db.db)).collect::<Vec<_>>()
@@ -293,7 +293,7 @@ async fn get_thumbnails(db_lock: DBLock, query: web::Query<MainEndpointURLParams
 
 #[get("/thumbnails/broken", wrap = "ETagCache")]
 async fn get_broken_thumbnails(db_lock: DBLock) -> JsonResult<Vec<ApiThumbnail>> {
-    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     Ok(web::Json(
         db.db.thumbnails.iter().rev()
             .filter(|t| t.flags.intersects(ThumbnailFlags::MissingVotes | ThumbnailFlags::MissingTimestamp))
@@ -304,11 +304,11 @@ async fn get_broken_thumbnails(db_lock: DBLock) -> JsonResult<Vec<ApiThumbnail>>
 
 #[get("/thumbnails/uuid/{uuid}", wrap = "ETagCache")]
 async fn get_thumbnail_by_uuid(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> JsonResult<ApiThumbnail> {
-    let Some(uuid) = string_set.read().map_err(|_| anyhow!(SS_READ_ERR))?
+    let Some(uuid) = string_set.read().map_err(|_| SS_READ_ERR.clone())?
             .set.get(path.into_inner().as_str()).cloned() else {
         return Err(utils::Error::EmptyStatus(StatusCode::NOT_FOUND));
     };
-    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     Ok(web::Json(
         db.db.thumbnails.iter().find(|t| Arc::ptr_eq(&t.uuid, &uuid))
             .map(|t| t.into_with_db(&db.db))
@@ -318,9 +318,9 @@ async fn get_thumbnail_by_uuid(db_lock: DBLock, string_set: StringSetLock, path:
 
 #[get("/thumbnails/video_id/{video_id}", wrap = "ETagCache")]
 async fn get_thumbnails_by_video_id(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> JsonResult<Vec<ApiThumbnail>> {
-    let video_id = string_set.read().map_err(|_| anyhow!(SS_READ_ERR))?
+    let video_id = string_set.read().map_err(|_| SS_READ_ERR.clone())?
         .set.get(path.into_inner().as_str()).cloned();
-    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     let titles = match video_id {
         None => vec![],
         Some(id) => db.db.thumbnails.iter().rev()
@@ -333,9 +333,9 @@ async fn get_thumbnails_by_video_id(db_lock: DBLock, string_set: StringSetLock, 
 
 #[get("/thumbnails/user_id/{video_id}", wrap = "ETagCache")]
 async fn get_thumbnails_by_user_id(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> JsonResult<Vec<ApiThumbnail>> {
-    let user_id = string_set.read().map_err(|_| anyhow!(SS_READ_ERR))?
+    let user_id = string_set.read().map_err(|_| SS_READ_ERR.clone())?
         .set.get(path.into_inner().as_str()).cloned();
-    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     let titles = match user_id {
         None => vec![],
         Some(id) => db.db.thumbnails.iter().rev()
@@ -349,7 +349,7 @@ async fn get_thumbnails_by_user_id(db_lock: DBLock, string_set: StringSetLock, p
 #[get("/thumbnails/channel/{channel}", wrap = "ETagCache")]
 async fn get_thumbnails_by_channel(db_lock: DBLock, path: web::Path<String>) -> JsonResult<Vec<ApiThumbnail>> {
     let channel_cache = {
-        let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+        let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
         db.channel_cache.clone()
     };
     let channel_data = channel_cache.get_channel(path.into_inner().as_str()).await.context("Failed to get channel info")?;
@@ -357,7 +357,7 @@ async fn get_thumbnails_by_channel(db_lock: DBLock, path: web::Path<String>) -> 
     // we only really need the string pointer's address to figure out if they're equal, thanks to
     // the `StringSet`
     let vid_set: HashSet<usize> = channel_data.video_ids.iter().map(utils::arc_addr).collect();
-    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     let thumbs = db.db.thumbnails.iter().rev()
         .filter(|thumbnail| vid_set.contains(&utils::arc_addr(&thumbnail.video_id)))
         .map(|t| t.into_with_db(&db.db))
@@ -367,9 +367,9 @@ async fn get_thumbnails_by_channel(db_lock: DBLock, path: web::Path<String>) -> 
 
 #[get("/users/user_id/{user_id}", wrap = "ETagCache")]
 async fn get_user_by_userid(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> JsonResult<User> {
-    let user_id = string_set.read().map_err(|_| anyhow!(SS_READ_ERR))?
+    let user_id = string_set.read().map_err(|_| SS_READ_ERR.clone())?
         .set.get(path.as_str()).cloned();
-    let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     Ok(web::Json(match user_id {
         None => User {
             user_id: path.into_inner().into(),
@@ -406,12 +406,12 @@ fn unknown_video(video_id: Arc<str>) -> Video {
 
 #[get("/videos/{video_id}", wrap = "ETagCache")]
 async fn get_video(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> JsonResult<Video> {
-    let video_id = string_set.read().map_err(|_| anyhow!(SS_READ_ERR))?
+    let video_id = string_set.read().map_err(|_| SS_READ_ERR.clone())?
         .set.get(path.as_str()).cloned();
     Ok(web::Json(match video_id {
         None => unknown_video(path.as_str().into()),
         Some(video_id) => {
-            let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+            let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
             let video_info = db.db.get_video_info(&video_id);
             match video_info {
                 None => unknown_video(video_id),

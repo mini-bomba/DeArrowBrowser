@@ -19,7 +19,6 @@ use actix_web::{http::header::EntityTag, web};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use chrono::{DateTime, Utc};
 use dearrow_parser::{DearrowDB, StringSet};
-// use anyhow::{Error, Context};
 use error_handling::{bail, ErrorContext, ResContext};
 use futures::{future::{BoxFuture, Shared}, lock::Mutex, FutureExt};
 use getrandom::getrandom;
@@ -27,7 +26,7 @@ use reqwest::Client;
 use std::{collections::HashMap, path::PathBuf, sync::{Arc, RwLock}};
 use serde::{Serialize, Deserialize};
 
-use crate::{innertube, routes};
+use crate::{constants, innertube};
 
 pub type DBLock = web::Data<RwLock<DatabaseState>>;
 pub type StringSetLock = web::Data<RwLock<StringSet>>;
@@ -100,7 +99,7 @@ impl Default for ListenConfig {
 
 pub struct DatabaseState {
     pub db: DearrowDB,
-    pub errors: Box<[anyhow::Error]>,
+    pub errors: Box<[ErrorContext]>,
     pub last_updated: i64,
     pub last_modified: i64,
     pub updating_now: bool,
@@ -188,7 +187,7 @@ impl ChannelCache {
 
     async fn ucid_to_channel(client: Arc<Client>, string_set_lock: Arc<RwLock<StringSet>>, ucid: Arc<str>) -> ChannelFutureResult {
         let it_res = innertube::get_channel(&client, &ucid).await?;
-        let string_set = string_set_lock.read().map_err(|_| ErrorContext::new(routes::SS_READ_ERR))?;
+        let string_set = string_set_lock.read().map_err(|_| constants::SS_READ_ERR.clone())?;
         Ok(Arc::new(ChannelData {
             channel_name: it_res.name.into(),
             total_videos: it_res.video_ids.len(),

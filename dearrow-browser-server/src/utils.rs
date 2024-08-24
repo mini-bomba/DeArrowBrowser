@@ -23,7 +23,6 @@ use sha2::{Sha256, Digest, digest::{typenum::U32, generic_array::GenericArray}};
 
 
 pub enum Error {
-    Anyhow(anyhow::Error, StatusCode),
     #[allow(clippy::enum_variant_names)]
     ErrorContext(ErrorContext, StatusCode),
     EmptyStatus(StatusCode),
@@ -32,7 +31,6 @@ pub enum Error {
 impl Debug for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::Anyhow(ref err, _) => Debug::fmt(err, f),
             Error::ErrorContext(ref err, _) => Debug::fmt(err, f),
             Error::EmptyStatus(status) => f.debug_tuple("Error::EmptyStatus").field(status).finish(),
         }
@@ -41,15 +39,9 @@ impl Debug for Error {
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::Anyhow(ref err, _) => Display::fmt(err, f),
             Error::ErrorContext(ref err, _) => Display::fmt(err, f),
             Error::EmptyStatus(status) => write!(f, "{status}"),
         }
-    }
-}
-impl From<anyhow::Error> for Error {
-    fn from(value: anyhow::Error) -> Self {
-        Error::Anyhow(value, StatusCode::INTERNAL_SERVER_ERROR)
     }
 }
 impl From<ErrorContext> for Error {
@@ -60,14 +52,13 @@ impl From<ErrorContext> for Error {
 impl std::error::Error for Error {}
 impl ResponseError for Error {
     fn status_code(&self) -> StatusCode {
-        let (Error::Anyhow(_, status) | Error::ErrorContext(_, status) | Error::EmptyStatus(status)) = self;
+        let (Error::ErrorContext(_, status) | Error::EmptyStatus(status)) = self;
         *status
     }
 
     fn error_response(&self) -> HttpResponse {
         let mut builder = HttpResponse::build(self.status_code());
         match self {
-            Error::Anyhow(err, _) => builder.insert_header(ContentType::plaintext()).body(format!("{err:?}")),
             Error::ErrorContext(err, _) => builder.insert_header(ContentType::plaintext()).body(format!("{err:?}")),
             Error::EmptyStatus(..) => builder.finish(),
         }
@@ -77,7 +68,6 @@ impl ResponseError for Error {
 impl Error {
     pub fn set_status(self, status: StatusCode) -> Self {
         match self {
-            Error::Anyhow(err, _) => Error::Anyhow(err, status),
             Error::ErrorContext(err, _) => Error::ErrorContext(err, status),
             Error::EmptyStatus(..) => Error::EmptyStatus(status),
         }

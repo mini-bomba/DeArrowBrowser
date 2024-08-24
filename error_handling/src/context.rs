@@ -20,17 +20,52 @@ use std::{convert::Infallible, error::Error, fmt::{Debug, Display}, sync::Arc};
 
 use crate::IntoErrorIterator;
 
+// A helper enum for easily cloneable strings
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum SharedString {
+    Arc(Arc<str>),
+    Static(&'static str),
+}
+
+impl Display for SharedString {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SharedString::Arc(s) => write!(f, "{s}"),
+            SharedString::Static(s) => write!(f, "{s}"),
+        }
+    }
+}
+
+impl From<&'static str> for SharedString {
+    fn from(value: &'static str) -> Self {
+        SharedString::Static(value)
+    }
+}
+
+impl From<Arc<str>> for SharedString {
+    fn from(value: Arc<str>) -> Self {
+        SharedString::Arc(value)
+    }
+}
+
+impl From<String> for SharedString
+{
+    fn from(value: String) -> Self {
+        SharedString::Arc(Arc::from(value))
+    }
+}
+
 // The ErrorContext struct
 
 #[derive(Clone)]
 pub struct ErrorContext {
-    pub context: Arc<str>,
+    pub context: SharedString,
     pub cause: Option<Arc<dyn Error + Send + Sync + 'static>>,
 }
 
 impl ErrorContext {
     pub fn new<T>(msg: T) -> ErrorContext
-    where T: Into<Arc<str>>
+    where T: Into<SharedString>
     {
         ErrorContext { context: msg.into(), cause: None }
     }
@@ -71,6 +106,16 @@ impl Error for ErrorContext {
     }
 }
 
+#[cfg(feature = "anyhow")]
+impl From<anyhow::Error> for ErrorContext {
+    fn from(value: anyhow::Error) -> Self {
+        let flattened = crate::SerializableError::from_anyhow(&value);
+        ErrorContext { 
+            context: SharedString::Arc(flattened.context),
+            cause: flattened.cause.map(|arc| arc as Arc<(dyn Error + Send + Sync + 'static)>),
+        }
+    }
+}
 
 
 // .context() traits
@@ -78,14 +123,14 @@ impl Error for ErrorContext {
 
 pub trait ErrContext {
     fn context<M>(self, msg: M) -> ErrorContext
-    where M: Into<Arc<str>>;
+    where M: Into<SharedString>;
 }
 
 impl<T> ErrContext for T
 where T: Error + Send + Sync + 'static
 {
     fn context<M>(self, msg: M) -> ErrorContext
-    where M: Into<Arc<str>>
+    where M: Into<SharedString>
     {
         ErrorContext {
             context: msg.into(),
@@ -94,15 +139,34 @@ where T: Error + Send + Sync + 'static
     }
 }
 
+// on anyhow::Error
+
+#[cfg(feature = "anyhow")]
+pub trait AnyhowErrContext {
+    fn context<M>(self, msg: M) -> ErrorContext
+    where M: Into<SharedString>;
+}
+
+#[cfg(feature = "anyhow")]
+impl AnyhowErrContext for anyhow::Error {
+    fn context<M>(self, msg: M) -> ErrorContext
+    where M: Into<SharedString> 
+    {
+        ErrorContext { 
+            context: msg.into(),
+            cause: Some(Arc::new(ErrorContext::from(self)))
+        }    
+    }
+}
 
 // on all Result<>s
 
 pub trait ResContext<T, E> {
     fn context<M>(self, msg: M) -> Result<T, ErrorContext>
-    where M: Into<Arc<str>>;
+    where M: Into<SharedString>;
 
     fn with_context<M, F>(self, f: F) -> Result<T, ErrorContext>
-    where M: Into<Arc<str>>,
+    where M: Into<SharedString>,
           F: FnOnce() -> M;
 }
 
@@ -110,32 +174,60 @@ impl<T, E> ResContext<T, E> for Result<T, E>
 where E: ErrContext
 {
     fn context<M>(self, msg: M) -> Result<T, ErrorContext>
-    where M: Into<Arc<str>>
+    where M: Into<SharedString>
     {
         self.map_err(|e| e.context(msg))
     }
 
     fn with_context<M, F>(self, f: F) -> Result<T, ErrorContext>
-    where M: Into<Arc<str>>,
+    where M: Into<SharedString>,
           F: FnOnce() -> M 
     {
         self.map_err(|e| e.context(f()))
     }
 }
 
+// on Result<>s with anyhow::Error
+#[cfg(feature = "anyhow")]
+pub trait AnyhowResContext<T, E> {
+    fn context<M>(self, msg: M) -> Result<T, ErrorContext>
+    where M: Into<SharedString>;
+
+    fn with_context<M, F>(self, f: F) -> Result<T, ErrorContext>
+    where M: Into<SharedString>,
+          F: FnOnce() -> M;
+}
+
+#[cfg(feature = "anyhow")]
+impl<T, E> AnyhowResContext<T, E> for Result<T, E>
+where E: AnyhowErrContext
+{
+    fn context<M>(self, msg: M) -> Result<T, ErrorContext>
+    where M: Into<SharedString>
+    {
+        self.map_err(|e| e.context(msg))
+    }
+
+    fn with_context<M, F>(self, f: F) -> Result<T, ErrorContext>
+    where M: Into<SharedString>,
+          F: FnOnce() -> M 
+    {
+        self.map_err(|e| e.context(f()))
+    }
+}
 
 // on all Option<>s
 
 impl<T> ResContext<T, Infallible> for Option<T>
 {
     fn context<M>(self, msg: M) -> Result<T, ErrorContext>
-    where M: Into<Arc<str>>
+    where M: Into<SharedString>
     {
         self.ok_or_else(|| ErrorContext { context: msg.into(), cause: None })
     }
 
     fn with_context<M, F>(self, f: F) -> Result<T, ErrorContext>
-    where M: Into<Arc<str>>,
+    where M: Into<SharedString>,
           F: FnOnce() -> M 
     {
         self.ok_or_else(|| ErrorContext { context: f().into(), cause: None })

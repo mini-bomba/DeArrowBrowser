@@ -19,10 +19,11 @@
 use std::future::{ready, Ready};
 
 use actix_web::{body::{BoxBody, EitherBody}, dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform}, http::{header::{CacheControl, CacheDirective, ETag, Header, IfNoneMatch}, StatusCode}, Error, HttpResponseBuilder};
-use anyhow::anyhow;
 use futures::{future::LocalBoxFuture, FutureExt};
 
-use crate::{state::DBLock, utils::{self, HeaderMapExt}};
+use crate::constants::DB_READ_ERR;
+use crate::state::DBLock;
+use crate::utils::{self, HeaderMapExt};
 
 pub struct ETagCache;
 
@@ -62,7 +63,7 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let db = req.app_data::<DBLock>().unwrap().clone();
         let Ok(etag) = db.read().map(|db| db.get_etag()) else {
-            return ready(Err(utils::Error::from(anyhow!("Failed to acquire DatabaseState for reading")).into())).boxed_local();
+            return ready(Err(utils::Error::from(DB_READ_ERR.clone()).into())).boxed_local();
         };
 
         let inm = match IfNoneMatch::parse(&req) {

@@ -24,7 +24,7 @@ use dearrow_browser_api::sync::{InnertubeChannel, InnertubeVideo};
 use regex::Regex;
 use reqwest::Client;
 
-use crate::{middleware::ETagCache, routes::DB_READ_ERR, state::{AppConfig, DBLock}, utils};
+use crate::{middleware::ETagCache, constants::DB_READ_ERR, state::{AppConfig, DBLock}, utils};
 
 type JsonResult<T> = utils::Result<web::Json<T>>;
 
@@ -87,7 +87,7 @@ async fn get_innertube_video(path: web::Path<String>, client: web::Data<Client>,
 #[get("/channel/{handle}", wrap="ETagCache")]
 async fn get_channel_endpoint(path: web::Path<String>, db_lock: DBLock) -> JsonResult<InnertubeChannel> {
     let channel_cache = {
-        let db = db_lock.read().map_err(|_| anyhow!(DB_READ_ERR))?;
+        let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
         db.channel_cache.clone()
     };
     let channel_data = channel_cache.get_channel(path.into_inner().as_str()).await.context("Failed to get channel info")?;

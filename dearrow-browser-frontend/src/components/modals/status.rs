@@ -287,6 +287,10 @@ pub fn StatusModal() -> Html {
                             {number_hoverswitch!(td, status.uncut_segments)}
                         </tr>
                         <tr class="hoverswitch-trigger">
+                            <th>{"Cached channels"}</th>
+                            {number_hoverswitch!(td, status.cached_channels)}
+                        </tr>
+                        <tr class="hoverswitch-trigger">
                             <th>{"Parse errors"}</th>
                             <td>
                                 {number_hoverswitch!(span, status.errors)}{" "}

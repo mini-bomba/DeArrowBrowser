@@ -33,6 +33,7 @@ pub struct StatusResponse {
     pub string_count: Option<usize>,
     pub video_infos: usize,
     pub uncut_segments: usize,
+    pub cached_channels: usize,
     pub server_version: RcStr,
     pub server_git_hash: Option<RcStr>,
     pub server_git_dirty: Option<bool>,

@@ -185,6 +185,10 @@ impl ChannelCache {
         }
     }
 
+    pub async fn num_channels_cached(&self) -> usize {
+        self.data_cache.lock().await.len()
+    }
+
     async fn handle_to_ucid(client: Client, handle: Arc<str>) -> UCIDFutureResult {
         innertube::handle_to_ucid(&client, &handle).await.map(Into::into)
     }

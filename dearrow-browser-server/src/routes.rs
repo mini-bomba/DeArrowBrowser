@@ -100,6 +100,11 @@ async fn get_status(db_lock: DBLock, string_set: StringSetLock, config: web::Dat
         Err(_) => None,
         Ok(set) => Some(set.set.len()),
     };
+    let channel_cache = {
+        let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
+        db.channel_cache.clone()
+    };
+    let cached_channels = channel_cache.num_channels_cached().await;
     let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     Ok(web::Json(StatusResponse {
         last_updated: db.last_updated,
@@ -113,6 +118,7 @@ async fn get_status(db_lock: DBLock, string_set: StringSetLock, config: web::Dat
         string_count: strings,
         video_infos: db.video_info_count,
         uncut_segments: db.uncut_segment_count,
+        cached_channels,
         server_version: SERVER_VERSION.clone(),
         server_git_hash: SERVER_GIT_HASH.clone(),
         server_git_dirty: built_info::GIT_DIRTY,

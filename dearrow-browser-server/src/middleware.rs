@@ -16,7 +16,7 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::{future::{ready, Ready}, time::Instant};
+use std::{future::{ready, Ready}, time::{Duration, Instant}};
 
 use actix_web::{body::{BoxBody, EitherBody}, dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform}, error::HttpError, http::{header::{CacheControl, CacheDirective, ETag, Header, IfNoneMatch}, StatusCode}, web, Error, HttpResponseBuilder};
 use futures::{future::LocalBoxFuture, FutureExt};
@@ -147,13 +147,25 @@ where
         
         Box::pin(async move {
             let mut resp = srv.await?;
-            let elapsed = Instant::elapsed(&start).as_nanos();
+            let elapsed = Instant::elapsed(&start);
             let headers = resp.headers_mut();
-            if let Err(e) = headers.append_header(("X-Time-Spent", format!("{elapsed} ns"))) {
+            if let Err(e) = headers.append_header(("X-Time-Spent", format!("{} ns", render_duration(&elapsed)))) {
                 error!("Failed to append the X-Time-Spent header: {}", HttpError::from(e));
             }
 
             Ok(resp)
         })
     }
+}
+
+// taken from frontend's utils.rs
+fn render_duration(duration: &Duration) -> String {
+    let string_n = format!("{}", duration.as_nanos());
+    let chunks = string_n.as_bytes() // get a bytes slice (cause chunking Iterators is nightly-only)
+        .rchunks(3)            // make chunks of 3, starting from end. digits are ASCII = 1B each
+        .rev()                 // reverse order of chunks
+        .collect::<Vec<_>>();  // collect into a vec (cause intersperse is nightly-only)
+    String::from_utf8(
+        chunks.join(b" " as &[u8])  // separate chunks with a space
+    ).expect("this should always be valid utf8")  // parse as string
 }

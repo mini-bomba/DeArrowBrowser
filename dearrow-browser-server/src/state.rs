@@ -43,6 +43,7 @@ pub struct AppConfig {
     #[serde(skip)]
     pub startup_timestamp: DateTime<Utc>,
     pub innertube: InnertubeConfig,
+    pub enable_timings_header: bool,
 }
 
 impl Default for AppConfig {
@@ -58,6 +59,7 @@ impl Default for AppConfig {
             reqwest_timeout_secs: 20.,
             startup_timestamp: Utc::now(),
             innertube: InnertubeConfig::default(),
+            enable_timings_header: false,
         }
     }
 }

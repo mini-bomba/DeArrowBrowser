@@ -94,6 +94,7 @@ async fn main() -> Result<(), ErrorContext> {
                 .app_data(db.clone())
                 .app_data(string_set_lock.clone())
                 .app_data(reqwest_client.clone())
+                .wrap(middleware::Timings)
                 .service(web::scope("/api")
                     .configure(routes::configure(config.clone()))
                 );

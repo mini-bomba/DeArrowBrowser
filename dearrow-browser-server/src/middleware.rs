@@ -16,14 +16,18 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::future::{ready, Ready};
+use std::{future::{ready, Ready}, time::Instant};
 
-use actix_web::{body::{BoxBody, EitherBody}, dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform}, http::{header::{CacheControl, CacheDirective, ETag, Header, IfNoneMatch}, StatusCode}, Error, HttpResponseBuilder};
+use actix_web::{body::{BoxBody, EitherBody}, dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform}, error::HttpError, http::{header::{CacheControl, CacheDirective, ETag, Header, IfNoneMatch}, StatusCode}, web, Error, HttpResponseBuilder};
 use futures::{future::LocalBoxFuture, FutureExt};
+use log::error;
 
 use crate::constants::DB_READ_ERR;
-use crate::state::DBLock;
+use crate::state::{DBLock, AppConfig};
 use crate::utils::{self, HeaderMapExt};
+
+
+// ETag middleware
 
 pub struct ETagCache;
 
@@ -91,5 +95,65 @@ where
 
             Ok(resp.map_into_left_body())
         }.boxed_local()
+    }
+}
+
+
+// Timings middleware
+
+pub struct Timings;
+
+
+impl<S, B> Transform<S, ServiceRequest> for Timings
+where
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
+    S::Future: 'static,
+    B: 'static,
+{
+    type Response = ServiceResponse<B>;
+    type Error = Error;
+    type InitError = ();
+    type Transform = TimingsInstance<S>;
+    type Future = Ready<Result<Self::Transform, Self::InitError>>;
+
+    fn new_transform(&self, service: S) -> Self::Future {
+        ready(Ok(TimingsInstance { service }))
+    }
+}
+
+pub struct TimingsInstance<S> {
+    service: S,
+}
+
+impl<S, B> Service<ServiceRequest> for TimingsInstance<S>
+where
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
+    S::Future: 'static,
+    B: 'static,
+{
+    type Response = ServiceResponse<B>;
+    type Error = Error;
+    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    forward_ready!(service);
+
+    fn call(&self, req: ServiceRequest) -> Self::Future {
+        let config = req.app_data::<web::Data<AppConfig>>().unwrap();
+        if !config.enable_timings_header {
+            return Box::pin(self.service.call(req))
+        }
+        let start = Instant::now();
+        let srv = self.service.call(req);
+        
+        Box::pin(async move {
+            let mut resp = srv.await?;
+            let elapsed = Instant::elapsed(&start).as_nanos();
+            let headers = resp.headers_mut();
+            if let Err(e) = headers.append_header(("X-Time-Spent", format!("{elapsed} ns"))) {
+                error!("Failed to append the X-Time-Spent header: {}", HttpError::from(e));
+            }
+
+            Ok(resp)
+        })
     }
 }

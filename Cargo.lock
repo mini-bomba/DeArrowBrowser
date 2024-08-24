@@ -642,7 +642,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-browser-api"
-version = "1.11.0"
+version = "1.11.1"
 dependencies = [
  "dearrow-parser",
  "serde",
@@ -650,7 +650,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-browser-frontend"
-version = "1.11.0"
+version = "1.11.1"
 dependencies = [
  "bincode",
  "built",
@@ -673,7 +673,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-browser-server"
-version = "1.11.0"
+version = "1.11.1"
 dependencies = [
  "actix-files",
  "actix-web",
@@ -698,7 +698,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-parser"
-version = "1.11.0"
+version = "1.11.1"
 dependencies = [
  "csv",
  "enumflags2",
@@ -811,7 +811,7 @@ dependencies = [
 
 [[package]]
 name = "error_handling"
-version = "1.11.0"
+version = "1.11.1"
 dependencies = [
  "anyhow",
  "serde",

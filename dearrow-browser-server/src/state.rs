@@ -107,6 +107,8 @@ pub struct DatabaseState {
     pub updating_now: bool,
     pub etag: Option<EntityTag>,
     pub channel_cache: ChannelCache,
+    pub video_info_count: usize,
+    pub uncut_segment_count: usize,
 }
 
 impl DatabaseState {
@@ -117,11 +119,11 @@ impl DatabaseState {
         }
     }
 
-    pub fn video_info_count(&self) -> usize {
+    pub fn calculate_video_info_count(&self) -> usize {
         self.db.video_infos.iter().map(|chunk| chunk.len()).sum()
     }
 
-    pub fn uncut_segment_count(&self) -> usize {
+    pub fn calculate_uncut_segment_count(&self) -> usize {
         self.db.video_infos.iter().map(|chunk| chunk.iter().map(|v| v.uncut_segments.len()).sum::<usize>()).sum()
     }
 
@@ -134,8 +136,8 @@ impl DatabaseState {
             self.db.thumbnails.len(), 
             self.db.usernames.len(), 
             self.db.vip_users.len(),
-            self.video_info_count(),
-            self.uncut_segment_count(),
+            self.video_info_count,
+            self.uncut_segment_count,
         ))
     }
 }
@@ -153,7 +155,7 @@ pub struct ChannelCache {
     /// NOTE: Keys of this hashmap are NOT stored in the `StringSet`!
     data_cache: Arc<Mutex<HashMap<Arc<str>, SharedChannelFuture>>>,
     string_set: Arc<RwLock<StringSet>>,
-    client: Arc<reqwest::Client>,
+    client: reqwest::Client,
 }
 
 #[derive(Debug)]
@@ -165,7 +167,7 @@ pub struct ChannelData {
 }
 
 impl ChannelCache {
-    pub fn new(string_set: Arc<RwLock<StringSet>>, client: Arc<Client>) -> ChannelCache {
+    pub fn new(string_set: Arc<RwLock<StringSet>>, client: Client) -> ChannelCache {
         ChannelCache { 
             handle_to_ucid_cache: Arc::default(),
             data_cache: Arc::default(), 
@@ -183,11 +185,11 @@ impl ChannelCache {
         }
     }
 
-    async fn handle_to_ucid(client: Arc<Client>, handle: Arc<str>) -> UCIDFutureResult {
+    async fn handle_to_ucid(client: Client, handle: Arc<str>) -> UCIDFutureResult {
         innertube::handle_to_ucid(&client, &handle).await.map(Into::into)
     }
 
-    async fn ucid_to_channel(client: Arc<Client>, string_set_lock: Arc<RwLock<StringSet>>, ucid: Arc<str>) -> ChannelFutureResult {
+    async fn ucid_to_channel(client: Client, string_set_lock: Arc<RwLock<StringSet>>, ucid: Arc<str>) -> ChannelFutureResult {
         let it_res = innertube::get_channel(&client, &ucid).await?;
         let string_set = string_set_lock.read().map_err(|_| constants::SS_READ_ERR.clone())?;
         Ok(Arc::new(ChannelData {

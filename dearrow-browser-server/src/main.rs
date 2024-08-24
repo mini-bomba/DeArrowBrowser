@@ -63,7 +63,7 @@ async fn main() -> Result<(), ErrorContext> {
     });
     info!("Loading database...");
     let string_set_lock = web::Data::new(RwLock::new(StringSet::with_capacity(16384)));
-    let reqwest_client = web::Data::new(ClientBuilder::new().timeout(Duration::from_secs_f64(config.reqwest_timeout_secs)).build().expect("Should be able to create a reqwest Client"));
+    let reqwest_client = web::ThinData(ClientBuilder::new().timeout(Duration::from_secs_f64(config.reqwest_timeout_secs)).build().expect("Should be able to create a reqwest Client"));
     let db: web::Data<RwLock<DatabaseState>> = {
         let mut string_set = string_set_lock.write().map_err(|_| constants::SS_WRITE_ERR.clone())?;
         let (db, errors) = DearrowDB::load_dir(&config.mirror_path, &mut string_set).context("Initial DearrowDB load failed")?;
@@ -76,9 +76,13 @@ async fn main() -> Result<(), ErrorContext> {
             last_modified: utils::get_mtime(&config.mirror_path.join("titles.csv")),
             updating_now: false,
             etag: None,
-            channel_cache: ChannelCache::new(string_set_lock.clone().into_inner(), reqwest_client.clone().into_inner()),
+            channel_cache: ChannelCache::new(string_set_lock.clone().into_inner(), reqwest_client.0.clone()),
+            uncut_segment_count: 0,
+            video_info_count: 0,
         };
         db_state.db.sort();
+        db_state.uncut_segment_count = db_state.calculate_uncut_segment_count();
+        db_state.video_info_count = db_state.calculate_video_info_count();
         db_state.etag = Some(db_state.generate_etag());
         web::Data::new(RwLock::new(db_state))
     };

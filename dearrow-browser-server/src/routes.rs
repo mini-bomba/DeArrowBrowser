@@ -16,6 +16,7 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 #![allow(clippy::needless_pass_by_value)]
+use std::sync::LazyLock;
 use std::{collections::HashSet, sync::Arc};
 use actix_web::{Responder, get, post, web, http::StatusCode, HttpResponse, rt::task::spawn_blocking};
 use error_handling::{anyhow, bail, ResContext, ErrorContext};
@@ -31,6 +32,10 @@ use crate::middleware::ETagCache;
 use crate::sbserver_emulation::get_random_time_for_video;
 use crate::state::*;
 use crate::utils;
+
+static SERVER_VERSION:  LazyLock<Arc<str>> = LazyLock::new(|| built_info::PKG_VERSION.into());
+static SERVER_GIT_HASH: LazyLock<Option<Arc<str>>> = LazyLock::new(|| built_info::GIT_COMMIT_HASH.map(std::convert::Into::into));
+static BUILD_TIMESTAMP: LazyLock<Option<i64>> = LazyLock::new(|| DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC).ok().map(|t| t.timestamp()));
 
 pub fn configure(app_config: web::Data<AppConfig>) -> impl FnOnce(&mut web::ServiceConfig) {
     return move |cfg| {
@@ -106,12 +111,12 @@ async fn get_status(db_lock: DBLock, string_set: StringSetLock, config: web::Dat
         usernames: db.db.usernames.len(),
         errors: db.errors.len(),
         string_count: strings,
-        video_infos: db.video_info_count(),
-        uncut_segments: db.uncut_segment_count(),
-        server_version: built_info::PKG_VERSION.into(),
-        server_git_hash: built_info::GIT_COMMIT_HASH.map(std::convert::Into::into),
+        video_infos: db.video_info_count,
+        uncut_segments: db.uncut_segment_count,
+        server_version: SERVER_VERSION.clone(),
+        server_git_hash: SERVER_GIT_HASH.clone(),
         server_git_dirty: built_info::GIT_DIRTY,
-        server_build_timestamp: DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC).ok().map(|t| t.timestamp()),
+        server_build_timestamp: *BUILD_TIMESTAMP,
         server_startup_timestamp: config.startup_timestamp.timestamp(),
     }))
 }
@@ -147,7 +152,11 @@ fn do_reload(db_lock: DBLock, string_set_lock: StringSetLock, config: web::Data<
             updating_now: false,
             etag: None,
             channel_cache: db_state.channel_cache.reset(),
+            uncut_segment_count: 0,
+            video_info_count: 0,
         };
+        db_state.uncut_segment_count = db_state.calculate_uncut_segment_count();
+        db_state.video_info_count = db_state.calculate_video_info_count();
         db_state.etag = Some(db_state.generate_etag());
         string_set.clean();
     }

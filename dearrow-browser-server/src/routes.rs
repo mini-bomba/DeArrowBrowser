@@ -19,7 +19,7 @@
 use std::sync::LazyLock;
 use std::{collections::HashSet, sync::Arc};
 use actix_web::{Responder, get, post, web, http::StatusCode, HttpResponse, rt::task::spawn_blocking};
-use error_handling::{anyhow, bail, ResContext, ErrorContext};
+use error_handling::{anyhow, bail, ErrorContext, IntoErrorIterator, ResContext, SerializableError};
 use chrono::{Utc, DateTime};
 use dearrow_parser::{DearrowDB, ThumbnailFlags, TitleFlags};
 use dearrow_browser_api::sync::*;
@@ -188,9 +188,9 @@ async fn request_reload(db_lock: DBLock, string_set_lock: StringSetLock, config:
 }
 
 #[get("/errors")]
-async fn get_errors(db_lock: DBLock) -> JsonResult<ErrorList> {
+async fn get_errors(db_lock: DBLock) -> JsonResult<Vec<SerializableError>> {
     let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
-    Ok(web::Json(db.errors.iter().map(|e| format!("{e:?}")).collect()))
+    Ok(web::Json(db.errors.iter().map(IntoErrorIterator::serializable_copy).collect()))
 }
 
 #[get("/titles", wrap = "ETagCache")]

@@ -41,8 +41,6 @@ pub struct StatusResponse {
     pub server_startup_timestamp: i64,
 }
 
-pub type ErrorList = Vec<String>;
-
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ApiTitle {
     pub uuid: RcStr,

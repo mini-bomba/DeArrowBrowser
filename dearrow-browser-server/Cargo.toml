@@ -28,9 +28,10 @@ log.workspace = true
 regex = "1.10.6"
 reqwest.workspace = true
 serde.workspace = true
+serde_with = "3.9.0"
+serde_json.workspace = true
 sha2.workspace = true
 toml = "0.8.8"
-serde_with = "3.9.0"
 
 [build-dependencies]
 built.workspace = true

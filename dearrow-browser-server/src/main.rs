@@ -99,6 +99,7 @@ async fn main() -> Result<(), ErrorContext> {
                 .app_data(string_set_lock.clone())
                 .app_data(reqwest_client.clone())
                 .wrap(middleware::Timings)
+                .wrap(middleware::ErrorRepresentation)
                 .service(web::scope("/api")
                     .configure(routes::configure(config.clone()))
                 );

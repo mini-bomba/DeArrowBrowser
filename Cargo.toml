@@ -3,7 +3,7 @@ members = ["dearrow-browser-server", "dearrow-browser-api", "dearrow-parser", "d
 resolver = "2"
 
 [workspace.package]
-version = "1.11.1"
+version = "1.11.2"
 homepage = "https://dearrow.minibomba.pro"
 repository = "https://github.com/mini-bomba/DeArrowBrowser"
 license = "AGPL-3.0-only"
@@ -16,6 +16,7 @@ futures = { version = "0.3.30", default-features = false, features = ["std", "as
 log = "0.4.21"
 reqwest = { version = "0.11.23", features = ["json"] }
 serde = { version = "1.0.194", features = ["derive", "rc"] }
+serde_json = "1.0.127"
 sha2 = "0.10.8"
 
 [workspace.lints.clippy]

@@ -17,10 +17,13 @@
 */
 use std::{fmt::{Debug, Display}, fs, path::Path, sync::Arc, time::UNIX_EPOCH};
 
-use actix_web::{http::{header::{ContentType, HeaderMap, TryIntoHeaderPair}, StatusCode}, HttpResponse, ResponseError};
-use error_handling::ErrorContext;
+use actix_web::{http::{header::{HeaderMap, TryIntoHeaderPair}, StatusCode}, HttpResponse, ResponseError};
+use error_handling::{ErrorContext, IntoErrorIterator};
 use sha2::{Sha256, Digest, digest::{typenum::U32, generic_array::GenericArray}};
 
+/// This extension will be present on a response if the response contains
+/// a [`error_handling::SerializableError`] encoded as json
+pub struct SerializableErrorResponseMarker;
 
 pub enum Error {
     #[allow(clippy::enum_variant_names)]
@@ -59,7 +62,13 @@ impl ResponseError for Error {
     fn error_response(&self) -> HttpResponse {
         let mut builder = HttpResponse::build(self.status_code());
         match self {
-            Error::ErrorContext(err, _) => builder.insert_header(ContentType::plaintext()).body(format!("{err:?}")),
+            Error::ErrorContext(err, _) => {
+                {
+                    let mut exts = builder.extensions_mut();
+                    exts.insert(SerializableErrorResponseMarker);
+                }
+                builder.json(err.serializable_copy())
+            },
             Error::EmptyStatus(..) => builder.finish(),
         }
     }
@@ -92,12 +101,18 @@ pub fn get_mtime(p: &Path) -> i64 {
 
 pub trait HeaderMapExt {
     fn append_header<H: TryIntoHeaderPair>(&mut self, header: H) -> std::result::Result<(), H::Error>;
+    fn replace_header<H: TryIntoHeaderPair>(&mut self, header: H) -> std::result::Result<(), H::Error>;
 }
 
 impl HeaderMapExt for HeaderMap {
     fn append_header<H: TryIntoHeaderPair>(&mut self, header: H) -> std::result::Result<(), H::Error> {
         let (name, value) = header.try_into_pair()?;
         self.append(name, value);
+        Ok(())
+    }
+    fn replace_header<H: TryIntoHeaderPair>(&mut self, header: H) -> std::result::Result<(), H::Error> {
+        let (name, value) = header.try_into_pair()?;
+        self.insert(name, value);
         Ok(())
     }
 }

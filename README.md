@@ -79,6 +79,10 @@ The `dearrow-browser-api` crate provides `sync` (threadsafe, `Arc<>` based), `un
 These implementations can be enabled or disabled using respective features and are available in separate modules.
 The `sync` implementation is enabled by default.
 
+Any errors from the API will be returned as human-readable plaintext unless the client had explicitly requested `application/json` as one of the accepted formats.
+If a client explicitly requests `application/json` by including it in the `Accept` request header (`*/*` does not count), any errors will be sent as json-encoded `SerializableError` from the `error_handling` crate.
+All endpoints will always return json on success, even if the client requests a different format.
+
 ## Credits
 
 The DeArrow Browser logo is a combination of the DeArrow logo (which is based on Twemoji) and the magnifying glass emoji from [Twemoji](https://github.com/twitter/twemoji) and is licensed under the [CC-BY 4.0 license](https://github.com/mini-bomba/DeArrowBrowser/blob/master/dearrow-browser-frontend/icon/LICENSE-CC-BY-4.0.txt).

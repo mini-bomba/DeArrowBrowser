@@ -18,11 +18,12 @@
 
 use std::{future::{ready, Ready}, time::{Duration, Instant}};
 
-use actix_web::{body::{BoxBody, EitherBody}, dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform}, error::HttpError, http::{header::{CacheControl, CacheDirective, ETag, Header, IfNoneMatch}, StatusCode}, web, Error, HttpResponseBuilder};
+use actix_web::{body::{BoxBody, EitherBody, MessageBody}, dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform}, error::HttpError, http::{header::{Accept, CacheControl, CacheDirective, ContentType, ETag, Header, IfNoneMatch}, StatusCode}, web, Error, HttpResponseBuilder};
+use error_handling::SerializableError;
 use futures::{future::LocalBoxFuture, FutureExt};
-use log::error;
+use log::{error, warn};
 
-use crate::constants::DB_READ_ERR;
+use crate::{constants::DB_READ_ERR, utils::SerializableErrorResponseMarker};
 use crate::state::{DBLock, AppConfig};
 use crate::utils::{self, HeaderMapExt};
 
@@ -140,12 +141,12 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let config = req.app_data::<web::Data<AppConfig>>().unwrap();
         if !config.enable_timings_header {
-            return Box::pin(self.service.call(req))
+            return self.service.call(req).boxed_local()
         }
         let start = Instant::now();
         let srv = self.service.call(req);
         
-        Box::pin(async move {
+        async move {
             let mut resp = srv.await?;
             let elapsed = Instant::elapsed(&start);
             let headers = resp.headers_mut();
@@ -154,7 +155,7 @@ where
             }
 
             Ok(resp)
-        })
+        }.boxed_local()
     }
 }
 
@@ -169,3 +170,82 @@ fn render_duration(duration: &Duration) -> String {
         chunks.join(b" " as &[u8])  // separate chunks with a space
     ).expect("this should always be valid utf8")  // parse as string
 }
+
+
+// Error representation middleware
+
+pub struct ErrorRepresentation;
+
+impl<S, B> Transform<S, ServiceRequest> for ErrorRepresentation
+where
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
+    S::Future: 'static,
+    B: MessageBody + 'static,
+{
+    type Response = ServiceResponse<EitherBody<B, BoxBody>>;
+    type Error = Error;
+    type InitError = ();
+    type Transform = ErrorRepresentationInstance<S>;
+    type Future = Ready<Result<Self::Transform, Self::InitError>>;
+
+    fn new_transform(&self, service: S) -> Self::Future {
+        ready(Ok(ErrorRepresentationInstance { service }))
+    }
+}
+
+pub struct ErrorRepresentationInstance<S> {
+    service: S,
+}
+
+impl<S, B> Service<ServiceRequest> for ErrorRepresentationInstance<S>
+where
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
+    S::Future: 'static,
+    B: MessageBody + 'static,
+{
+    type Response = ServiceResponse<EitherBody<B, BoxBody>>;
+    type Error = Error;
+    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    forward_ready!(service);
+
+    fn call(&self, req: ServiceRequest) -> Self::Future {
+        let requested_json = Accept::parse(&req).is_ok_and(|a| a.iter().any(|item| item.item.essence_str() == "application/json"));
+
+        let srv = self.service.call(req);
+
+        async move {
+            let resp = srv.await?;
+            if requested_json || !resp.response().extensions().contains::<SerializableErrorResponseMarker>() {
+                return Ok(resp.map_into_left_body())
+            }
+
+            // client did not explicitly request json and the response contains serialized error
+            // json - convert to plaintext
+            let resp = resp.map_body(|head, body| {
+                match body.try_into_bytes() {
+                    Err(body) => {
+                        warn!("Failed to read & convert the body of a SerializableError response");
+                        EitherBody::left(body)
+                    },
+                    Ok(bytes) => {
+                        match serde_json::from_slice::<SerializableError>(&bytes) {
+                            Err(err) => {
+                                warn!("Failed to deserialize the SerializableError response: {err}");
+                                EitherBody::right(BoxBody::new(bytes))
+                            },
+                            Ok(error) => {
+                                if let Err(err) = head.headers.replace_header(ContentType::plaintext()) {
+                                    warn!("Failed to replace the ContentType header: {err}");
+                                }
+                                EitherBody::right(BoxBody::new(format!("{error:?}")))
+                            }
+                        }
+                    }
+                }
+            });
+            Ok(resp)
+        }.boxed_local()
+    }
+}
+

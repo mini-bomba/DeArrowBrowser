@@ -73,7 +73,7 @@ fn UUIDTitle(props: &UUIDPageProps) -> HtmlResult {
         if resp.status() == StatusCode::NOT_FOUND {
             return Ok(None);
         }
-        resp.check_status().await.context("API request failed")?
+        resp.check_status().await?
             .json::<ApiTitle>().await.context("Failed to deserialize API response").map(Some)
     }, (window_context, props.uuid.clone()))?;
 
@@ -166,7 +166,7 @@ fn UUIDThumbnail(props: &UUIDPageProps) -> HtmlResult {
         if resp.status() == StatusCode::NOT_FOUND {
             return Ok(None);
         }
-        resp.check_status().await.context("API request failed")?
+        resp.check_status().await?
             .json::<ApiThumbnail>().await.context("Failed to deserialize API response").map(Some)
     }, (window_context, props.uuid.clone()))?;
     let caption: Rc<ThumbnailCaption> = use_memo(RcEq(thumbnail.clone()), |thumbnail| {

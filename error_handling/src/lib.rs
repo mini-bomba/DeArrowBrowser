@@ -25,6 +25,7 @@ pub use iterator::*;
 pub use serializable::*;
 
 #[macro_export]
+/// Create a new [`ErrorContext`] stack
 macro_rules! anyhow {
     ($val:expr) => {
         $crate::ErrorContext::new($val)
@@ -35,6 +36,7 @@ macro_rules! anyhow {
 }
 
 #[macro_export]
+/// Create a new [`ErrorContext`] stack and immediately return it as [`Result::Err`]
 macro_rules! bail {
     ($($tok:tt)+) => {
         return Err($crate::anyhow!($($tok)+));

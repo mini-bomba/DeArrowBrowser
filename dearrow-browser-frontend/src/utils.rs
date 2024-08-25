@@ -15,11 +15,11 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use std::{fmt::Display, ops::Deref, rc::Rc};
+use std::{ops::Deref, rc::Rc};
 
 use chrono::{DateTime, Utc, NaiveDateTime};
-use error_handling::{ErrorContext, ResContext};
-use reqwest::{Client, StatusCode, Url};
+use error_handling::{bail, ErrContext, ErrorContext, ResContext, SerializableError};
+use reqwest::{Client, Url};
 use yew::Html;
 
 const TIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
@@ -234,43 +234,23 @@ impl ReqwestUrlExt for Url {
     }
 }
 
-#[derive(Debug)]
-pub enum RequestError {
-    StatusCode {
-        status: StatusCode,
-        body: String,
-    },
-    Reqwest(reqwest::Error),
-}
-
-impl Display for RequestError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RequestError::StatusCode {status, body} => write!(f, "The server returned a {status} status code: {body}"),
-            RequestError::Reqwest(err) => write!(f, "{err}"),
-        }
-    }
-}
-impl std::error::Error for RequestError {}
-impl From<reqwest::Error> for RequestError {
-    fn from(value: reqwest::Error) -> Self {
-        RequestError::Reqwest(value)
-    }
-}
-
 pub trait ReqwestResponseExt: Sized {
     #[allow(async_fn_in_trait)]  // this is for local use
-    async fn check_status(self) -> Result<Self, RequestError>;
+    async fn check_status(self) -> Result<Self, ErrorContext>;
 }
 
 impl ReqwestResponseExt for reqwest::Response {
-    async fn check_status(self) -> Result<Self, RequestError> {
+    async fn check_status(self) -> Result<Self, ErrorContext> {
         let status = self.status();
-        if !status.is_success() {
-            let body = self.text().await?;
-            return Err(RequestError::StatusCode { status, body })
+        if status.is_success() {
+            Ok(self)
+        } else {
+            let body = self.text().await.with_context(|| format!("The server returned a '{status}' status code"))?;
+            match serde_json::from_str::<SerializableError>(&body) {
+                Err(..) => bail!("The server returned a '{status}' status code with the following body:\n{body}",),
+                Ok(err) => Err(err.context("--- SERVER ERROR STACK FOLLOWS ---").context(format!("The server returned a '{status}' status code")))
+            }
         }
-        Ok(self)
     }
 }
 
@@ -290,8 +270,9 @@ where
 {
     get_reqwest_client()
         .get(url)
+        .header("Accept", "application/json")
         .send().await.context("Failed to send the request")?
-        .check_status().await.context("Request failed")?
+        .check_status().await?
         .json().await.context("Failed to deserialize response")
 }
 

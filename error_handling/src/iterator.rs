@@ -21,7 +21,7 @@ use std::{error::Error, sync::Arc};
 use crate::SerializableError;
 
 
-/// `ErrorIterator` - iterates over the chain of `Error::source`
+/// `ErrorIterator` - iterates over the chain of [`Error::source`]
 pub struct ErrorIterator<'a> {
     next_item: Option<&'a (dyn Error + 'static)>,
 }
@@ -42,6 +42,7 @@ impl<'a> Iterator for ErrorIterator<'a> {
 pub trait IntoErrorIterator {
     fn error_chain(&self) -> ErrorIterator<'_>;
 
+    /// Copies and flattens the error stack into a [`SerializableError`]
     fn serializable_copy(&self) -> SerializableError {
         let mut iter = self.error_chain();
         let mut result = SerializableError {

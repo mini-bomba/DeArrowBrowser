@@ -24,8 +24,7 @@ use serde::{Deserialize, Serialize};
 use crate::IntoErrorIterator;
 
 
-// SerializableError - an error stack with all messages flattened into strings, trivial to
-// (de)serialize
+/// An error stack with all messages flattened into strings, trivial to (de)serialize
 #[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct SerializableError {
@@ -70,6 +69,7 @@ impl Error for SerializableError {
 
 #[cfg(feature = "anyhow")]
 impl SerializableError {
+    /// Convert an [`anyhow::Error`] into a [`SerializableError`]
     pub fn from_anyhow(err: &anyhow::Error) -> Self {
         let mut iter = err.chain();
         let mut result = SerializableError {

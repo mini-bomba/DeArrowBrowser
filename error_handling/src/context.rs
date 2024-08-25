@@ -20,7 +20,7 @@ use std::{convert::Infallible, error::Error, fmt::{Debug, Display}, sync::Arc};
 
 use crate::IntoErrorIterator;
 
-// A helper enum for easily cloneable strings
+/// A helper enum for easily cloneable strings
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum SharedString {
     Arc(Arc<str>),
@@ -58,6 +58,7 @@ impl From<String> for SharedString
 // The ErrorContext struct
 
 #[derive(Clone)]
+/// An annotated error stack
 pub struct ErrorContext {
     pub context: SharedString,
     pub cause: Option<Arc<dyn Error + Send + Sync + 'static>>,
@@ -121,6 +122,7 @@ impl From<anyhow::Error> for ErrorContext {
 // .context() traits
 // on all Errors
 
+/// A helper trait for annotating any Error with an [`ErrorContext`]
 pub trait ErrContext {
     fn context<M>(self, msg: M) -> ErrorContext
     where M: Into<SharedString>;
@@ -142,6 +144,7 @@ where T: Error + Send + Sync + 'static
 // on anyhow::Error
 
 #[cfg(feature = "anyhow")]
+/// A helper trait for converting an anyhow error stack into an [`ErrorContext`] stack
 pub trait AnyhowErrContext {
     fn context<M>(self, msg: M) -> ErrorContext
     where M: Into<SharedString>;
@@ -161,6 +164,7 @@ impl AnyhowErrContext for anyhow::Error {
 
 // on all Result<>s
 
+/// A helper trait for annotating result errors and empty options
 pub trait ResContext<T, E> {
     fn context<M>(self, msg: M) -> Result<T, ErrorContext>
     where M: Into<SharedString>;
@@ -189,6 +193,7 @@ where E: ErrContext
 
 // on Result<>s with anyhow::Error
 #[cfg(feature = "anyhow")]
+/// A helper trait for converting anyhow results into [`ErrorContext`] results
 pub trait AnyhowResContext<T, E> {
     fn context<M>(self, msg: M) -> Result<T, ErrorContext>
     where M: Into<SharedString>;

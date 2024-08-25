@@ -19,8 +19,10 @@ use std::{ops::Deref, rc::Rc};
 
 use chrono::{DateTime, Utc, NaiveDateTime};
 use error_handling::{bail, ErrContext, ErrorContext, ResContext, SerializableError};
-use reqwest::{Client, Url};
+use reqwest::Url;
 use yew::Html;
+
+use crate::constants::{REQWEST_CLIENT, SBB_BASE};
 
 const TIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
@@ -254,21 +256,12 @@ impl ReqwestResponseExt for reqwest::Response {
     }
 }
 
-thread_local! {
-    static REQWEST_CLIENT: Client = Client::new();
-    static SBB_BASE: Url = Url::parse("https://sb.ltn.fi/").expect("should be able to parse sb.ltn.fi base URL");
-}
-
-pub fn get_reqwest_client() -> Client {
-    REQWEST_CLIENT.with(Clone::clone)
-}
-
 pub async fn api_request<U,R>(url: U) -> Result<R, ErrorContext>
 where 
     U: reqwest::IntoUrl,
     R: serde::de::DeserializeOwned,
 {
-    get_reqwest_client()
+    REQWEST_CLIENT
         .get(url)
         .header("Accept", "application/json")
         .send().await.context("Failed to send the request")?
@@ -277,13 +270,13 @@ where
 }
 
 pub fn sbb_video_link(vid: &str) -> Url {
-    let mut url = SBB_BASE.with(Clone::clone);
+    let mut url = SBB_BASE.clone();
     url.extend_segments(&["video", vid]).expect("https://sb.ltn.fi/ should be a valid base");
     url
 }
 
 pub fn sbb_userid_link(uid: &str) -> Url {
-    let mut url = SBB_BASE.with(Clone::clone);
+    let mut url = SBB_BASE.clone();
     url.extend_segments(&["userid", uid]).expect("https://sb.ltn.fi/ should be a valid base");
     url
 }

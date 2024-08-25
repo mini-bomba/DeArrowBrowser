@@ -27,9 +27,10 @@ use yew::prelude::*;
 use crate::components::icon::*;
 use crate::components::links::userid_link;
 use crate::components::youtube::{OriginalTitle, YoutubeIframe, YoutubeVideoLink};
+use crate::constants::REQWEST_CLIENT;
 use crate::hooks::use_async_suspension;
 use crate::thumbnails::components::{Thumbnail, ThumbnailCaption};
-use crate::utils::{get_reqwest_client, html_length, render_datetime, RcEq, ReqwestResponseExt};
+use crate::utils::{html_length, render_datetime, RcEq, ReqwestResponseExt};
 use crate::WindowContext;
 
 #[derive(Properties, PartialEq, Clone)]
@@ -69,7 +70,7 @@ fn UUIDTitle(props: &UUIDPageProps) -> HtmlResult {
     let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
     let title = use_async_suspension(|(wc, uuid)| async move {
         let url = wc.origin_join_segments(&["api", "titles", "uuid", &uuid]);
-        let resp = get_reqwest_client().get(url).send().await.context("API request failed")?;
+        let resp = REQWEST_CLIENT.get(url).send().await.context("API request failed")?;
         if resp.status() == StatusCode::NOT_FOUND {
             return Ok(None);
         }
@@ -162,7 +163,7 @@ fn UUIDThumbnail(props: &UUIDPageProps) -> HtmlResult {
     let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
     let thumbnail = use_async_suspension(|(wc, uuid)| async move {
         let url = wc.origin_join_segments(&["api", "thumbnails", "uuid", &uuid]);
-        let resp = get_reqwest_client().get(url).send().await.context("API request failed")?;
+        let resp = REQWEST_CLIENT.get(url).send().await.context("API request failed")?;
         if resp.status() == StatusCode::NOT_FOUND {
             return Ok(None);
         }

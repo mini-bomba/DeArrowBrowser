@@ -21,6 +21,7 @@ use reqwest::Url;
 use serde::Deserialize;
 
 use crate::utils::{api_request, ReqwestUrlExt};
+use crate::constants::*;
 
 
 #[derive(Deserialize)]
@@ -30,7 +31,7 @@ pub struct OEmbedResponse {
 }
 
 pub async fn get_oembed_info(vid: &str) -> Result<OEmbedResponse, ErrorContext> {
-    let mut url = YOUTUBE_OEMBED_URL.with(Clone::clone);
+    let mut url = YOUTUBE_OEMBED_URL.clone();
     url.query_pairs_mut()
         .clear()
         .append_pair("url", youtu_be_link(vid).as_str());
@@ -38,19 +39,13 @@ pub async fn get_oembed_info(vid: &str) -> Result<OEmbedResponse, ErrorContext> 
 }
 
 pub fn youtu_be_link(vid: &str) -> Url {
-    let mut url = YOUTU_BE_URL.with(Clone::clone);
+    let mut url = YOUTU_BE_URL.clone();
     url.extend_segments(&[vid]).expect("https://youtu.be/ should be a valid base");
     url
 }
 
 pub fn original_thumbnail_url(vid: &str) -> Url {
-    let mut url = THUMBNAIL_URL.with(Clone::clone);
+    let mut url = THUMBNAIL_URL.clone();
     url.extend_segments(&[vid, "maxresdefault.jpg"]).expect("youtube thumbnail url should be a valid base");
     url
-}
-
-thread_local! {
-    static YOUTU_BE_URL: Url = Url::parse("https://youtu.be/").expect("should be able to parse youtu.be base URL");
-    static YOUTUBE_OEMBED_URL: Url = Url::parse("https://www.youtube-nocookie.com/oembed").expect("should be able to parse youtube-nocookie oembed URL");
-    static THUMBNAIL_URL: Url = Url::parse("https://img.youtube.com/vi").expect("should be able to parse the youtube thumbnail URL");
 }

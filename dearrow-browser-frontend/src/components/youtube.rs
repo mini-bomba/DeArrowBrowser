@@ -18,10 +18,10 @@
 use std::rc::Rc;
 
 use gloo_console::error;
-use reqwest::Url;
 use yew::prelude::*;
 
 use crate::components::links::videoid_link;
+use crate::constants::YOUTUBE_EMBED_URL;
 use crate::hooks::use_async_suspension;
 use crate::innertube::{self, youtu_be_link};
 use crate::utils::ReqwestUrlExt;
@@ -34,7 +34,7 @@ pub struct YoutubeProps {
 #[function_component]
 pub fn YoutubeIframe(props: &YoutubeProps) -> Html {
     let embed_url: Rc<AttrValue> = use_memo(props.videoid.clone(), |vid| {
-        let mut url = YOUTUBE_EMBED_URL.with(Clone::clone);
+        let mut url = YOUTUBE_EMBED_URL.clone();
         url.extend_segments(&[vid]).unwrap();
         return AttrValue::Rc(url.as_str().into())
     });
@@ -78,8 +78,4 @@ pub fn YoutubeVideoLink(props: &VideoLinkProps) -> Html {
             {videoid_link(props.videoid.clone())}
         </>
     }
-}
-
-thread_local! {
-    static YOUTUBE_EMBED_URL: Url = Url::parse("https://www.youtube-nocookie.com/embed/").expect("should be able to parse the youtube embed url");
 }

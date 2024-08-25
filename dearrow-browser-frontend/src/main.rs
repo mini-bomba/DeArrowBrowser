@@ -27,14 +27,15 @@ use yew_hooks::{use_async_with_options, use_interval, UseAsyncOptions};
 use yew_router::prelude::*;
 use web_sys::window;
 
-pub mod hooks;
-pub mod utils;
 pub mod components;
+pub mod constants;
 pub mod contexts;
+pub mod hooks;
+pub mod innertube;
+pub mod settings;
+pub mod utils;
 pub mod pages;
 pub mod thumbnails;
-pub mod settings;
-pub mod innertube;
 use contexts::*;
 use pages::*;
 

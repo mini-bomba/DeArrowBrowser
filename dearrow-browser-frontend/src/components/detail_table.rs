@@ -556,7 +556,7 @@ pub fn BaseDetailTableRenderer(props: &BaseDetailTableRendererProps) -> Html {
     };
     match props.details {
         DetailSlice::Titles(ref list) => html! {
-            <table class="detail-table titles">
+            <table class="detail-table titles" data-layout={AttrValue::Static(settings.title_table_layout.into())}>
                 <tr class="header">
                     <th>{"Submitted"}</th>
                     if !props.hide_videoid {
@@ -580,7 +580,7 @@ pub fn BaseDetailTableRenderer(props: &BaseDetailTableRendererProps) -> Html {
             </table>
         },
         DetailSlice::Thumbnails(ref list) => html! {
-            <table class="detail-table thumbnails">
+            <table class="detail-table thumbnails" data-layout={AttrValue::Static(settings.thumbnail_table_layout.into())}>
                 <tr class="header">
                     <th>{"Submitted"}</th>
                     if !props.hide_videoid {

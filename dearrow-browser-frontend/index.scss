@@ -570,6 +570,10 @@ fieldset {
   background-position: center;
 }
 
+.detail-table[data-layout="Expanded"] td > .icon:only-child {
+  font-size: 2rem;
+}
+
 .icon-dablogo {
   background-image: url("/icon/logo.svg");
 }

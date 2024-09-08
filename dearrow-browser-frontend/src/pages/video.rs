@@ -51,6 +51,10 @@ fn VideoDetailsTable(props: &VideoDetailsTableProps) -> Html {
     html! {
         <div class="info-table">
             <div>{format!("Video ID: {}", props.videoid)}</div>
+            <div>
+                {"Channel: "}
+                <Suspense fallback={fallback.clone()}><ChannelLink videoid={props.videoid.clone()} /></Suspense>
+            </div>
             <div hidden={props.mode != DetailType::Title}>
                 {"Original title: "}
                 <Suspense {fallback}><OriginalTitle videoid={props.videoid.clone()} /></Suspense>
@@ -86,7 +90,6 @@ fn VideoDetailsTable(props: &VideoDetailsTableProps) -> Html {
             
             <div><a href={&*youtube_url}>{"View on YouTube"}</a></div>
             <div><a href={&*sbb_url}>{"View on SB Browser"}</a></div>
-            <Suspense><ChannelLink videoid={props.videoid.clone()} /></Suspense>
         </div>
     }
 }
@@ -117,11 +120,11 @@ fn ChannelLink(props: &VideoPageProps) -> HtmlResult {
         }
     }, props.videoid.clone())?;
 
-    let Ok(ref channel_handle) = *channel_handle else { return Ok(html! {}) };
+    let Ok(ref channel_handle) = *channel_handle else { return Ok(html! {<span><em>{"Unknown"}</em></span>}) };
     let route = MainRoute::Channel { id: channel_handle.clone() };
     
     Ok(html! {
-        <Link<MainRoute> to={route}>{"Browse this channel's page "}<Icon r#type={IconType::DABLogo} /></Link<MainRoute>>
+        <Link<MainRoute> to={route}>{channel_handle}<Icon r#type={IconType::DABLogo} /></Link<MainRoute>>
     })
 }
 

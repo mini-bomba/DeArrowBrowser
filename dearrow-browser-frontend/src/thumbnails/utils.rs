@@ -19,8 +19,8 @@
 use std::cell::OnceCell;
 
 use gloo_console::error;
-use web_sys::{window, AbortController, AbortSignal, AddEventListenerOptions, EventTarget, Response, Window, WorkerGlobalScope};
-use web_sys::js_sys::{global, Function, JsString, Promise, Reflect};
+use web_sys::{window, AbortController, AddEventListenerOptions, EventTarget, Response, Window, WorkerGlobalScope};
+use web_sys::js_sys::{global, Function, JsString, Promise};
 use wasm_bindgen::{closure::Closure, prelude::wasm_bindgen, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 
@@ -118,19 +118,6 @@ impl<F: ?Sized> Drop for Interval<F> {
 }
 
 
-/// Extensions for the `web_sys::AddEventListenerOptions` object
-pub trait EventListenerOptionsExt {
-    fn signal(&mut self, signal: &AbortSignal) -> &mut Self;
-}
-
-impl EventListenerOptionsExt for AddEventListenerOptions {
-    fn signal(&mut self, signal: &AbortSignal) -> &mut Self {
-        Reflect::set(self.as_ref(), &"signal".into(), signal).expect("setting signal property should work");
-        self
-    }
-}
-
-
 /// Represents a registered event listener
 ///
 /// Automatically cancelled via the `AbortController` when this object is dropped
@@ -141,13 +128,13 @@ pub struct EventListener<F: ?Sized> {
 
 impl<F: ?Sized> EventListener<F> {
     pub fn new(target: &EventTarget, r#type: &str, handler: Closure<F>) -> Result<Self, JsValue> {
-        Self::new_with_options(target, r#type, handler, AddEventListenerOptions::new())
+        Self::new_with_options(target, r#type, handler, &AddEventListenerOptions::new())
     }
 
-    pub fn new_with_options(target: &EventTarget, r#type: &str, handler: Closure<F>, mut options: AddEventListenerOptions) -> Result<Self, JsValue> {
+    pub fn new_with_options(target: &EventTarget, r#type: &str, handler: Closure<F>, options: &AddEventListenerOptions) -> Result<Self, JsValue> {
         let abort = AbortController::new().expect("should be able to construct an AbortController");
-        options.signal(&abort.signal());
-        target.add_event_listener_with_callback_and_add_event_listener_options(r#type, handler.as_ref().unchecked_ref(), &options)?;
+        options.set_signal(&abort.signal());
+        target.add_event_listener_with_callback_and_add_event_listener_options(r#type, handler.as_ref().unchecked_ref(), options)?;
         Ok(Self {
             _closure: handler,
             abort,

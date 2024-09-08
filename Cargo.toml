@@ -35,6 +35,7 @@ missing_errors_doc = "allow"      # no docs currently
 missing_panics_doc = "allow"      # no docs currently
 # let me do dumb shit
 inline_always = "allow"
+too_many_lines = "allow"  # there's no such thing as a function with too many lines
 
 [profile.release]
 strip = true

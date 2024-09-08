@@ -158,9 +158,12 @@ impl ThumbnailWorker {
         // Create the shared worker
         let worker = SharedWorker::new_with_worker_options(
             "/thumbnails/worker_loader.mjs",
-            WorkerOptions::new()
-                .name("thumbnails_worker")
-                .type_(web_sys::WorkerType::Module)
+            &{
+                let opts = WorkerOptions::new();
+                opts.set_name("thumbnails_worker");
+                opts.set_type(web_sys::WorkerType::Module);
+                opts
+            }
         ).map_err(Error::JS)?;
         let port = worker.port();
 

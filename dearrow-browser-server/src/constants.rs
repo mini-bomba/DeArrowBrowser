@@ -15,10 +15,44 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use std::sync::LazyLock;
+use std::{sync::{Arc, LazyLock}, time::Duration};
+use chrono::DateTime;
 use error_handling::{ErrorContext, anyhow};
+use regex::Regex;
+use actix_web::http::StatusCode;
 
+use crate::built_info;
+
+// Paths
+pub const CONFIG_PATH: &str = "config.toml";
+
+// Limits
+pub static IT_TIMEOUT: Duration = Duration::from_secs(1);
+
+// Locking errors
 pub static SS_READ_ERR:  LazyLock<ErrorContext> = LazyLock::new(|| anyhow!("Failed to acquire StringSet for reading"));
 pub static SS_WRITE_ERR: LazyLock<ErrorContext> = LazyLock::new(|| anyhow!("Failed to acquire StringSet for writing"));
 pub static DB_READ_ERR:  LazyLock<ErrorContext> = LazyLock::new(|| anyhow!("Failed to acquire DatabaseState for reading"));
 pub static DB_WRITE_ERR: LazyLock<ErrorContext> = LazyLock::new(|| anyhow!("Failed to acquire DatabaseState for writing"));
+
+// Innertube API urls
+pub static IT_PLAYER_URL: LazyLock<reqwest::Url> = LazyLock::new(|| reqwest::Url::parse("https://www.youtube.com/youtubei/v1/player").expect("Should be able to parse the IT_PLAYER_URL"));
+pub static IT_BROWSE_URL: LazyLock<reqwest::Url> = LazyLock::new(|| reqwest::Url::parse("https://www.youtube.com/youtubei/v1/browse").expect("Should be able to parse the IT_BROWSE_URL"));
+pub static YT_BASE_URL:   LazyLock<reqwest::Url> = LazyLock::new(|| reqwest::Url::parse("https://www.youtube.com/").expect("Should be able to parse the YT_BASE_URL"));
+
+// Youtube channel IDs and handles
+// https://stackoverflow.com/a/16326307
+pub static UCID_EXTRACTION_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"externalId":"([^"]+)""#).expect("Should be able to parse the UCID extraction regex"));
+// https://github.com/yt-dlp/yt-dlp/blob/a065086640e888e8d58c615d52ed2f4f4e4c9d18/yt_dlp/extractor/youtube.py#L518-L519
+pub static UCID_REGEX:        LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^UC(?-u:[\w-]){22}$").expect("Should be able to parse the UCID regex"));
+pub static HANDLE_REGEX:      LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^@[\w.-]{3,30}$").expect("Should be able to parse the @handle regex"));
+
+// Parsed built_info fields
+pub static SERVER_VERSION:  LazyLock<Arc<str>> = LazyLock::new(|| built_info::PKG_VERSION.into());
+pub static SERVER_GIT_HASH: LazyLock<Option<Arc<str>>> = LazyLock::new(|| built_info::GIT_COMMIT_HASH.map(std::convert::Into::into));
+pub static BUILD_TIMESTAMP: LazyLock<Option<i64>> = LazyLock::new(|| DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC).ok().map(|t| t.timestamp()));
+
+// Custom response status codes
+/// 333 Not ready yet - Indicates that the server is still querying requested data.
+/// The response may contain progress information. The client should request the same URL again.
+pub static NOT_READY_YET: LazyLock<StatusCode> = LazyLock::new(|| StatusCode::from_u16(333).expect("333 should be a 'valid' status code"));

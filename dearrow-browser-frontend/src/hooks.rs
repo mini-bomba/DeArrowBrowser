@@ -15,8 +15,7 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use std::{future::Future, cell::RefCell};
-use std::rc::Rc;
+use std::{future::Future, cell::{RefCell, Cell}, rc::Rc};
 use yew::prelude::*;
 use yew::platform::spawn_local;
 use yew::suspense::{SuspensionResult, Suspension};
@@ -59,6 +58,60 @@ where
             Err(sus)
         }
     }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum LoopControl {
+    Continue,
+    Terminate,
+}
+
+pub struct IterationResult<R, S> {
+    pub result: R,
+    pub control: LoopControl,
+    pub state: S,
+}
+
+/// A hook that runs an async function in a loop.
+///
+/// The function will keep getting called until either it returns LoopControl::Terminate, or the
+/// dependencies change.
+#[hook]
+pub fn use_async_loop<FF, F, D, R, S>(future: FF, deps: D) -> UseStateHandle<R>
+where
+    FF: 'static + Fn(D, S) -> F,
+    F:  'static + Future<Output = IterationResult<R, S>>,
+    D:  'static + PartialEq + Clone,
+    R:  'static + Default + Clone,
+    S:  'static + Default
+{
+
+    let result_state: UseStateHandle<R> = use_state(|| Default::default());
+    let reset_counter: Rc<Cell<usize>> = use_memo((), |()| Cell::default());
+    {
+        let result_state = result_state.clone();
+        use_memo(deps, move |deps| {
+            let deps = deps.clone();
+            reset_counter.set(reset_counter.get()+1);
+            result_state.set(Default::default());
+            let reset_idx = reset_counter.get();
+            spawn_local(async move {
+                let mut internal_state: S = Default::default();
+                loop {
+                    let res = future(deps.clone(), internal_state).await;
+                    internal_state = res.state;
+                    if reset_idx != reset_counter.get() {
+                        return;
+                    }
+                    result_state.set(res.result);
+                    if res.control == LoopControl::Terminate {
+                        return;
+                    }
+                }
+            });
+        });
+    }
+    result_state
 }
 
 #[hook]

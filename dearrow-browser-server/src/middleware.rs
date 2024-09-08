@@ -23,12 +23,22 @@ use error_handling::SerializableError;
 use futures::{future::LocalBoxFuture, FutureExt};
 use log::{error, warn};
 
-use crate::{constants::DB_READ_ERR, utils::SerializableErrorResponseMarker};
+use crate::constants::*;
 use crate::state::{DBLock, AppConfig};
-use crate::utils::{self, HeaderMapExt};
+use crate::utils::{self, HeaderMapExt, SerializableErrorResponseMarker};
 
 
 // ETag middleware
+
+/// This response extension controls the behaviour of the [`ETagCache`] middleware
+#[derive(Clone, Copy)]
+pub enum ETagCacheControl {
+    /// Do not cache this response.
+    ///
+    /// The `ETag` header will not be appended to this response.
+    /// The `Cache-Control` header will be set to `no-cache, no-store` on this response.
+    DoNotCache,
+}
 
 pub struct ETagCache;
 
@@ -90,9 +100,19 @@ where
         async move {
             let mut resp = srv.await?;
 
-            let headers = resp.headers_mut();
-            headers.append_header(ETag(etag)).map_err(Into::<actix_web::error::HttpError>::into)?;
-            headers.append_header(CacheControl(vec![CacheDirective::NoCache])).map_err(Into::<actix_web::error::HttpError>::into)?;
+            let extension = resp.response().extensions().get::<ETagCacheControl>().copied();
+            match extension {
+                None => {
+                    let headers = resp.headers_mut();
+                    headers.append_header(ETag(etag)).map_err(Into::<actix_web::error::HttpError>::into)?;
+                    headers.append_header(CacheControl(vec![CacheDirective::NoCache])).map_err(Into::<actix_web::error::HttpError>::into)?;
+                },
+                Some(ETagCacheControl::DoNotCache) => {
+                    let headers = resp.headers_mut();
+                    headers.append_header(CacheControl(vec![CacheDirective::NoCache, CacheDirective::NoStore])).map_err(Into::<actix_web::error::HttpError>::into)?;
+                },
+            }
+
 
             Ok(resp.map_into_left_body())
         }.boxed_local()
@@ -249,3 +269,61 @@ where
     }
 }
 
+
+// Custom status code middleware
+
+pub struct CustomStatusCodes;
+
+
+impl<S, B> Transform<S, ServiceRequest> for CustomStatusCodes
+where
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
+    S::Future: 'static,
+    B: 'static,
+{
+    type Response = ServiceResponse<B>;
+    type Error = Error;
+    type InitError = ();
+    type Transform = CustomStatusCodesInstance<S>;
+    type Future = Ready<Result<Self::Transform, Self::InitError>>;
+
+    fn new_transform(&self, service: S) -> Self::Future {
+        ready(Ok(CustomStatusCodesInstance { service }))
+    }
+}
+
+pub struct CustomStatusCodesInstance<S> {
+    service: S,
+}
+
+impl<S, B> Service<ServiceRequest> for CustomStatusCodesInstance<S>
+where
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
+    S::Future: 'static,
+    B: 'static,
+{
+    type Response = ServiceResponse<B>;
+    type Error = Error;
+    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    forward_ready!(service);
+
+    fn call(&self, req: ServiceRequest) -> Self::Future {
+        let srv = self.service.call(req);
+        
+        async move {
+            let mut resp = srv.await?;
+            let head = resp.response_mut().head_mut();
+
+            #[allow(clippy::single_match)] // we may have more codes later
+            match head.status.as_u16() {
+                333 => {
+                    head.reason = Some("Not Ready Yet");
+                }
+                _ => {},
+            }
+
+            Ok(resp)
+        }.boxed_local()
+    }
+}

@@ -17,7 +17,7 @@
 */
 use std::{fmt::{Debug, Display}, fs, path::Path, sync::Arc, time::UNIX_EPOCH};
 
-use actix_web::{http::{header::{HeaderMap, TryIntoHeaderPair}, StatusCode}, HttpResponse, ResponseError};
+use actix_web::{dev::Extensions, http::{header::{HeaderMap, TryIntoHeaderPair}, StatusCode}, HttpResponse, Responder, ResponseError};
 use error_handling::{ErrorContext, IntoErrorIterator};
 use sha2::{Sha256, Digest, digest::{typenum::U32, generic_array::GenericArray}};
 
@@ -120,3 +120,26 @@ impl HeaderMapExt for HeaderMap {
 pub fn arc_addr<T: ?Sized>(arc: &Arc<T>) -> usize {
     Arc::as_ptr(arc).cast::<()>() as usize
 }
+
+pub struct ExtendResponder<T: Responder> {
+    pub inner: T,
+    pub extensions: Extensions,
+}
+
+impl<T: Responder> Responder for ExtendResponder<T> {
+    type Body = T::Body;
+
+    fn respond_to(self, req: &actix_web::HttpRequest) -> HttpResponse<Self::Body> {
+        let mut resp = self.inner.respond_to(req);
+        resp.extensions_mut().extend(self.extensions);
+        resp
+    }
+}
+
+pub trait ResponderExt: Responder + Sized {
+    fn extend(self) -> ExtendResponder<Self> {
+        ExtendResponder { inner: self, extensions: Extensions::new() }
+    }
+}
+
+impl<T> ResponderExt for T where T: Responder + Sized {}

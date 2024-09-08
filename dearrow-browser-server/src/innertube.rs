@@ -16,26 +16,18 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::{collections::VecDeque, ops::Deref, sync::LazyLock};
+use std::{collections::VecDeque, ops::Deref, sync::{atomic::Ordering, Arc}};
 
-use actix_web::{get, web, HttpResponse};
+use actix_web::{get, web, Either, HttpResponse, http::StatusCode};
 use error_handling::{anyhow, bail, ErrorContext, ResContext};
-use dearrow_browser_api::sync::{InnertubeChannel, InnertubeVideo};
-use regex::Regex;
+use dearrow_browser_api::sync::{InnertubeChannel, InnertubeVideo, self as api};
 use reqwest::Client;
 
-use crate::{middleware::ETagCache, constants::DB_READ_ERR, state::{AppConfig, DBLock}, utils};
+use crate::{middleware::{ETagCache, ETagCacheControl}, state::{AppConfig, DBLock, GetChannelOutput, self}, utils::{self, ExtendResponder, ResponderExt}};
+use crate::constants::*;
 
 type JsonResult<T> = utils::Result<web::Json<T>>;
-
-static IT_PLAYER_URL: LazyLock<reqwest::Url>  = LazyLock::new(|| reqwest::Url::parse("https://www.youtube.com/youtubei/v1/player").expect("Should be able to parse the IT_PLAYER_URL"));
-static IT_BROWSE_URL: LazyLock<reqwest::Url>  = LazyLock::new(|| reqwest::Url::parse("https://www.youtube.com/youtubei/v1/browse").expect("Should be able to parse the IT_BROWSE_URL"));
-static YT_BASE_URL: LazyLock<reqwest::Url>    = LazyLock::new(|| reqwest::Url::parse("https://www.youtube.com/").expect("Should be able to parse the YT_BASE_URL"));
-// https://stackoverflow.com/a/16326307
-static UCID_EXTRACTION_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"externalId":"([^"]+)""#).expect("Should be able to parse the UCID extraction regex"));
-// https://github.com/yt-dlp/yt-dlp/blob/a065086640e888e8d58c615d52ed2f4f4e4c9d18/yt_dlp/extractor/youtube.py#L518-L519
-pub static UCID_REGEX: LazyLock<Regex>        = LazyLock::new(|| Regex::new(r"^UC(?-u:[\w-]){22}$").expect("Should be able to parse the UCID regex"));
-pub static HANDLE_REGEX: LazyLock<Regex>          = LazyLock::new(|| Regex::new(r"^@[\w.-]{3,30}$").expect("Should be able to parse the @handle regex"));
+type JsonResultOrFetchProgress<T> = utils::Result<Either<web::Json<T>, (ExtendResponder<web::Json<api::ChannelFetchProgress>>, StatusCode)>>;
 
 pub fn configure_disabled(cfg: &mut web::ServiceConfig) {
     cfg.default_service(web::to(disabled_route));
@@ -85,17 +77,29 @@ async fn get_innertube_video(path: web::Path<String>, client: web::ThinData<Clie
 }
 
 #[get("/channel/{handle}", wrap="ETagCache")]
-async fn get_channel_endpoint(path: web::Path<String>, db_lock: DBLock) -> JsonResult<InnertubeChannel> {
+async fn get_channel_endpoint(path: web::Path<String>, db_lock: DBLock) -> JsonResultOrFetchProgress<InnertubeChannel> {
     let channel_cache = {
         let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
         db.channel_cache.clone()
     };
     let channel_data = channel_cache.get_channel(path.into_inner().as_str()).await.context("Failed to get channel info")?;
 
-    Ok(web::Json(InnertubeChannel {
-        channel_name: channel_data.channel_name.deref().into(),
-        total_videos: channel_data.total_videos as u64,
-    }))
+    match channel_data {
+        GetChannelOutput::Pending(progress) => {
+            let mut resp = web::Json(api::ChannelFetchProgress {
+                videos_fetched: progress.videos_fetched.load(Ordering::Relaxed) as u64,
+                videos_in_fscache: progress.videos_in_fscache.load(Ordering::Relaxed) as u64,
+            }).extend();
+            resp.extensions.insert(ETagCacheControl::DoNotCache);
+            Ok(Either::Right((resp, *NOT_READY_YET)))
+        },
+        GetChannelOutput::Resolved(result) => {
+            Ok(Either::Left(web::Json(InnertubeChannel {
+                channel_name: result.channel_name.deref().into(),
+                total_videos: result.total_videos as u64,
+            })))
+        }
+    }
 }
 
 pub async fn handle_to_ucid(client: &Client, handle: &str) -> Result<String, ErrorContext> {
@@ -137,7 +141,7 @@ pub struct ChannelData {
     pub video_ids: Vec<String>,
 }
 
-pub async fn get_channel(client: &Client, ucid: &str) -> Result<ChannelData, ErrorContext> {
+pub async fn get_channel(client: &Client, ucid: &str, progress: Arc<state::ChannelFetchProgress>) -> Result<ChannelData, ErrorContext> {
     if !UCID_REGEX.is_match(ucid) {
         bail!("Invalid UCID");
     }
@@ -181,6 +185,7 @@ pub async fn get_channel(client: &Client, ucid: &str) -> Result<ChannelData, Err
                 }),
             }
         }
+        progress.videos_fetched.store(video_ids.len(), Ordering::Relaxed);
     }
 
     Ok(ChannelData {

@@ -15,9 +15,10 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use std::{fs::{set_permissions, File, Permissions}, io::{self, Read, Write}, os::unix::prelude::PermissionsExt, sync::RwLock, time::Duration};
+use std::{fs::{create_dir_all, set_permissions, File, Permissions}, io::{self, Read, Write}, os::unix::prelude::PermissionsExt, sync::RwLock, time::Duration};
 use actix_files::{Files, NamedFile};
-use actix_web::{HttpServer, App, web, dev::{ServiceResponse, fn_service, ServiceRequest}, middleware::NormalizePath};
+use actix_web::{dev::{fn_service, ServiceRequest, ServiceResponse}, middleware::NormalizePath, web, App, HttpServer};
+use constants::CONFIG_PATH;
 use error_handling::{bail, ErrorContext, ResContext};
 use chrono::Utc;
 use env_logger::Env;
@@ -33,9 +34,6 @@ mod middleware;
 mod innertube;
 use reqwest::ClientBuilder;
 use state::*;
-
-const CONFIG_PATH: &str = "config.toml";
-
 
 #[actix_web::main]
 async fn main() -> Result<(), ErrorContext> {
@@ -61,6 +59,7 @@ async fn main() -> Result<(), ErrorContext> {
             return Err(e).context(format!("Failed to open {CONFIG_PATH}"));
         }
     });
+    create_dir_all(&config.channel_cache_path).context("Failed to create the channel cache directory")?;
     info!("Loading database...");
     let string_set_lock = web::Data::new(RwLock::new(StringSet::with_capacity(16384)));
     let reqwest_client = web::ThinData(ClientBuilder::new().timeout(Duration::from_secs_f64(config.reqwest_timeout_secs)).build().expect("Should be able to create a reqwest Client"));
@@ -98,6 +97,7 @@ async fn main() -> Result<(), ErrorContext> {
                 .app_data(db.clone())
                 .app_data(string_set_lock.clone())
                 .app_data(reqwest_client.clone())
+                .wrap(middleware::CustomStatusCodes)
                 .wrap(middleware::Timings)
                 .wrap(middleware::ErrorRepresentation)
                 .service(web::scope("/api")

@@ -28,6 +28,7 @@ use dearrow_parser::{Title, TitleFlags, Thumbnail, ThumbnailFlags, VideoInfo};
 use serde::{Deserialize, Serialize};
 
 use crate::{middleware::ETagCache, state::{DBLock, StringSetLock}, utils};
+use crate::constants::*;
 
 type JsonResult<T> = utils::Result<web::Json<T>>;
 type CustomizedJsonResult<T> = utils::Result<CustomizeResponder<web::Json<T>>>;
@@ -172,9 +173,9 @@ async fn post_video_branding() -> HttpResponse {
 
 #[get("/api/branding", wrap = "ETagCache")]
 async fn get_video_branding(db_lock: DBLock, string_set: StringSetLock, query: web::Query<VideoBrandingParams>) -> CustomizedJsonResult<SBApiVideo> {
-    let video_id = string_set.read().map_err(|_| anyhow!("Failed to acquire StringSet for reading"))?
+    let video_id = string_set.read().map_err(|_| SS_READ_ERR.clone())?
         .set.get(query.0.videoID.as_str()).cloned();
-    let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     if let Some(service) = query.0.service {
         if service != "YouTube" {
             return Ok(web::Json(unknown_video(&query.0.videoID)).customize().with_status(StatusCode::NOT_FOUND));
@@ -245,7 +246,7 @@ struct ChunkBrandingPath {
 
 #[get("/api/branding/{hash_prefix}", wrap = "ETagCache")]
 async fn get_chunk_branding(db_lock: DBLock, query: web::Query<ChunkBrandingParams>, path: web::Path<ChunkBrandingPath>) -> CustomizedJsonResult<HashMap<Arc<str>, SBApiVideo>> {
-    let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     if let Some(service) = query.0.service {
         if service != "YouTube" {
             return Ok(web::Json(HashMap::new()).customize().with_status(StatusCode::NOT_FOUND));
@@ -326,9 +327,9 @@ struct UserInfo {
 
 #[get("/api/userInfo", wrap = "ETagCache")]
 async fn get_user_info(db_lock: DBLock, string_set: StringSetLock, query: web::Query<UserInfoParams>) -> JsonResult<UserInfo> {
-    let user_id = string_set.read().map_err(|_| anyhow!("Failed to acquire StringSet for reading"))?
+    let user_id = string_set.read().map_err(|_| SS_READ_ERR.clone())?
         .set.get(query.0.publicUserID.as_str()).cloned();
-    let db = db_lock.read().map_err(|_| anyhow!("Failed to acquire DatabaseState for reading"))?;
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     Ok(web::Json(match user_id {
         None => {
             let user_id: Arc<str> = query.0.publicUserID.into();

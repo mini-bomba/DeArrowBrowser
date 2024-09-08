@@ -16,26 +16,23 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 #![allow(clippy::needless_pass_by_value)]
-use std::sync::LazyLock;
+use std::sync::atomic::Ordering;
 use std::{collections::HashSet, sync::Arc};
+use actix_web::Either;
 use actix_web::{Responder, get, post, web, http::StatusCode, HttpResponse, rt::task::spawn_blocking};
 use error_handling::{anyhow, bail, ErrorContext, IntoErrorIterator, ResContext, SerializableError};
-use chrono::{Utc, DateTime};
+use chrono::Utc;
 use dearrow_parser::{DearrowDB, ThumbnailFlags, TitleFlags};
-use dearrow_browser_api::sync::*;
+use dearrow_browser_api::sync::{*, self as api};
 use log::warn;
 use serde::Deserialize;
 
 use crate::built_info;
 use crate::constants::*;
-use crate::middleware::ETagCache;
+use crate::middleware::{ETagCache, ETagCacheControl};
 use crate::sbserver_emulation::get_random_time_for_video;
 use crate::state::*;
-use crate::utils;
-
-static SERVER_VERSION:  LazyLock<Arc<str>> = LazyLock::new(|| built_info::PKG_VERSION.into());
-static SERVER_GIT_HASH: LazyLock<Option<Arc<str>>> = LazyLock::new(|| built_info::GIT_COMMIT_HASH.map(std::convert::Into::into));
-static BUILD_TIMESTAMP: LazyLock<Option<i64>> = LazyLock::new(|| DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC).ok().map(|t| t.timestamp()));
+use crate::utils::{self, ExtendResponder, ResponderExt};
 
 pub fn configure(app_config: web::Data<AppConfig>) -> impl FnOnce(&mut web::ServiceConfig) {
     return move |cfg| {
@@ -68,6 +65,7 @@ pub fn configure(app_config: web::Data<AppConfig>) -> impl FnOnce(&mut web::Serv
 }
 
 type JsonResult<T> = utils::Result<web::Json<T>>;
+type JsonResultOrFetchProgress<T> = utils::Result<Either<web::Json<T>, (ExtendResponder<web::Json<api::ChannelFetchProgress>>, StatusCode)>>;
 
 #[derive(Deserialize)]
 #[serde(default)]
@@ -273,22 +271,34 @@ async fn get_titles_by_user_id(db_lock: DBLock, string_set: StringSetLock, path:
 }
 
 #[get("/titles/channel/{channel}", wrap = "ETagCache")]
-async fn get_titles_by_channel(db_lock: DBLock, path: web::Path<String>) -> JsonResult<Vec<ApiTitle>> {
+async fn get_titles_by_channel(db_lock: DBLock, path: web::Path<String>) -> JsonResultOrFetchProgress<Vec<ApiTitle>> {
     let channel_cache = {
         let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
         db.channel_cache.clone()
     };
     let channel_data = channel_cache.get_channel(path.into_inner().as_str()).await.context("Failed to get channel info")?;
 
-    // we only really need the string pointer's address to figure out if they're equal, thanks to
-    // the `StringSet`
-    let vid_set: HashSet<usize> = channel_data.video_ids.iter().map(utils::arc_addr).collect();
-    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
-    let titles = db.db.titles.iter().rev()
-        .filter(|title| vid_set.contains(&utils::arc_addr(&title.video_id)))
-        .map(|t| t.into_with_db(&db.db))
-        .collect();
-    Ok(web::Json(titles))
+    match channel_data {
+        GetChannelOutput::Pending(progress) => {
+            let mut resp = web::Json(api::ChannelFetchProgress {
+                videos_fetched: progress.videos_fetched.load(Ordering::Relaxed) as u64,
+                videos_in_fscache: progress.videos_in_fscache.load(Ordering::Relaxed) as u64,
+            }).extend();
+            resp.extensions.insert(ETagCacheControl::DoNotCache);
+            Ok(Either::Right((resp, *NOT_READY_YET)))
+        },
+        GetChannelOutput::Resolved(result) => {
+            // we only really need the string pointer's address to figure out if they're equal, thanks to
+            // the `StringSet`
+            let vid_set: HashSet<usize> = result.video_ids.iter().map(utils::arc_addr).collect();
+            let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
+            let titles = db.db.titles.iter().rev()
+                .filter(|title| vid_set.contains(&utils::arc_addr(&title.video_id)))
+                .map(|t| t.into_with_db(&db.db))
+                .collect();
+            Ok(Either::Left(web::Json(titles)))
+        }
+    }
 }
 
 #[get("/thumbnails", wrap = "ETagCache")]
@@ -362,22 +372,35 @@ async fn get_thumbnails_by_user_id(db_lock: DBLock, string_set: StringSetLock, p
 }
 
 #[get("/thumbnails/channel/{channel}", wrap = "ETagCache")]
-async fn get_thumbnails_by_channel(db_lock: DBLock, path: web::Path<String>) -> JsonResult<Vec<ApiThumbnail>> {
+async fn get_thumbnails_by_channel(db_lock: DBLock, path: web::Path<String>) -> JsonResultOrFetchProgress<Vec<ApiThumbnail>> {
     let channel_cache = {
         let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
         db.channel_cache.clone()
     };
     let channel_data = channel_cache.get_channel(path.into_inner().as_str()).await.context("Failed to get channel info")?;
 
-    // we only really need the string pointer's address to figure out if they're equal, thanks to
-    // the `StringSet`
-    let vid_set: HashSet<usize> = channel_data.video_ids.iter().map(utils::arc_addr).collect();
-    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
-    let thumbs = db.db.thumbnails.iter().rev()
-        .filter(|thumbnail| vid_set.contains(&utils::arc_addr(&thumbnail.video_id)))
-        .map(|t| t.into_with_db(&db.db))
-        .collect();
-    Ok(web::Json(thumbs))
+    match channel_data {
+        GetChannelOutput::Pending(progress) => {
+            let mut resp = web::Json(api::ChannelFetchProgress {
+                videos_fetched: progress.videos_fetched.load(Ordering::Relaxed) as u64,
+                videos_in_fscache: progress.videos_in_fscache.load(Ordering::Relaxed) as u64,
+            }).extend();
+            resp.extensions.insert(ETagCacheControl::DoNotCache);
+            Ok(Either::Right((resp, *NOT_READY_YET)))
+        },
+        GetChannelOutput::Resolved(result) => {
+            // we only really need the string pointer's address to figure out if they're equal, thanks to
+            // the `StringSet`
+            let vid_set: HashSet<usize> = result.video_ids.iter().map(utils::arc_addr).collect();
+            let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
+            let thumbs = db.db.thumbnails.iter().rev()
+                .filter(|thumbnail| vid_set.contains(&utils::arc_addr(&thumbnail.video_id)))
+                .map(|t| t.into_with_db(&db.db))
+                .collect();
+            Ok(Either::Left(web::Json(thumbs)))
+        }
+    }
+
 }
 
 #[get("/users/user_id/{user_id}", wrap = "ETagCache")]

@@ -97,7 +97,6 @@ pub fn TableModeSwitch(props: &TableModeSwitchProps) -> Html {
 
 #[derive(Properties, PartialEq, Clone)]
 pub struct PageSelectProps {
-    // pub state: UseStateHandle<usize>,
     pub page_count: usize,
 }
 
@@ -175,18 +174,18 @@ impl DetailList {
 }
 
 #[hook]
-pub fn use_detail_download(url: Rc<Url>, mode: DetailType, sort: bool) -> SuspensionResult<Rc<Result<DetailList, ErrorContext>>> {
+pub fn use_detail_download(url: Rc<Url>, mode: DetailType, sort: bool) -> SuspensionResult<Rc<Result<DetailSlice, ErrorContext>>> {
     let status: StatusContext = use_context().expect("StatusResponse should be defined");
     use_async_suspension(|(mode, url, sort, _)| async move {
         let mut result = match mode {
-            DetailType::Thumbnail => DetailList::Thumbnails(api_request((*url).clone()).await?),
-            DetailType::Title => DetailList::Titles(api_request((*url).clone()).await?),
+            DetailType::Thumbnail => DetailSlice::Thumbnails(RcEq(api_request((*url).clone()).await?)),
+            DetailType::Title => DetailSlice::Titles(RcEq(api_request((*url).clone()).await?)),
         };
         if sort {
         // Sort by time submited, most to least recent
             match result {
-                DetailList::Thumbnails(ref mut list) => list.sort_unstable_by(|a, b| b.time_submitted.cmp(&a.time_submitted)),
-                DetailList::Titles(ref mut list) => list.sort_unstable_by(|a, b| b.time_submitted.cmp(&a.time_submitted)),
+                DetailSlice::Thumbnails(ref mut list) => Rc::get_mut(&mut list.0).expect("should be get mutable reference here").sort_unstable_by(|a, b| b.time_submitted.cmp(&a.time_submitted)),
+                DetailSlice::Titles(ref mut list) => Rc::get_mut(&mut list.0).expect("should be get mutable reference here").sort_unstable_by(|a, b| b.time_submitted.cmp(&a.time_submitted)),
             }
         }
         Ok(result)
@@ -252,20 +251,20 @@ pub enum DetailIndex {
 }
 
 #[hook]
-pub fn use_detail_slice(details: Rc<Result<DetailList, ErrorContext>>, index: DetailIndex) -> DetailSlice {
-    (*use_memo((RcEq(details), index), |(details, index)|
-        match (&**details, index) {
-            (Err(_), _)                                                                 
+pub fn use_detail_slice(details: Option<DetailSlice>, index: DetailIndex) -> DetailSlice {
+    (*use_memo((details, index), |(details, index)|
+        match (details, index) {
+            (None, _)                                                                 
                 => DetailSlice::Thumbnails((&[] as &[ApiThumbnail]).into()), // dummy slice on error
 
-            (Ok(DetailList::Thumbnails(ref thumbs)), DetailIndex::Page { size, index }) 
+            (Some(DetailSlice::Thumbnails(ref thumbs)), DetailIndex::Page { size, index }) 
                 => DetailSlice::Thumbnails(if size*(index+1) > thumbs.len() {thumbs.get(size*index..)} else {thumbs.get(size*index..size*(index+1))}.unwrap_or(&[]).into()),
-            (Ok(DetailList::Thumbnails(ref thumbs)), DetailIndex::All)                  
+            (Some(DetailSlice::Thumbnails(ref thumbs)), DetailIndex::All)                  
                 => DetailSlice::Thumbnails((&**thumbs).into()),
 
-            (Ok(DetailList::Titles(ref titles)), DetailIndex::Page { size, index })     
+            (Some(DetailSlice::Titles(ref titles)), DetailIndex::Page { size, index })     
                 => DetailSlice::Titles(if size*(index+1) > titles.len() {titles.get(size*index..)} else {titles.get(size*index..size*(index+1))}.unwrap_or(&[]).into()),
-            (Ok(DetailList::Titles(ref titles)), DetailIndex::All)                      
+            (Some(DetailSlice::Titles(ref titles)), DetailIndex::All)                      
                 => DetailSlice::Titles((&**titles).into()),
         }
     )).clone()
@@ -613,7 +612,7 @@ pub fn BaseDetailTableRenderer(props: &BaseDetailTableRendererProps) -> Html {
 #[function_component]
 pub fn UnpaginatedDetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
     let details = use_detail_download(props.url.clone(), props.mode, props.sort)?;
-    let detail_slice = use_detail_slice(details.clone(), DetailIndex::All);
+    let detail_slice = use_detail_slice((*details).as_ref().ok().cloned(), DetailIndex::All);
 
     if let Some(entry_count) = &props.entry_count {
         if let Ok(ref list) = *details {
@@ -638,13 +637,35 @@ pub fn UnpaginatedDetailTableRenderer(props: &DetailTableRendererProps) -> HtmlR
 }
 
 #[function_component]
-pub fn PaginatedDetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
+pub fn BasePaginatedDetailTableRenderer(props: &BaseDetailTableRendererProps) -> Html {
     let settings_context: SettingsContext = use_context().expect("SettingsContext should be available");
     let settings = settings_context.settings();
     let entries_per_page: usize = settings.entries_per_page.into();
     let state = use_location_state().get_state();
+    let detail_slice = use_detail_slice(Some(props.details.clone()), DetailIndex::Page { size: entries_per_page, index: state.detail_table_page });
+
+    let detail_count = props.details.len();
+    let page_count = (detail_count+entries_per_page-1)/entries_per_page;
+
+    let inner_props = BaseDetailTableRendererProps {
+        details: detail_slice,
+        ..*props
+    };
+    
+    html! {
+        <>
+            <BaseDetailTableRenderer ..{inner_props} />
+            if page_count > 1 {
+                <PageSelect {page_count} />
+            }
+        </>
+    }
+}
+
+#[function_component]
+pub fn PaginatedDetailTableRenderer(props: &DetailTableRendererProps) -> HtmlResult {
     let details = use_detail_download(props.url.clone(), props.mode, props.sort)?;
-    let detail_slice = use_detail_slice(details.clone(), DetailIndex::Page { size: entries_per_page, index: state.detail_table_page });
+    let detail_slice = use_detail_slice((*details).as_ref().ok().cloned(), DetailIndex::All);
 
     if let Some(entry_count) = &props.entry_count {
         if let Ok(ref list) = *details {
@@ -662,15 +683,8 @@ pub fn PaginatedDetailTableRenderer(props: &DetailTableRendererProps) -> HtmlRes
             </center>
         });
     }
-    let detail_count = details.as_ref().as_ref().unwrap().len();
-    let page_count = (detail_count+entries_per_page)/entries_per_page;
     
     Ok(html! {
-        <>
-            <BaseDetailTableRenderer details={detail_slice} hide_videoid={props.hide_videoid} hide_userid={props.hide_userid} hide_username={props.hide_username} />
-            if page_count > 1 {
-                <PageSelect {page_count} />
-            }
-        </>
+        <BasePaginatedDetailTableRenderer details={detail_slice} hide_videoid={props.hide_videoid} hide_userid={props.hide_userid} hide_username={props.hide_username} />
     })
 }

@@ -110,3 +110,9 @@ pub struct InnertubeChannel {
     pub channel_name: RcStr,
     pub total_videos: u64,
 }
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Copy)]
+pub struct ChannelFetchProgress {
+    pub videos_fetched: u64,
+    pub videos_in_fscache: u64,
+}

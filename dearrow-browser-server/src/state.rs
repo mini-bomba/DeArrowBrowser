@@ -15,18 +15,18 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use actix_web::{http::header::EntityTag, web};
+use actix_web::{http::header::EntityTag, rt::{spawn, time::sleep}, web};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use chrono::{DateTime, Utc};
 use dearrow_parser::{DearrowDB, StringSet};
-use error_handling::{bail, ErrorContext, ResContext};
-use futures::{future::{BoxFuture, Shared}, lock::Mutex, FutureExt};
+use error_handling::{bail, ErrContext, ErrorContext, ResContext};
+use futures::{channel::oneshot, future::{BoxFuture, Shared}, lock::Mutex, select_biased, FutureExt};
 use getrandom::getrandom;
 use reqwest::Client;
-use std::{collections::HashMap, path::PathBuf, sync::{Arc, RwLock}};
+use std::{collections::HashMap, path::PathBuf, sync::{atomic::AtomicUsize, Arc, RwLock}};
 use serde::{Serialize, Deserialize};
 
-use crate::{constants, innertube};
+use crate::{constants::*, innertube};
 
 pub type DBLock = web::Data<RwLock<DatabaseState>>;
 pub type StringSetLock = web::Data<RwLock<StringSet>>;
@@ -44,6 +44,7 @@ pub struct AppConfig {
     pub startup_timestamp: DateTime<Utc>,
     pub innertube: InnertubeConfig,
     pub enable_timings_header: bool,
+    pub channel_cache_path: PathBuf,
 }
 
 impl Default for AppConfig {
@@ -60,6 +61,7 @@ impl Default for AppConfig {
             startup_timestamp: Utc::now(),
             innertube: InnertubeConfig::default(),
             enable_timings_header: false,
+            channel_cache_path: PathBuf::from("./cache/channels")
         }
     }
 }
@@ -145,17 +147,30 @@ impl DatabaseState {
 type UCIDFutureResult = Result<Arc<str>, ErrorContext>;
 type SharedUCIDFuture = Shared<BoxFuture<'static, UCIDFutureResult>>;
 
-type ChannelFutureResult = Result<Arc<ChannelData>, ErrorContext>;
-type SharedChannelFuture = Shared<BoxFuture<'static, ChannelFutureResult>>;
-
 #[derive(Clone)]
 pub struct ChannelCache {
-    /// NOTE: Keas of this hashmap and results from these futures are NOT stored in the `StringSet`!
+    /// NOTE: Keys of this hashmap and results from these futures are NOT stored in the `StringSet`!
     handle_to_ucid_cache: Arc<Mutex<HashMap<Arc<str>, SharedUCIDFuture>>>,
     /// NOTE: Keys of this hashmap are NOT stored in the `StringSet`!
-    data_cache: Arc<Mutex<HashMap<Arc<str>, SharedChannelFuture>>>,
+    data_cache: Arc<Mutex<HashMap<Arc<str>, ChannelDataCacheEntry>>>,
     string_set: Arc<RwLock<StringSet>>,
     client: reqwest::Client,
+}
+
+#[derive(Clone)]
+enum ChannelDataCacheEntry {
+    Pending {
+        future: Shared<oneshot::Receiver<Result<Arc<ChannelData>, ErrorContext>>>,
+        progress: Arc<ChannelFetchProgress>,
+    },
+    Resolved(Arc<ChannelData>),
+    Failed(ErrorContext),
+}
+
+#[derive(Debug, Default)]
+pub struct ChannelFetchProgress {
+    pub videos_fetched: AtomicUsize,
+    pub videos_in_fscache: AtomicUsize,
 }
 
 #[derive(Debug)]
@@ -164,6 +179,12 @@ pub struct ChannelData {
     /// only contains video ids found in the `StringSet` at the time of creation
     pub video_ids: Box<[Arc<str>]>,
     pub total_videos: usize,
+}
+
+#[derive(Clone, Debug)]
+pub enum GetChannelOutput {
+    Pending(Arc<ChannelFetchProgress>),
+    Resolved(Arc<ChannelData>),
 }
 
 impl ChannelCache {
@@ -193,9 +214,9 @@ impl ChannelCache {
         innertube::handle_to_ucid(&client, &handle).await.map(Into::into)
     }
 
-    async fn ucid_to_channel(client: Client, string_set_lock: Arc<RwLock<StringSet>>, ucid: Arc<str>) -> ChannelFutureResult {
-        let it_res = innertube::get_channel(&client, &ucid).await?;
-        let string_set = string_set_lock.read().map_err(|_| constants::SS_READ_ERR.clone())?;
+    async fn fetch_channel(&self, ucid: &str, progress: Arc<ChannelFetchProgress>) -> Result<Arc<ChannelData>, ErrorContext> {
+        let it_res = innertube::get_channel(&self.client, ucid, progress).await?;
+        let string_set = self.string_set.read().map_err(|_| SS_READ_ERR.clone())?;
         Ok(Arc::new(ChannelData {
             channel_name: it_res.name.into(),
             total_videos: it_res.video_ids.len(),
@@ -203,16 +224,26 @@ impl ChannelCache {
         }))
     }
 
-    pub async fn get_channel(&self, handle: &str) -> ChannelFutureResult {
-        let ucid = if innertube::UCID_REGEX.is_match(handle) {
+    async fn fetch_channel_task(cache: ChannelCache, ucid: Arc<str>, progress: Arc<ChannelFetchProgress>, output: oneshot::Sender<Result<Arc<ChannelData>, ErrorContext>>) {
+        let result = cache.fetch_channel(&ucid, progress).await;
+        let _ = output.send(result.clone());
+        let mut data_cache = cache.data_cache.lock().await;
+        match result {
+            Ok(res) => data_cache.insert(ucid, ChannelDataCacheEntry::Resolved(res)),
+            Err(err) => data_cache.insert(ucid, ChannelDataCacheEntry::Failed(err))
+        };
+    }
+
+    pub async fn get_channel(&self, handle: &str) -> Result<GetChannelOutput, ErrorContext> {
+        let ucid = if UCID_REGEX.is_match(handle) {
             handle.into()
         } else {
             let handle = handle.to_lowercase();
-            let handle = if innertube::HANDLE_REGEX.is_match(&handle) {
+            let handle = if HANDLE_REGEX.is_match(&handle) {
                 handle.into()
             } else {
                 let maybe_handle = format!("@{handle}");
-                if !innertube::HANDLE_REGEX.is_match(&maybe_handle) {
+                if !HANDLE_REGEX.is_match(&maybe_handle) {
                     bail!("Invalid handle/UCID!")
                 }
                 maybe_handle.into()
@@ -226,11 +257,28 @@ impl ChannelCache {
             ucid_future.await.context("Failed to convert handle to UCID")?
         };
 
-        let channel_data = {
+        let channel_data_entry = {
             let mut channel_data_cache = self.data_cache.lock().await;
-            channel_data_cache.entry(ucid).or_insert_with_key(|ucid| Self::ucid_to_channel(self.client.clone(), self.string_set.clone(), ucid.clone()).boxed().shared()).clone()
-        }.await.context("Failed to fetch channel data")?;
+            channel_data_cache.entry(ucid).or_insert_with_key(|ucid| {
+                let progress: Arc<ChannelFetchProgress> = Arc::default();
+                let (sender, receiver) = oneshot::channel();
+                spawn(Self::fetch_channel_task(self.clone(), ucid.clone(), progress.clone(), sender));
+                ChannelDataCacheEntry::Pending { 
+                    future: receiver.shared(),
+                    progress,
+                }
+            }).clone()
+        };
 
-        Ok(channel_data)
+        Ok::<usize, ErrorContext>(0)?;
+
+        match channel_data_entry {
+            ChannelDataCacheEntry::Resolved(res) => Ok(GetChannelOutput::Resolved(res)),
+            ChannelDataCacheEntry::Failed(err) => Err(err.context("Failed to fetch channel data")),
+            ChannelDataCacheEntry::Pending { mut future, progress } => select_biased! {
+                res = future => Ok(GetChannelOutput::Resolved(res.context("Failed to fetch channel data")?.context("Failed to fetch channel data")?)),
+                () = sleep(IT_TIMEOUT).fuse() => Ok(GetChannelOutput::Pending(progress)),
+            }
+        }
     }
 }

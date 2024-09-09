@@ -15,7 +15,7 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use std::{fmt::{Debug, Display}, fs, path::Path, sync::Arc, time::UNIX_EPOCH};
+use std::{ffi::CString, fmt::{Debug, Display}, fs, os::{fd::AsRawFd, unix::ffi::OsStrExt}, path::Path, sync::Arc, time::UNIX_EPOCH};
 
 use actix_web::{dev::Extensions, http::{header::{HeaderMap, TryIntoHeaderPair}, StatusCode}, HttpResponse, Responder, ResponseError};
 use error_handling::{ErrorContext, IntoErrorIterator};
@@ -143,3 +143,16 @@ pub trait ResponderExt: Responder + Sized {
 }
 
 impl<T> ResponderExt for T where T: Responder + Sized {}
+
+
+pub fn link_file<T: AsRawFd>(file: &T, new_path: &Path) -> std::io::Result<()> {
+    let path_cstr = CString::new(new_path.as_os_str().as_bytes()).expect("Failed to convert new_path to a CString");
+    let res = unsafe {
+        libc::linkat(file.as_raw_fd(), c"".as_ptr(), libc::AT_FDCWD, path_cstr.as_ptr(), libc::AT_EMPTY_PATH)
+    };
+    if res == 0 {
+        Ok(())
+    } else {
+        Err(std::io::Error::last_os_error())
+    }
+}

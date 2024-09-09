@@ -34,6 +34,7 @@ pub struct StatusResponse {
     pub video_infos: usize,
     pub uncut_segments: usize,
     pub cached_channels: usize,
+    pub fscached_channels: usize,
     pub server_version: RcStr,
     pub server_git_hash: Option<RcStr>,
     pub server_git_dirty: Option<bool>,
@@ -108,11 +109,21 @@ pub struct InnertubeVideo {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct InnertubeChannel {
     pub channel_name: RcStr,
+    pub num_videos: u64,
+    pub num_vods: u64,
+    pub num_shorts: u64,
     pub total_videos: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Copy)]
 pub struct ChannelFetchProgress {
+    pub videos: BrowseProgress,
+    pub vods: BrowseProgress,
+    pub shorts: BrowseProgress,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Copy)]
+pub struct BrowseProgress {
     pub videos_fetched: u64,
     pub videos_in_fscache: u64,
 }

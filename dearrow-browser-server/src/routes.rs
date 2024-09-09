@@ -16,7 +16,6 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 #![allow(clippy::needless_pass_by_value)]
-use std::sync::atomic::Ordering;
 use std::{collections::HashSet, sync::Arc};
 use actix_web::Either;
 use actix_web::{Responder, get, post, web, http::StatusCode, HttpResponse, rt::task::spawn_blocking};
@@ -24,6 +23,7 @@ use error_handling::{anyhow, bail, ErrorContext, IntoErrorIterator, ResContext, 
 use chrono::Utc;
 use dearrow_parser::{DearrowDB, ThumbnailFlags, TitleFlags};
 use dearrow_browser_api::sync::{*, self as api};
+use futures::join;
 use log::warn;
 use serde::Deserialize;
 
@@ -102,7 +102,7 @@ async fn get_status(db_lock: DBLock, string_set: StringSetLock, config: web::Dat
         let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
         db.channel_cache.clone()
     };
-    let cached_channels = channel_cache.num_channels_cached().await;
+    let (cached_channels, fscached_channels) = join!(channel_cache.num_channels_cached(), channel_cache.num_channels_fscached());
     let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     Ok(web::Json(StatusResponse {
         last_updated: db.last_updated,
@@ -117,6 +117,7 @@ async fn get_status(db_lock: DBLock, string_set: StringSetLock, config: web::Dat
         video_infos: db.video_info_count,
         uncut_segments: db.uncut_segment_count,
         cached_channels,
+        fscached_channels,
         server_version: SERVER_VERSION.clone(),
         server_git_hash: SERVER_GIT_HASH.clone(),
         server_git_dirty: built_info::GIT_DIRTY,
@@ -280,10 +281,7 @@ async fn get_titles_by_channel(db_lock: DBLock, path: web::Path<String>) -> Json
 
     match channel_data {
         GetChannelOutput::Pending(progress) => {
-            let mut resp = web::Json(api::ChannelFetchProgress {
-                videos_fetched: progress.videos_fetched.load(Ordering::Relaxed) as u64,
-                videos_in_fscache: progress.videos_in_fscache.load(Ordering::Relaxed) as u64,
-            }).extend();
+            let mut resp = web::Json(api::ChannelFetchProgress::from(&progress)).extend();
             resp.extensions.insert(ETagCacheControl::DoNotCache);
             Ok(Either::Right((resp, *NOT_READY_YET)))
         },
@@ -381,10 +379,7 @@ async fn get_thumbnails_by_channel(db_lock: DBLock, path: web::Path<String>) -> 
 
     match channel_data {
         GetChannelOutput::Pending(progress) => {
-            let mut resp = web::Json(api::ChannelFetchProgress {
-                videos_fetched: progress.videos_fetched.load(Ordering::Relaxed) as u64,
-                videos_in_fscache: progress.videos_in_fscache.load(Ordering::Relaxed) as u64,
-            }).extend();
+            let mut resp = web::Json(api::ChannelFetchProgress::from(&progress)).extend();
             resp.extensions.insert(ETagCacheControl::DoNotCache);
             Ok(Either::Right((resp, *NOT_READY_YET)))
         },

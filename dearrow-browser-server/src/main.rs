@@ -59,7 +59,15 @@ async fn main() -> Result<(), ErrorContext> {
             return Err(e).context(format!("Failed to open {CONFIG_PATH}"));
         }
     });
-    create_dir_all(&config.channel_cache_path).context("Failed to create the channel cache directory")?;
+    {
+        create_dir_all(&config.channel_cache_path).context("Failed to create the channel cache main directory")?;
+        let mut cache_path = config.channel_cache_path.join("videos");
+        create_dir_all(&cache_path).context("Failed to create the channel cache videos directory")?;
+        cache_path.set_file_name("vods");
+        create_dir_all(&cache_path).context("Failed to create the channel cache vods directory")?;
+        cache_path.set_file_name("shorts");
+        create_dir_all(&cache_path).context("Failed to create the channel cache shorts directory")?;
+    }
     info!("Loading database...");
     let string_set_lock = web::Data::new(RwLock::new(StringSet::with_capacity(16384)));
     let reqwest_client = web::ThinData(ClientBuilder::new().timeout(Duration::from_secs_f64(config.reqwest_timeout_secs)).build().expect("Should be able to create a reqwest Client"));
@@ -75,7 +83,7 @@ async fn main() -> Result<(), ErrorContext> {
             last_modified: utils::get_mtime(&config.mirror_path.join("titles.csv")),
             updating_now: false,
             etag: None,
-            channel_cache: ChannelCache::new(string_set_lock.clone().into_inner(), reqwest_client.0.clone()),
+            channel_cache: ChannelCache::new(string_set_lock.clone().into_inner(), config.clone().into_inner(), reqwest_client.0.clone()),
             uncut_segment_count: 0,
             video_info_count: 0,
         };

@@ -18,12 +18,15 @@
 use actix_web::{http::header::EntityTag, rt::{spawn, time::sleep}, web};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use chrono::{DateTime, Utc};
+use dearrow_browser_api::sync as api;
 use dearrow_parser::{DearrowDB, StringSet};
 use error_handling::{bail, ErrContext, ErrorContext, ResContext};
-use futures::{channel::oneshot, future::{BoxFuture, Shared}, lock::Mutex, select_biased, FutureExt};
+use futures::{channel::oneshot, future::{BoxFuture, Shared}, join, lock::Mutex, select_biased, FutureExt};
 use getrandom::getrandom;
+use log::warn;
 use reqwest::Client;
-use std::{collections::HashMap, path::PathBuf, sync::{atomic::AtomicUsize, Arc, RwLock}};
+use tokio::fs::read_dir;
+use std::{collections::{HashMap, HashSet}, ffi::OsString, path::{Path, PathBuf}, sync::{atomic::{AtomicUsize, Ordering::Relaxed}, Arc, RwLock}, time::Instant};
 use serde::{Serialize, Deserialize};
 
 use crate::{constants::*, innertube};
@@ -153,24 +156,99 @@ pub struct ChannelCache {
     handle_to_ucid_cache: Arc<Mutex<HashMap<Arc<str>, SharedUCIDFuture>>>,
     /// NOTE: Keys of this hashmap are NOT stored in the `StringSet`!
     data_cache: Arc<Mutex<HashMap<Arc<str>, ChannelDataCacheEntry>>>,
+    fscache_count_cache: Arc<Mutex<Option<FSCacheCountCache>>>,
     string_set: Arc<RwLock<StringSet>>,
+    config: Arc<AppConfig>,
     client: reqwest::Client,
+}
+
+#[derive(Debug)]
+struct FSCacheCountCache {
+    future: Shared<BoxFuture<'static, usize>>,
+    timestamp: Instant,
+}
+
+impl FSCacheCountCache {
+    async fn list_dir(path: &Path) -> HashSet<OsString> {
+        let mut set = HashSet::new();
+        let mut reader = match read_dir(path).await {
+            Ok(r) => r,
+            Err(e) => {
+                warn!("Failed to list files in directory '{}': {e}", path.display());
+                return set;
+            }
+        };
+        loop {
+            match reader.next_entry().await {
+                Ok(Some(entry)) => set.insert(entry.file_name()),
+                Ok(None) => break,
+                Err(e) => {
+                    warn!("Got an error while listing files in directory '{}': {e}", path.display());
+                    break;
+                },
+            };
+        }
+        set
+    }
+
+    async fn count(config: Arc<AppConfig>) -> usize {
+        let vids_path = config.channel_cache_path.join(IT_BROWSE_VIDEOS.cache_dir);
+        let vods_path = config.channel_cache_path.join(IT_BROWSE_LIVE.cache_dir);
+        let shorts_path = config.channel_cache_path.join(IT_BROWSE_SHORTS.cache_dir);
+        let (mut videos, vods, shorts) = join!(Self::list_dir(&vids_path), Self::list_dir(&vods_path), Self::list_dir(&shorts_path));
+        videos.extend(vods);
+        videos.extend(shorts);
+        videos.len()
+    }
+
+    pub fn new(config: Arc<AppConfig>) -> FSCacheCountCache {
+        FSCacheCountCache { 
+            future: Self::count(config).boxed().shared(),
+            timestamp: Instant::now(),
+        }
+    }
 }
 
 #[derive(Clone)]
 enum ChannelDataCacheEntry {
     Pending {
         future: Shared<oneshot::Receiver<Result<Arc<ChannelData>, ErrorContext>>>,
-        progress: Arc<ChannelFetchProgress>,
+        progress: ChannelFetchProgress,
     },
     Resolved(Arc<ChannelData>),
     Failed(ErrorContext),
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct ChannelFetchProgress {
+    videos: Arc<BrowseProgress>,
+    vods: Arc<BrowseProgress>,
+    shorts: Arc<BrowseProgress>,
+}
+
+impl From<&ChannelFetchProgress> for api::ChannelFetchProgress {
+    fn from(value: &ChannelFetchProgress) -> Self {
+        api::ChannelFetchProgress {
+            videos: value.videos.as_ref().into(),
+            vods: value.vods.as_ref().into(),
+            shorts: value.shorts.as_ref().into(),
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct BrowseProgress {
     pub videos_fetched: AtomicUsize,
     pub videos_in_fscache: AtomicUsize,
+}
+
+impl From<&BrowseProgress> for api::BrowseProgress {
+    fn from(value: &BrowseProgress) -> Self {
+        api::BrowseProgress {
+            videos_fetched: value.videos_fetched.load(Relaxed) as u64,
+            videos_in_fscache: value.videos_in_fscache.load(Relaxed) as u64,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -178,21 +256,26 @@ pub struct ChannelData {
     pub channel_name: Box<str>,
     /// only contains video ids found in the `StringSet` at the time of creation
     pub video_ids: Box<[Arc<str>]>,
+    pub num_videos: usize,
+    pub num_vods: usize,
+    pub num_shorts: usize,
     pub total_videos: usize,
 }
 
 #[derive(Clone, Debug)]
 pub enum GetChannelOutput {
-    Pending(Arc<ChannelFetchProgress>),
+    Pending(ChannelFetchProgress),
     Resolved(Arc<ChannelData>),
 }
 
 impl ChannelCache {
-    pub fn new(string_set: Arc<RwLock<StringSet>>, client: Client) -> ChannelCache {
+    pub fn new(string_set: Arc<RwLock<StringSet>>, config: Arc<AppConfig>, client: Client) -> ChannelCache {
         ChannelCache { 
             handle_to_ucid_cache: Arc::default(),
             data_cache: Arc::default(), 
+            fscache_count_cache: Arc::default(),
             string_set,
+            config,
             client,
         }
     }
@@ -201,7 +284,9 @@ impl ChannelCache {
         ChannelCache { 
             handle_to_ucid_cache: Arc::default(),
             data_cache: Arc::default(), 
+            fscache_count_cache: self.fscache_count_cache.clone(),
             string_set: self.string_set.clone(),
+            config: self.config.clone(),
             client: self.client.clone(),
         }
     }
@@ -210,21 +295,48 @@ impl ChannelCache {
         self.data_cache.lock().await.len()
     }
 
+    pub async fn num_channels_fscached(&self) -> usize {
+        let mut cache = self.fscache_count_cache.lock().await;
+        let should_replace = match *cache {
+            None => true,
+            Some(ref cache) => cache.timestamp.elapsed() > FSCACHE_SIZE_CACHE_DURATION,
+        };
+        if should_replace {
+            *cache = Some(FSCacheCountCache::new(self.config.clone()));
+        }
+        let fut = cache.as_ref().unwrap().future.clone();
+        drop(cache);
+        fut.await
+    }
+
     async fn handle_to_ucid(client: Client, handle: Arc<str>) -> UCIDFutureResult {
         innertube::handle_to_ucid(&client, &handle).await.map(Into::into)
     }
 
-    async fn fetch_channel(&self, ucid: &str, progress: Arc<ChannelFetchProgress>) -> Result<Arc<ChannelData>, ErrorContext> {
-        let it_res = innertube::get_channel(&self.client, ucid, progress).await?;
+    async fn fetch_channel(&self, ucid: &Arc<str>, progress: ChannelFetchProgress) -> Result<Arc<ChannelData>, ErrorContext> {
+        let videos_task = spawn(innertube::browse_channel(self.client.clone(), self.config.clone(), &IT_BROWSE_VIDEOS, ucid.clone(), progress.videos.clone()));
+        let vods_task   = spawn(innertube::browse_channel(self.client.clone(), self.config.clone(), &IT_BROWSE_LIVE,   ucid.clone(), progress.vods.clone()));
+        let shorts_task = spawn(innertube::browse_channel(self.client.clone(), self.config.clone(), &IT_BROWSE_SHORTS, ucid.clone(), progress.shorts.clone()));
+
+        let videos = videos_task.await.context("Video fetching task panicked")?.context("Failed to fetch all videos")?;
+        let vods   = vods_task.await.context("VOD fetching task panicked")?.context("Failed to fetch all VODs")?;
+        let shorts = shorts_task.await.context("Shorts fetching task panicked")?.context("Failed to fetch all shorts")?;
+
         let string_set = self.string_set.read().map_err(|_| SS_READ_ERR.clone())?;
         Ok(Arc::new(ChannelData {
-            channel_name: it_res.name.into(),
-            total_videos: it_res.video_ids.len(),
-            video_ids: it_res.video_ids.into_iter().filter_map(|vid| string_set.set.get(vid.as_str()).cloned()).collect(),
+            channel_name: videos.name.into(),
+            num_videos: videos.video_ids.len(),
+            num_vods: vods.video_ids.len(),
+            num_shorts: shorts.video_ids.len(),
+            total_videos: videos.video_ids.len() + vods.video_ids.len() + shorts.video_ids.len(),
+            video_ids: videos.video_ids.into_iter()
+                .chain(vods.video_ids.into_iter())
+                .chain(shorts.video_ids.into_iter())
+                .filter_map(|vid| string_set.set.get(vid.as_str()).cloned()).collect(),
         }))
     }
 
-    async fn fetch_channel_task(cache: ChannelCache, ucid: Arc<str>, progress: Arc<ChannelFetchProgress>, output: oneshot::Sender<Result<Arc<ChannelData>, ErrorContext>>) {
+    async fn fetch_channel_task(cache: ChannelCache, ucid: Arc<str>, progress: ChannelFetchProgress, output: oneshot::Sender<Result<Arc<ChannelData>, ErrorContext>>) {
         let result = cache.fetch_channel(&ucid, progress).await;
         let _ = output.send(result.clone());
         let mut data_cache = cache.data_cache.lock().await;
@@ -260,7 +372,7 @@ impl ChannelCache {
         let channel_data_entry = {
             let mut channel_data_cache = self.data_cache.lock().await;
             channel_data_cache.entry(ucid).or_insert_with_key(|ucid| {
-                let progress: Arc<ChannelFetchProgress> = Arc::default();
+                let progress: ChannelFetchProgress = ChannelFetchProgress::default();
                 let (sender, receiver) = oneshot::channel();
                 spawn(Self::fetch_channel_task(self.clone(), ucid.clone(), progress.clone(), sender));
                 ChannelDataCacheEntry::Pending { 

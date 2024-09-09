@@ -688,6 +688,7 @@ dependencies = [
  "error_handling",
  "futures",
  "getrandom",
+ "libc",
  "log",
  "regex",
  "reqwest",
@@ -695,6 +696,8 @@ dependencies = [
  "serde_json",
  "serde_with",
  "sha2",
+ "tokio",
+ "tokio-stream",
  "toml",
 ]
 

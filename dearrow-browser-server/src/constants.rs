@@ -21,13 +21,14 @@ use error_handling::{ErrorContext, anyhow};
 use regex::Regex;
 use actix_web::http::StatusCode;
 
-use crate::built_info;
+use crate::{built_info, innertube::BrowseMode};
 
 // Paths
 pub const CONFIG_PATH: &str = "config.toml";
 
 // Limits
 pub static IT_TIMEOUT: Duration = Duration::from_secs(1);
+pub static FSCACHE_SIZE_CACHE_DURATION: Duration = Duration::from_secs(60);
 
 // Locking errors
 pub static SS_READ_ERR:  LazyLock<ErrorContext> = LazyLock::new(|| anyhow!("Failed to acquire StringSet for reading"));
@@ -39,6 +40,11 @@ pub static DB_WRITE_ERR: LazyLock<ErrorContext> = LazyLock::new(|| anyhow!("Fail
 pub static IT_PLAYER_URL: LazyLock<reqwest::Url> = LazyLock::new(|| reqwest::Url::parse("https://www.youtube.com/youtubei/v1/player").expect("Should be able to parse the IT_PLAYER_URL"));
 pub static IT_BROWSE_URL: LazyLock<reqwest::Url> = LazyLock::new(|| reqwest::Url::parse("https://www.youtube.com/youtubei/v1/browse").expect("Should be able to parse the IT_BROWSE_URL"));
 pub static YT_BASE_URL:   LazyLock<reqwest::Url> = LazyLock::new(|| reqwest::Url::parse("https://www.youtube.com/").expect("Should be able to parse the YT_BASE_URL"));
+
+// Innertube API browse modes
+pub static IT_BROWSE_VIDEOS: BrowseMode = BrowseMode { param: "EgZ2aWRlb3PyBgQKAjoA",         cache_dir: "videos" };
+pub static IT_BROWSE_LIVE:   BrowseMode = BrowseMode { param: "EgdzdHJlYW1z8gYECgJ6AA%3D%3D", cache_dir: "vods" };
+pub static IT_BROWSE_SHORTS: BrowseMode = BrowseMode { param: "EgZzaG9ydHPyBgUKA5oBAA%3D%3D", cache_dir: "shorts" };
 
 // Youtube channel IDs and handles
 // https://stackoverflow.com/a/16326307

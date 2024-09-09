@@ -288,7 +288,14 @@ pub fn StatusModal() -> Html {
                         </tr>
                         <tr class="hoverswitch-trigger">
                             <th>{"Cached channels"}</th>
-                            {number_hoverswitch!(td, status.cached_channels)}
+                            if status.cached_channels >= 1000 || status.fscached_channels >= 1000 {
+                                <td class="hoverswitch">
+                                    <span>{status.cached_channels.abbreviate_int()}{" / "}{status.fscached_channels.abbreviate_int()}</span>
+                                    <span>{status.cached_channels.render_int()}{" / "}{status.fscached_channels.render_int()}</span>
+                                </td>
+                            } else {
+                                <td>{status.cached_channels}{" / "}{status.fscached_channels}</td>
+                            }
                         </tr>
                         <tr class="hoverswitch-trigger">
                             <th>{"Parse errors"}</th>

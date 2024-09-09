@@ -16,15 +16,20 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::{collections::VecDeque, ops::Deref, sync::{atomic::Ordering, Arc}};
+use std::{collections::{HashSet, VecDeque}, ops::Deref, sync::{atomic::Ordering, Arc}};
 
 use actix_web::{get, web, Either, HttpResponse, http::StatusCode};
 use error_handling::{anyhow, bail, ErrorContext, ResContext};
 use dearrow_browser_api::sync::{InnertubeChannel, InnertubeVideo, self as api};
+use log::warn;
 use reqwest::Client;
+use tokio::{fs::{remove_file, File}, io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter}};
+use tokio_stream::{wrappers::LinesStream, StreamExt};
 
-use crate::{middleware::{ETagCache, ETagCacheControl}, state::{AppConfig, DBLock, GetChannelOutput, self}, utils::{self, ExtendResponder, ResponderExt}};
 use crate::constants::*;
+use crate::middleware::{ETagCache, ETagCacheControl};
+use crate::state::{self, AppConfig, DBLock, GetChannelOutput};
+use crate::utils::{self, link_file, ExtendResponder, ResponderExt};
 
 type JsonResult<T> = utils::Result<web::Json<T>>;
 type JsonResultOrFetchProgress<T> = utils::Result<Either<web::Json<T>, (ExtendResponder<web::Json<api::ChannelFetchProgress>>, StatusCode)>>;
@@ -86,16 +91,16 @@ async fn get_channel_endpoint(path: web::Path<String>, db_lock: DBLock) -> JsonR
 
     match channel_data {
         GetChannelOutput::Pending(progress) => {
-            let mut resp = web::Json(api::ChannelFetchProgress {
-                videos_fetched: progress.videos_fetched.load(Ordering::Relaxed) as u64,
-                videos_in_fscache: progress.videos_in_fscache.load(Ordering::Relaxed) as u64,
-            }).extend();
+            let mut resp = web::Json(api::ChannelFetchProgress::from(&progress)).extend();
             resp.extensions.insert(ETagCacheControl::DoNotCache);
             Ok(Either::Right((resp, *NOT_READY_YET)))
         },
         GetChannelOutput::Resolved(result) => {
             Ok(Either::Left(web::Json(InnertubeChannel {
                 channel_name: result.channel_name.deref().into(),
+                num_videos: result.num_videos as u64,
+                num_vods: result.num_vods as u64,
+                num_shorts: result.num_shorts as u64,
                 total_videos: result.total_videos as u64,
             })))
         }
@@ -136,26 +141,57 @@ pub async fn handle_to_ucid(client: &Client, handle: &str) -> Result<String, Err
 }
 
 
-pub struct ChannelData {
+pub struct BrowseChannelData {
     pub name: String,
     pub video_ids: Vec<String>,
 }
 
-pub async fn get_channel(client: &Client, ucid: &str, progress: Arc<state::ChannelFetchProgress>) -> Result<ChannelData, ErrorContext> {
-    if !UCID_REGEX.is_match(ucid) {
+pub struct BrowseMode {
+    pub param: &'static str,
+    pub cache_dir: &'static str,
+}
+
+pub async fn browse_channel(client: Client, config: Arc<AppConfig>, mode: &BrowseMode, ucid: Arc<str>, progress: Arc<state::BrowseProgress>) -> Result<BrowseChannelData, ErrorContext> {
+    if !UCID_REGEX.is_match(&ucid) {
         bail!("Invalid UCID");
     }
+    
+    // Check fscache
+    let fscache_dir = config.channel_cache_path.join(mode.cache_dir);
+    let fscache_path = fscache_dir.join(&*ucid);
+    let cached_video_ids: Vec<String> = match File::open(&fscache_path).await {
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => vec![],
+        Err(err) => {
+            warn!("Got an unexpected error while trying to open the videos cache entry for channel UCID '{ucid}' for reading: {err}");
+            vec![]
+        },
+        Ok(file) => {
+            let file = BufReader::new(file);
+            match LinesStream::new(file.lines()).filter(|r| !r.as_ref().is_ok_and(String::is_empty)).collect().await {
+                Ok(v) => v,
+                Err(err) => {
+                    warn!("Got an unexpected error while trying to read the videos cache entry for channel UCID '{ucid}': {err}");
+                    vec![]
+                }
+            }
+        }
+    };
+    progress.videos_in_fscache.store(cached_video_ids.len(), Ordering::Relaxed);
 
+    // Put into hashmap for easy searching
+    let cached_video_ids_set: HashSet<&str> = cached_video_ids.iter().map(AsRef::as_ref).collect();
+
+    // Fetch new vids via innertube
     let mut channel_name: Option<String> = None;
-    let mut video_ids = vec![];
+    let mut new_video_ids = vec![];
     let mut pending_requests: VecDeque<it::browse::Input> = VecDeque::from([it::browse::Input {
-        browse_id: Some(ucid),
-        params: Some("EgZ2aWRlb3PyBgQKAjoA"),
+        browse_id: Some(&ucid),
+        params: Some(mode.param),
         context: it::Context::default(),
         continuation: None,
     }]);
 
-    while let Some(request) = pending_requests.pop_front() {
+    'outer: while let Some(request) = pending_requests.pop_front() {
         let is_continuation = request.continuation.is_some();
         let resp = client.post(IT_BROWSE_URL.clone()).json(&request).send().await.context("Failed to send browse request")?;
         let resp = resp.error_for_status().context("Browse request failed")?;
@@ -170,13 +206,28 @@ pub async fn get_channel(client: &Client, ucid: &str, progress: Arc<state::Chann
 
             channel_name = Some(resp.microformat.microformat_data_renderer.title);
 
-            resp.contents.two_column_browse_results_renderer.tabs.pop().context("Failed to decode browse channel response - decoded tabs list was empty")?
-                .tab_renderer.content.rich_grid_renderer.contents
+            let Some(tab) = resp.contents.two_column_browse_results_renderer.tabs.pop() else {
+                if mode.param == IT_BROWSE_VIDEOS.param {
+                    bail!("Failed to decode browse channel response - decoded tabs list was empty");
+                }
+                break 'outer;  // acceptable for other tabs
+            };
+            tab.tab_renderer.content.rich_grid_renderer.contents
         };
 
         for res in results {
             match res {
-                it::browse::out::RichGridItem::RichItemRenderer { content } => video_ids.push(content.video_renderer.video_id),
+                it::browse::out::RichGridItem::RichItemRenderer { content } => {
+                    let video_id = match content {
+                        it::browse::out::RichItemContent::ReelItemRenderer { video_id } |
+                        it::browse::out::RichItemContent::VideoRenderer { video_id } => video_id,
+                    };
+                    if cached_video_ids_set.contains(&*video_id) {
+                        progress.videos_fetched.store(new_video_ids.len(), Ordering::Relaxed);
+                        break 'outer;
+                    }
+                    new_video_ids.push(video_id);
+                },
                 it::browse::out::RichGridItem::ContinuationItemRenderer { continuation_endpoint } => pending_requests.push_back(it::browse::Input {
                     continuation: Some(continuation_endpoint.continuation_command.token),
                     context: it::Context::default(),
@@ -185,12 +236,58 @@ pub async fn get_channel(client: &Client, ucid: &str, progress: Arc<state::Chann
                 }),
             }
         }
-        progress.videos_fetched.store(video_ids.len(), Ordering::Relaxed);
+        progress.videos_fetched.store(new_video_ids.len(), Ordering::Relaxed);
+    }
+    drop(cached_video_ids_set); // no longer needed
+
+    // Arrange the final list
+    if new_video_ids.is_empty() {
+        new_video_ids = cached_video_ids;
+    } else {
+        new_video_ids.extend_from_slice(&cached_video_ids);
+        drop(cached_video_ids);
+
+        // Cache videoid list
+        // First create the file as a temporary, unlinked file. Then link it after writing is finished.
+        //
+        // This essentially makes writing the cache file an atomic operation - if writing fails, no
+        // changes to the file system are made.
+        // Worst that can happen is we unlink the existing file and are unable to link the new one in.
+        match File::options().write(true).custom_flags(libc::O_TMPFILE).open(fscache_dir).await {
+            Err(err) => {
+                warn!("Got an unexpected error while trying to open the videos cache entry for channel UCID '{ucid}' for writing: {err}");
+            },
+            Ok(mut file) => {
+                let result: std::io::Result<()> = async {
+                    let mut file = BufWriter::new(&mut file);
+                    for videoid in &new_video_ids {
+                        file.write_all(videoid.as_bytes()).await?;
+                        file.write_all(b"\n").await?;
+                    }
+                    file.flush().await?;
+                    Ok(())
+                }.await;
+                if let Err(err) = result {
+                    warn!("Got an unexpected error while trying to write the videos cache entry for channel UCID '{ucid}': {err}");
+                } else {
+                    // Writing finished, swap the files.
+                    match remove_file(&fscache_path).await {
+                        Ok(()) => (),
+                        Err(err) if err.kind() == std::io::ErrorKind::NotFound => (), // this is fine
+                        Err(err) => warn!("Failed to unlink existing videos cache entry for channel UCID '{ucid}': {err}"),
+                    }
+                    if let Err(err) = link_file(&file, &fscache_path) {
+                        warn!("Failed to link in the new videos cache entry for channel UCID '{ucid}': {err}");
+                    }
+                }
+            }
+        }
     }
 
-    Ok(ChannelData {
+
+    Ok(BrowseChannelData {
         name: channel_name.expect("Channel name should've been found"),
-        video_ids,
+        video_ids: new_video_ids,
     })
 }
 
@@ -201,6 +298,7 @@ mod it {
 
     // https://github.com/ajayyy/DeArrow/blob/c4e1375380bc3b0cb202af283f0e7b4e5e6e30f1/src/thumbnails/thumbnailData.ts#L233
     #[derive(Serialize, Clone, Default)]
+    #[serde(rename_all="camelCase")]
     pub struct Context<'a> {
         pub client: Client<'a>,
     }
@@ -208,12 +306,10 @@ mod it {
     // https://github.com/ajayyy/DeArrow/blob/c4e1375380bc3b0cb202af283f0e7b4e5e6e30f1/src/thumbnails/thumbnailData.ts#L234
     #[skip_serializing_none]
     #[derive(Serialize, Clone)]
+    #[serde(rename_all="camelCase")]
     pub struct Client<'a> {
-        #[serde(rename="clientName")]
         pub client_name: &'static str,
-        #[serde(rename="clientVersion")]
         pub client_version: &'static str,
-        #[serde(rename="visitorData")]
         pub visitor_data: Option<&'a str>,
     }
 
@@ -234,17 +330,16 @@ mod it {
         // https://github.com/ajayyy/DeArrow/blob/c4e1375380bc3b0cb202af283f0e7b4e5e6e30f1/src/thumbnails/thumbnailData.ts#L232
         #[skip_serializing_none]
         #[derive(Serialize, Clone)]
+        #[serde(rename_all="camelCase")]
         pub struct Input<'a> {
             pub context: super::Context<'a>,
-            #[serde(rename="videoId")]
             pub video_id: &'a str,
-            #[serde(rename="serviceIntegrityDimensions")]
             pub service_integrity_dimensions: Option<Sid<'a>>,
         }
 
         #[derive(Serialize, Clone)]
+        #[serde(rename_all="camelCase")]
         pub struct Sid<'a> {
-            #[serde(rename="poToken")]
             pub po_token: &'a str
         }
 
@@ -253,17 +348,16 @@ mod it {
             use serde_with::{serde_as, DisplayFromStr};
 
             #[derive(Deserialize)]
+            #[serde(rename_all="camelCase")]
             pub struct Video {
-                #[serde(rename="videoDetails")]
                 pub video_details: VideoDetails,
             }
 
             #[serde_as]
             #[derive(Deserialize)]
+            #[serde(rename_all="camelCase")]
             pub struct VideoDetails {
-                #[serde(rename="videoId")]
                 pub video_id: String,
-                #[serde(rename="lengthSeconds")]
                 #[serde_as(as="DisplayFromStr")]
                 pub length_seconds: u64,
             }
@@ -278,9 +372,9 @@ mod it {
 
         #[skip_serializing_none]
         #[derive(Serialize, Clone)]
+        #[serde(rename_all="camelCase")]
         pub struct Input<'a> {
             pub context: super::Context<'a>,
-            #[serde(rename="browseId")]
             pub browse_id: Option<&'a str>,
             pub continuation: Option<String>,
             pub params: Option<&'a str>,
@@ -292,54 +386,59 @@ mod it {
 
 
             #[derive(Deserialize, Clone)]
+            #[serde(rename_all="camelCase")]
             pub struct Channel {
                 pub contents: ChannelContents,
                 pub microformat: Microformat,
             }
 
             #[derive(Deserialize, Clone)]
+            #[serde(rename_all="camelCase")]
             pub struct Microformat {
-                #[serde(rename="microformatDataRenderer")]
                 pub microformat_data_renderer: MicroformatDataRenderer,
             }
 
             #[derive(Deserialize, Clone)]
+            #[serde(rename_all="camelCase")]
             pub struct MicroformatDataRenderer {
                 pub title: String,
             }
 
             #[derive(Deserialize, Clone)]
+            #[serde(rename_all="camelCase")]
             pub struct ChannelContents {
-                #[serde(rename="twoColumnBrowseResultsRenderer")]
                 pub two_column_browse_results_renderer: BrowseResultsRenderer,
             }
 
             #[serde_as]
             #[derive(Deserialize, Clone)]
+            #[serde(rename_all="camelCase")]
             pub struct BrowseResultsRenderer {
                 #[serde_as(as="VecSkipError<_>")]
                 pub tabs: Vec<Tab>,
             }
 
             #[derive(Deserialize, Clone)]
+            #[serde(rename_all="camelCase")]
             pub struct Tab {
-                #[serde(rename="tabRenderer")]
                 pub tab_renderer: TabRenderer,
             }
 
             #[derive(Deserialize, Clone)]
+            #[serde(rename_all="camelCase")]
             pub struct TabRenderer {
                 pub content: TabContent,
             }
 
             #[derive(Deserialize, Clone)]
+            #[serde(rename_all="camelCase")]
             pub struct TabContent {
-                #[serde(rename="richGridRenderer")]
                 pub rich_grid_renderer: RichGridRenderer,
             }
 
             #[serde_as]
             #[derive(Deserialize, Clone)]
+            #[serde(rename_all="camelCase")]
             pub struct RichGridRenderer {
                 #[serde_as(as="VecSkipError<_>")]
                 pub contents: Vec<RichGridItem>,
@@ -347,62 +446,70 @@ mod it {
 
             #[serde_as]
             #[derive(Deserialize, Clone)]
+            #[serde(rename_all="camelCase")]
             pub struct Continuation {
                 #[serde_as(as="VecSkipError<_>")]
-                #[serde(rename="onResponseReceivedActions")]
                 pub on_response_received_actions: Vec<ContinuationAction>,
             }
 
             #[derive(Deserialize, Clone)]
+            #[serde(rename_all="camelCase")]
             pub struct ContinuationAction {
-                #[serde(rename="appendContinuationItemsAction")]
                 pub append_continuation_items_action: AppendItemsAction,
             }
 
             #[serde_as]
             #[derive(Deserialize, Clone)]
+            #[serde(rename_all="camelCase")]
             pub struct AppendItemsAction {
                 #[serde_as(as="VecSkipError<_>")]
-                #[serde(rename="continuationItems")]
                 pub continuation_items: Vec<RichGridItem>
             }
 
-
             #[derive(Deserialize, Clone)]
+            #[serde(rename_all="camelCase", rename_all_fields="camelCase")]
             pub enum RichGridItem {
-                #[serde(rename="richItemRenderer")]
                 RichItemRenderer {
                     content: RichItemContent,
                 },
-                #[serde(rename="continuationItemRenderer")]
                 ContinuationItemRenderer {
-                    #[serde(rename="continuationEndpoint")]
                     continuation_endpoint: ContinuationEndpoint,
                 },
             }
 
             #[derive(Deserialize, Clone)]
+            #[serde(rename_all="camelCase")]
             pub struct ContinuationEndpoint {
-                #[serde(rename="continuationCommand")]
                 pub continuation_command: ContinuationCommand,
             }
 
             #[derive(Deserialize, Clone)]
+            #[serde(rename_all="camelCase")]
             pub struct ContinuationCommand {
                 pub token: String,
             }
 
             #[derive(Deserialize, Clone)]
-            pub struct RichItemContent {
-                #[serde(rename="videoRenderer")]
-                pub video_renderer: VideoRenderer,
+            #[serde(rename_all="camelCase", rename_all_fields="camelCase")]
+            pub enum RichItemContent {
+                VideoRenderer {
+                    video_id: String,
+                },
+                ReelItemRenderer {
+                    video_id: String,
+                }
             }
-
-            #[derive(Deserialize, Clone)]
-            pub struct VideoRenderer {
-                #[serde(rename="videoId")]
-                pub video_id: String,
-            }
+            //
+            // pub struct RichItemContent {
+            //     #[serde(rename="videoRenderer")]
+            //     pub video_renderer: VideoRenderer,
+            // }
+            //
+            // #[derive(Deserialize, Clone)]
+            // pub struct VideoRenderer {
+            //     #[serde(rename="videoId")]
+            //     pub video_id: String,
+            // }
             
         }
     }

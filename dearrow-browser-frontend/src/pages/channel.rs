@@ -50,7 +50,7 @@ fn ChannelDetails(props: &ChannelPageProps) -> HtmlResult {
         Ok(ref channel) => html! {
             <>
                 <div>{format!("Channel name: {}", channel.channel_name)}</div>
-                <div>{format!("Total videos: {}", channel.total_videos)}</div>
+                <div>{format!("Videos: {} plain, {} VODs, {} shorts; {} total", channel.num_videos, channel.num_vods, channel.num_shorts, channel.total_videos)}</div>
             </>
         },
         Err(ref e) => html! {
@@ -136,10 +136,12 @@ pub fn ChannelPage(props: &ChannelPageProps) -> Html {
                 <center>
                     <b>{"Loading..."}</b><br />
                     if let ChannelLoadingStatus::LoadingProgress(ref loading_status) = *detail_status {
-                        <em>{format!(" {} new videos fetched, {} pulled from fscache", loading_status.videos_fetched, loading_status.videos_in_fscache)}</em><br /><br />
+                        <em>{format!("videos: {} new videos fetched, {} pulled from fscache", loading_status.videos.videos_fetched, loading_status.videos.videos_in_fscache)}</em><br />
+                        <em>{format!("VODs: {} new videos fetched, {} pulled from fscache", loading_status.vods.videos_fetched, loading_status.vods.videos_in_fscache)}</em><br />
+                        <em>{format!("shorts: {} new videos fetched, {} pulled from fscache", loading_status.shorts.videos_fetched, loading_status.shorts.videos_in_fscache)}</em><br /><br />
                     }
                     {"Loading this page for the first time for a given channel will take a while, especially for channels with lots of videos."}<br />
-                    {"Subsequent requests for this channel should be quick for everyone, until the database is reloaded."}
+                    {"Subsequent requests for this channel should be quick for everyone, until the cache is manually cleared."}
                 </center>
         },
         ChannelLoadingStatus::Failed(ref err) => html! {

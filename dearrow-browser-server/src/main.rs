@@ -60,13 +60,11 @@ async fn main() -> Result<(), ErrorContext> {
         }
     });
     {
-        create_dir_all(&config.channel_cache_path).context("Failed to create the channel cache main directory")?;
-        let mut cache_path = config.channel_cache_path.join("videos");
-        create_dir_all(&cache_path).context("Failed to create the channel cache videos directory")?;
-        cache_path.set_file_name("vods");
-        create_dir_all(&cache_path).context("Failed to create the channel cache vods directory")?;
-        cache_path.set_file_name("shorts");
-        create_dir_all(&cache_path).context("Failed to create the channel cache shorts directory")?;
+        create_dir_all(&config.cache_path).context("Failed to create the cache main directory")?;
+        create_dir_all(config.cache_path.join(constants::FSCACHE_TEMPDIR)).context("Failed to create the cache temporary directory")?;
+        create_dir_all(config.cache_path.join(constants::IT_BROWSE_VIDEOS.cache_dir)).context("Failed to create the channel cache videos directory")?;
+        create_dir_all(config.cache_path.join(constants::IT_BROWSE_LIVE.cache_dir)).context("Failed to create the channel cache vods directory")?;
+        create_dir_all(config.cache_path.join(constants::IT_BROWSE_SHORTS.cache_dir)).context("Failed to create the channel cache shorts directory")?;
     }
     info!("Loading database...");
     let string_set_lock = web::Data::new(RwLock::new(StringSet::with_capacity(16384)));

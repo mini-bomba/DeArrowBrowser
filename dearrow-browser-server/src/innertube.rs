@@ -23,13 +23,13 @@ use error_handling::{anyhow, bail, ErrorContext, ResContext};
 use dearrow_browser_api::sync::{InnertubeChannel, InnertubeVideo, self as api};
 use log::warn;
 use reqwest::Client;
-use tokio::{fs::{remove_file, File}, io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter}};
+use tokio::{fs::File, io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter}};
 use tokio_stream::{wrappers::LinesStream, StreamExt};
 
-use crate::constants::*;
+use crate::{constants::*, utils::TemporaryFile};
 use crate::middleware::{ETagCache, ETagCacheControl};
 use crate::state::{self, AppConfig, DBLock, GetChannelOutput};
-use crate::utils::{self, link_file, ExtendResponder, ResponderExt};
+use crate::utils::{self, ExtendResponder, ResponderExt};
 
 type JsonResult<T> = utils::Result<web::Json<T>>;
 type JsonResultOrFetchProgress<T> = utils::Result<Either<web::Json<T>, (ExtendResponder<web::Json<api::ChannelFetchProgress>>, StatusCode)>>;
@@ -157,8 +157,12 @@ pub async fn browse_channel(client: Client, config: Arc<AppConfig>, mode: &Brows
     }
     
     // Check fscache
-    let fscache_dir = config.channel_cache_path.join(mode.cache_dir);
-    let fscache_path = fscache_dir.join(&*ucid);
+    let fscache_path = {
+        let mut path = config.cache_path.join(mode.cache_dir);
+        path.push(&*ucid);
+        path
+    };
+    let fscache_tmpdir = config.cache_path.join(FSCACHE_TEMPDIR);
     let cached_video_ids: Vec<String> = match File::open(&fscache_path).await {
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => vec![],
         Err(err) => {
@@ -253,13 +257,13 @@ pub async fn browse_channel(client: Client, config: Arc<AppConfig>, mode: &Brows
         // This essentially makes writing the cache file an atomic operation - if writing fails, no
         // changes to the file system are made.
         // Worst that can happen is we unlink the existing file and are unable to link the new one in.
-        match File::options().write(true).custom_flags(libc::O_TMPFILE).open(fscache_dir).await {
+        match TemporaryFile::new(fscache_path, &fscache_tmpdir).await {
             Err(err) => {
                 warn!("Got an unexpected error while trying to open the videos cache entry for channel UCID '{ucid}' for writing: {err}");
             },
             Ok(mut file) => {
                 let result: std::io::Result<()> = async {
-                    let mut file = BufWriter::new(&mut file);
+                    let mut file = BufWriter::new(&mut *file);
                     for videoid in &new_video_ids {
                         file.write_all(videoid.as_bytes()).await?;
                         file.write_all(b"\n").await?;
@@ -270,14 +274,9 @@ pub async fn browse_channel(client: Client, config: Arc<AppConfig>, mode: &Brows
                 if let Err(err) = result {
                     warn!("Got an unexpected error while trying to write the videos cache entry for channel UCID '{ucid}': {err}");
                 } else {
-                    // Writing finished, swap the files.
-                    match remove_file(&fscache_path).await {
-                        Ok(()) => (),
-                        Err(err) if err.kind() == std::io::ErrorKind::NotFound => (), // this is fine
-                        Err(err) => warn!("Failed to unlink existing videos cache entry for channel UCID '{ucid}': {err}"),
-                    }
-                    if let Err(err) = link_file(&file, &fscache_path) {
-                        warn!("Failed to link in the new videos cache entry for channel UCID '{ucid}': {err}");
+                    // Writing finished, commit changes.
+                    if let Err(err) = file.commit().await {
+                        warn!("Got an unexpected error while trying to commit the videos cache entry for channel UCID '{ucid}': {err:?}");
                     }
                 }
             }

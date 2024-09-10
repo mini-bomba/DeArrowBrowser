@@ -15,11 +15,13 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use std::{ffi::CString, fmt::{Debug, Display}, fs, os::{fd::AsRawFd, unix::ffi::OsStrExt}, path::Path, sync::Arc, time::UNIX_EPOCH};
+use std::{ffi::CString, fmt::{Debug, Display}, fs, mem::MaybeUninit, ops::{Deref, DerefMut}, os::{fd::AsRawFd, unix::ffi::OsStrExt}, path::{Path, PathBuf}, sync::Arc, time::UNIX_EPOCH};
 
 use actix_web::{dev::Extensions, http::{header::{HeaderMap, TryIntoHeaderPair}, StatusCode}, HttpResponse, Responder, ResponseError};
-use error_handling::{ErrorContext, IntoErrorIterator};
+use base64::prelude::{BASE64_URL_SAFE_NO_PAD, Engine};
+use error_handling::{ErrContext, ErrorContext, IntoErrorIterator, ResContext};
 use sha2::{Sha256, Digest, digest::{typenum::U32, generic_array::GenericArray}};
+use tokio::fs::File;
 
 /// This extension will be present on a response if the response contains
 /// a [`error_handling::SerializableError`] encoded as json
@@ -147,12 +149,115 @@ impl<T> ResponderExt for T where T: Responder + Sized {}
 
 pub fn link_file<T: AsRawFd>(file: &T, new_path: &Path) -> std::io::Result<()> {
     let path_cstr = CString::new(new_path.as_os_str().as_bytes()).expect("Failed to convert new_path to a CString");
+    let fd_cstr = CString::new(format!("/proc/self/fd/{}", file.as_raw_fd())).expect("Failed to create a path to file descriptor as CString");
     let res = unsafe {
-        libc::linkat(file.as_raw_fd(), c"".as_ptr(), libc::AT_FDCWD, path_cstr.as_ptr(), libc::AT_EMPTY_PATH)
+        libc::linkat(libc::AT_FDCWD, fd_cstr.as_ptr(), libc::AT_FDCWD, path_cstr.as_ptr(), libc::AT_SYMLINK_FOLLOW)
     };
     if res == 0 {
         Ok(())
     } else {
         Err(std::io::Error::last_os_error())
+    }
+}
+
+pub fn random_b64<const N: usize>() -> String {
+    let mut buffer = [MaybeUninit::<u8>::uninit(); N];
+    BASE64_URL_SAFE_NO_PAD.encode(getrandom::getrandom_uninit(&mut buffer).expect("Should be able to get random data"))
+}
+
+#[derive(Clone)]
+pub enum TempFileType {
+    UnnamedFile,
+    FileInTmpDir{
+        current_path: PathBuf,
+    },
+}
+
+pub struct TemporaryFile {
+    file: File,
+    r#type: TempFileType,
+    is_committed: bool,
+    target_path: PathBuf,
+}
+
+impl TemporaryFile {
+    pub async fn new(target_path: PathBuf, fallback_tmpdir: &Path) -> std::io::Result<TemporaryFile> {
+        match Self::new_unnamed(&target_path).await {
+            // filesystem doesnt support unnamed files, try another type
+            Err(err) if err.raw_os_error() == Some(libc::EOPNOTSUPP) => (),
+            // other error, report
+            Err(err) => return Err(err),
+            // it worked, awesome
+            Ok(file) => return Ok(TemporaryFile {
+                file,
+                r#type: TempFileType::UnnamedFile,
+                is_committed: false,
+                target_path,
+            }),
+        };
+
+        // unnamed file didn't work, fall back
+        let tmp_file_path = fallback_tmpdir.join(random_b64::<64>());
+        let file = File::options().write(true).create_new(true).open(&tmp_file_path).await?;
+        Ok(TemporaryFile { 
+            file, 
+            r#type: TempFileType::FileInTmpDir { current_path: tmp_file_path },
+            is_committed: false, 
+            target_path, 
+        })
+    }
+
+    async fn new_unnamed(target_path: &Path) -> std::io::Result<File> {
+        match target_path.parent() {
+            Some(dir) => File::options().write(true).custom_flags(libc::O_TMPFILE).open(dir).await,
+            // fake a "not supported" error to be caught by ::new()
+            None => Err(std::io::Error::from_raw_os_error(libc::EOPNOTSUPP)),  
+        }
+    }   
+
+    pub async fn commit(&mut self) -> std::result::Result<(), ErrorContext> {
+        if self.is_committed {
+            return Ok(());
+        }
+
+        match &self.r#type {
+            TempFileType::UnnamedFile => {
+                match tokio::fs::remove_file(&self.target_path).await {
+                    Err(err) if err.kind() == std::io::ErrorKind::NotFound => (), // fine
+                    Err(err) => return Err(err.context(format!("Failed to remove existing file at {}", self.target_path.display()))),
+                    Ok(()) => (),
+                };
+                link_file(&self.file, &self.target_path).with_context(|| format!("Failed to link in the new file at {}", self.target_path.display()))?;
+            },
+            TempFileType::FileInTmpDir { current_path } => {
+                tokio::fs::rename(&current_path, &self.target_path).await.with_context(|| format!("Failed to move temp file from {} to {}", current_path.display(), self.target_path.display()))?;
+            },
+        }
+        self.is_committed = true;
+        Ok(())
+    }
+}
+
+impl Drop for TemporaryFile {
+    fn drop(&mut self) {
+        if !self.is_committed {
+            if let TempFileType::FileInTmpDir { current_path } = &self.r#type {
+                let _ = std::fs::remove_file(current_path);  // can't do anything at this point
+            }
+        }
+    }
+}
+
+impl Deref for TemporaryFile {
+    type Target = File;
+
+    fn deref(&self) -> &Self::Target {
+        &self.file
+    }
+}
+
+impl DerefMut for TemporaryFile {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.file
     }
 }

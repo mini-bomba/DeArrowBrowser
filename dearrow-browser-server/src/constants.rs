@@ -25,6 +25,7 @@ use crate::{built_info, innertube::BrowseMode};
 
 // Paths
 pub const CONFIG_PATH: &str = "config.toml";
+pub const FSCACHE_TEMPDIR: &str = "tmp";
 
 // Limits
 pub static IT_TIMEOUT: Duration = Duration::from_secs(1);
@@ -42,9 +43,9 @@ pub static IT_BROWSE_URL: LazyLock<reqwest::Url> = LazyLock::new(|| reqwest::Url
 pub static YT_BASE_URL:   LazyLock<reqwest::Url> = LazyLock::new(|| reqwest::Url::parse("https://www.youtube.com/").expect("Should be able to parse the YT_BASE_URL"));
 
 // Innertube API browse modes
-pub static IT_BROWSE_VIDEOS: BrowseMode = BrowseMode { param: "EgZ2aWRlb3PyBgQKAjoA",         cache_dir: "videos" };
-pub static IT_BROWSE_LIVE:   BrowseMode = BrowseMode { param: "EgdzdHJlYW1z8gYECgJ6AA%3D%3D", cache_dir: "vods" };
-pub static IT_BROWSE_SHORTS: BrowseMode = BrowseMode { param: "EgZzaG9ydHPyBgUKA5oBAA%3D%3D", cache_dir: "shorts" };
+pub static IT_BROWSE_VIDEOS: BrowseMode = BrowseMode { param: "EgZ2aWRlb3PyBgQKAjoA",         cache_dir: "channels/videos" };
+pub static IT_BROWSE_LIVE:   BrowseMode = BrowseMode { param: "EgdzdHJlYW1z8gYECgJ6AA%3D%3D", cache_dir: "channels/vods" };
+pub static IT_BROWSE_SHORTS: BrowseMode = BrowseMode { param: "EgZzaG9ydHPyBgUKA5oBAA%3D%3D", cache_dir: "channels/shorts" };
 
 // Youtube channel IDs and handles
 // https://stackoverflow.com/a/16326307

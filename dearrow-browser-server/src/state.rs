@@ -16,20 +16,18 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 use actix_web::{http::header::EntityTag, rt::{spawn, time::sleep}, web};
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use chrono::{DateTime, Utc};
 use dearrow_browser_api::sync as api;
 use dearrow_parser::{DearrowDB, StringSet};
 use error_handling::{bail, ErrContext, ErrorContext, ResContext};
 use futures::{channel::oneshot, future::{BoxFuture, Shared}, join, lock::Mutex, select_biased, FutureExt};
-use getrandom::getrandom;
 use log::warn;
 use reqwest::Client;
 use tokio::fs::read_dir;
 use std::{collections::{HashMap, HashSet}, ffi::OsString, path::{Path, PathBuf}, sync::{atomic::{AtomicUsize, Ordering::Relaxed}, Arc, RwLock}, time::Instant};
 use serde::{Serialize, Deserialize};
 
-use crate::{constants::*, innertube};
+use crate::{constants::*, innertube, utils::random_b64};
 
 pub type DBLock = web::Data<RwLock<DatabaseState>>;
 pub type StringSetLock = web::Data<RwLock<StringSet>>;
@@ -47,24 +45,22 @@ pub struct AppConfig {
     pub startup_timestamp: DateTime<Utc>,
     pub innertube: InnertubeConfig,
     pub enable_timings_header: bool,
-    pub channel_cache_path: PathBuf,
+    pub cache_path: PathBuf,
 }
 
 impl Default for AppConfig {
     fn default() -> Self {
-        let mut buffer: Vec<u8> = (0..32).map(|_| 0u8).collect();
-        getrandom(&mut buffer[..]).unwrap();
         Self {
             mirror_path: PathBuf::from("./mirror"),
             static_content_path: PathBuf::from("./static"),
             listen: ListenConfig::default(),
-            auth_secret: URL_SAFE_NO_PAD.encode(buffer),
+            auth_secret: random_b64::<64>(),
             enable_sbserver_emulation: false,
             reqwest_timeout_secs: 20.,
             startup_timestamp: Utc::now(),
             innertube: InnertubeConfig::default(),
             enable_timings_header: false,
-            channel_cache_path: PathBuf::from("./cache/channels")
+            cache_path: PathBuf::from("./cache")
         }
     }
 }
@@ -192,9 +188,9 @@ impl FSCacheCountCache {
     }
 
     async fn count(config: Arc<AppConfig>) -> usize {
-        let vids_path = config.channel_cache_path.join(IT_BROWSE_VIDEOS.cache_dir);
-        let vods_path = config.channel_cache_path.join(IT_BROWSE_LIVE.cache_dir);
-        let shorts_path = config.channel_cache_path.join(IT_BROWSE_SHORTS.cache_dir);
+        let vids_path = config.cache_path.join(IT_BROWSE_VIDEOS.cache_dir);
+        let vods_path = config.cache_path.join(IT_BROWSE_LIVE.cache_dir);
+        let shorts_path = config.cache_path.join(IT_BROWSE_SHORTS.cache_dir);
         let (mut videos, vods, shorts) = join!(Self::list_dir(&vids_path), Self::list_dir(&vods_path), Self::list_dir(&shorts_path));
         videos.extend(vods);
         videos.extend(shorts);

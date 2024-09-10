@@ -56,11 +56,22 @@ To run a local development server without docker, you'll need:
   - `cargo run` in the `dearrow-browser-server` directory
   - optionally use something like `cargo-watch` to rebuild on source file changes
 
-## Running an instance
-1. Build the image
+## Building the container image
+The main `Dockerfile` requires a custom "builder base" image defined in `builder_base.Dockerfile`.
+This helps cache some layers in the builder stage that are less commonly changed, even when the `image prune` command is issued after building.
+
+To build the main image:
+1. Build the helper "builder base" image and tag it as `dearrow-browser:builder-base`
+```sh
+docker build -f builder_base.Dockerfile -t dearrow-browser:builder-base .
+```
+2. Build the main image
 ```sh
 docker build -t dearrow-browser .
 ```
+
+## Running an instance
+1. Build the image (see above)
 2. Create a config.toml file. Static content (frontend) is available at /static in the container.
 3. Run the container
 ```sh

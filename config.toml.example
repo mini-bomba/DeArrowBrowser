@@ -1,6 +1,6 @@
 mirror_path = "./mirror"  # path to mirror with csv files
 static_content_path = "./static"  # path to compiled dearrow-browser-frontend
-channel_cache_path = "./cache"  # path to cache directory for channel data
+channel_cache_path = "./cache/channels"  # path to cache directory for channel data
 auth_secret = "set this to something random"  # secret for authenticated enpoints (such as reload)
 enable_sbserver_emulation = false  # set to true to enable /sbserver apis
 reqwest_timeout_secs = 20 # timeout for HTTP requests made by the server (such as innertube)

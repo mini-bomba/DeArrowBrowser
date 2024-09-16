@@ -62,6 +62,7 @@ async fn main() -> Result<(), ErrorContext> {
     {
         create_dir_all(&config.cache_path).context("Failed to create the cache main directory")?;
         create_dir_all(config.cache_path.join(constants::FSCACHE_TEMPDIR)).context("Failed to create the cache temporary directory")?;
+        create_dir_all(config.cache_path.join(constants::FSCACHE_PLAYLISTS)).context("Failed to create the cache playlists directory")?;
         create_dir_all(config.cache_path.join(constants::IT_BROWSE_VIDEOS.cache_dir)).context("Failed to create the channel cache videos directory")?;
         create_dir_all(config.cache_path.join(constants::IT_BROWSE_LIVE.cache_dir)).context("Failed to create the channel cache vods directory")?;
         create_dir_all(config.cache_path.join(constants::IT_BROWSE_SHORTS.cache_dir)).context("Failed to create the channel cache shorts directory")?;

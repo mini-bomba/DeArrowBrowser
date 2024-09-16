@@ -220,6 +220,8 @@ pub struct ChannelFetchProgress {
     videos: Arc<BrowseProgress>,
     vods: Arc<BrowseProgress>,
     shorts: Arc<BrowseProgress>,
+    releases_tab: Arc<BrowseProgress>,
+    releases_home: Arc<BrowseProgress>,
 }
 
 impl From<&ChannelFetchProgress> for api::ChannelFetchProgress {
@@ -228,6 +230,8 @@ impl From<&ChannelFetchProgress> for api::ChannelFetchProgress {
             videos: value.videos.as_ref().into(),
             vods: value.vods.as_ref().into(),
             shorts: value.shorts.as_ref().into(),
+            releases_tab: value.releases_tab.as_ref().into(),
+            releases_home: value.releases_home.as_ref().into(),
         }
     }
 }
@@ -255,6 +259,7 @@ pub struct ChannelData {
     pub num_videos: usize,
     pub num_vods: usize,
     pub num_shorts: usize,
+    pub num_releases: usize,
     pub total_videos: usize,
 }
 
@@ -313,21 +318,29 @@ impl ChannelCache {
         let videos_task = spawn(innertube::browse_channel(self.client.clone(), self.config.clone(), &IT_BROWSE_VIDEOS, ucid.clone(), progress.videos.clone()));
         let vods_task   = spawn(innertube::browse_channel(self.client.clone(), self.config.clone(), &IT_BROWSE_LIVE,   ucid.clone(), progress.vods.clone()));
         let shorts_task = spawn(innertube::browse_channel(self.client.clone(), self.config.clone(), &IT_BROWSE_SHORTS, ucid.clone(), progress.shorts.clone()));
+        let releases_tab_task  = spawn(innertube::browse_releases_tab(self.client.clone(), self.config.clone(), ucid.clone(), progress.releases_tab.clone()));
+        let releases_home_task = spawn(innertube::browse_releases_homepage(self.client.clone(), self.config.clone(), ucid.clone(), progress.releases_tab.clone()));
 
         let videos = videos_task.await.context("Video fetching task panicked")?.context("Failed to fetch all videos")?;
         let vods   = vods_task.await.context("VOD fetching task panicked")?.context("Failed to fetch all VODs")?;
         let shorts = shorts_task.await.context("Shorts fetching task panicked")?.context("Failed to fetch all shorts")?;
+        let releases_tab = releases_tab_task.await.context("Releases (via tab) fetching task panicked")?.context("Failed to fetch all releases from the tab")?;
+        let releases_home = releases_home_task.await.context("Releases (via homepage) fetching task panicked")?.context("Failed to fetch all releases from the homepage")?;
 
         let string_set = self.string_set.read().map_err(|_| SS_READ_ERR.clone())?;
+        let num_releases = releases_tab.iter().map(Vec::len).sum::<usize>() + releases_home.iter().map(Vec::len).sum::<usize>();
         Ok(Arc::new(ChannelData {
             channel_name: videos.name.into(),
             num_videos: videos.video_ids.len(),
             num_vods: vods.video_ids.len(),
             num_shorts: shorts.video_ids.len(),
-            total_videos: videos.video_ids.len() + vods.video_ids.len() + shorts.video_ids.len(),
+            num_releases,
+            total_videos: videos.video_ids.len() + vods.video_ids.len() + shorts.video_ids.len() + num_releases,
             video_ids: videos.video_ids.into_iter()
                 .chain(vods.video_ids.into_iter())
                 .chain(shorts.video_ids.into_iter())
+                .chain(releases_tab.into_iter().flat_map(Vec::into_iter))
+                .chain(releases_home.into_iter().flat_map(Vec::into_iter))
                 .filter_map(|vid| string_set.set.get(vid.as_str()).cloned()).collect(),
         }))
     }

@@ -40,3 +40,7 @@ too_many_lines = "allow"  # there's no such thing as a function with too many li
 [profile.release]
 strip = true
 lto = true
+
+[profile.dev]
+opt-level = 1
+strip = false

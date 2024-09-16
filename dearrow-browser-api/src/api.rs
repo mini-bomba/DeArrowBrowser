@@ -112,6 +112,7 @@ pub struct InnertubeChannel {
     pub num_videos: u64,
     pub num_vods: u64,
     pub num_shorts: u64,
+    pub num_releases: u64,
     pub total_videos: u64,
 }
 
@@ -120,6 +121,8 @@ pub struct ChannelFetchProgress {
     pub videos: BrowseProgress,
     pub vods: BrowseProgress,
     pub shorts: BrowseProgress,
+    pub releases_tab: BrowseProgress,
+    pub releases_home: BrowseProgress,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Copy)]

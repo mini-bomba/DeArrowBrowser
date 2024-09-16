@@ -15,13 +15,15 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use std::{ffi::CString, fmt::{Debug, Display}, fs, mem::MaybeUninit, ops::{Deref, DerefMut}, os::{fd::AsRawFd, unix::ffi::OsStrExt}, path::{Path, PathBuf}, sync::Arc, time::UNIX_EPOCH};
+use std::{env::var_os, ffi::CString, fmt::{Debug, Display}, fs, mem::MaybeUninit, ops::{Deref, DerefMut}, os::{fd::AsRawFd, unix::ffi::OsStrExt}, path::{Path, PathBuf}, sync::Arc, time::{SystemTime, UNIX_EPOCH}};
 
 use actix_web::{dev::Extensions, http::{header::{HeaderMap, TryIntoHeaderPair}, StatusCode}, HttpResponse, Responder, ResponseError};
 use base64::prelude::{BASE64_URL_SAFE_NO_PAD, Engine};
 use error_handling::{ErrContext, ErrorContext, IntoErrorIterator, ResContext};
+use log::warn;
+use serde::de::DeserializeOwned;
 use sha2::{Sha256, Digest, digest::{typenum::U32, generic_array::GenericArray}};
-use tokio::fs::File;
+use tokio::fs::{create_dir_all, write, File};
 
 /// This extension will be present on a response if the response contains
 /// a [`error_handling::SerializableError`] encoded as json
@@ -261,3 +263,38 @@ impl DerefMut for TemporaryFile {
         &mut self.file
     }
 }
+
+#[allow(clippy::cast_possible_wrap)] // can't do anything really
+pub fn unix_timestamp() -> i128 {
+    match SystemTime::UNIX_EPOCH.elapsed() {
+        Ok(d) => d.as_millis() as i128,
+        Err(e) => -(e.duration().as_millis() as i128)
+    }
+}
+
+pub trait ReqwestResponseExt {
+    async fn json_debug<T: DeserializeOwned>(self) -> std::result::Result<T, ErrorContext>;
+}
+
+impl ReqwestResponseExt for reqwest::Response {
+    async fn json_debug<T: DeserializeOwned>(self) -> std::result::Result<T, ErrorContext> {
+        let body = self.bytes().await.context("Failed to receive response")?;
+        let decoded = serde_json::from_slice(&body).context("Failed to decode response as JSON");
+
+        #[cfg(debug_assertions)]
+        if decoded.is_err() || var_os("DAB_IT_DUMP_ALL").is_some() {
+            let dump_result: std::io::Result<()> = async {
+                let mut path = PathBuf::from("./debug");
+                create_dir_all(&path).await?;
+                path.push(format!("{}.json", unix_timestamp()));
+                write(&path, &body).await?;
+                Ok(())
+            }.await;
+            if let Err(e) = dump_result {
+                warn!("Failed to dump contents of a response: {e}");
+            }
+        }
+
+        decoded
+    }
+} 

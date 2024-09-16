@@ -1,3 +1,4 @@
 /target
 /cache
+/debug
 config.toml

@@ -23,9 +23,12 @@ use actix_web::http::StatusCode;
 
 use crate::{built_info, innertube::BrowseMode};
 
+pub static NUMBER_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\d+").expect("Should be able to parse the number regex"));
+
 // Paths
 pub const CONFIG_PATH: &str = "config.toml";
 pub const FSCACHE_TEMPDIR: &str = "tmp";
+pub const FSCACHE_PLAYLISTS: &str = "playlists";
 
 // Limits
 pub static IT_TIMEOUT: Duration = Duration::from_secs(1);
@@ -43,9 +46,12 @@ pub static IT_BROWSE_URL: LazyLock<reqwest::Url> = LazyLock::new(|| reqwest::Url
 pub static YT_BASE_URL:   LazyLock<reqwest::Url> = LazyLock::new(|| reqwest::Url::parse("https://www.youtube.com/").expect("Should be able to parse the YT_BASE_URL"));
 
 // Innertube API browse modes
-pub static IT_BROWSE_VIDEOS: BrowseMode = BrowseMode { param: "EgZ2aWRlb3PyBgQKAjoA",         cache_dir: "channels/videos" };
-pub static IT_BROWSE_LIVE:   BrowseMode = BrowseMode { param: "EgdzdHJlYW1z8gYECgJ6AA%3D%3D", cache_dir: "channels/vods" };
-pub static IT_BROWSE_SHORTS: BrowseMode = BrowseMode { param: "EgZzaG9ydHPyBgUKA5oBAA%3D%3D", cache_dir: "channels/shorts" };
+pub const IT_BROWSE_VIDEOS:   BrowseMode = BrowseMode { param: "EgZ2aWRlb3PyBgQKAjoA",         tab_name: "Videos",   cache_dir: "channels/videos" };
+pub const IT_BROWSE_LIVE:     BrowseMode = BrowseMode { param: "EgdzdHJlYW1z8gYECgJ6AA%3D%3D", tab_name: "Live",     cache_dir: "channels/vods" };
+pub const IT_BROWSE_SHORTS:   BrowseMode = BrowseMode { param: "EgZzaG9ydHPyBgUKA5oBAA%3D%3D", tab_name: "Shorts",   cache_dir: "channels/shorts" };
+pub const IT_BROWSE_RELEASES: BrowseMode = BrowseMode { param: "EghyZWxlYXNlc_IGBQoDsgEA",     tab_name: "Releases", cache_dir: "" };
+pub const IT_BROWSE_HOME:     BrowseMode = BrowseMode { param: "",                             tab_name: "Home",     cache_dir: "" };
+pub const IT_RELEASES_SHELF_NAME: &str = "Albums & Singles";
 
 // Youtube channel IDs and handles
 // https://stackoverflow.com/a/16326307

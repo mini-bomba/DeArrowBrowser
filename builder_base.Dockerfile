@@ -24,8 +24,8 @@ FROM builder-base-base AS dep-builder
 RUN git clone https://github.com/trunk-rs/trunk /trunk
 WORKDIR /trunk
 RUN git fetch origin fe4fc9d2509843f787dfc65f89111adc1987e059 && git checkout fe4fc9d2509843f787dfc65f89111adc1987e059
-RUN --mount=type=cache,target=/root/.cargo,id=alpine_cargo_dir --mount=type=cache,target=/trunk/target,id=trunk_target cargo build --release --locked
+RUN --mount=type=cache,target=/root/.cargo,id=alpine_cargo_dir --mount=type=cache,target=/trunk/target,id=trunk_target cargo build --release --locked && mv target/release/trunk /trunk.bin
 
 FROM builder-base-base AS builder-base
 RUN apk --no-cache add rust-wasm binaryen dart-sass wasm-bindgen
-COPY --from=dep-builder /trunk/target/release/trunk /usr/local/bin/trunk
+COPY --from=dep-builder /trunk.bin /usr/local/bin/trunk

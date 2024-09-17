@@ -319,7 +319,7 @@ impl ChannelCache {
         let vods_task   = spawn(innertube::browse_channel(self.client.clone(), self.config.clone(), &IT_BROWSE_LIVE,   ucid.clone(), progress.vods.clone()));
         let shorts_task = spawn(innertube::browse_channel(self.client.clone(), self.config.clone(), &IT_BROWSE_SHORTS, ucid.clone(), progress.shorts.clone()));
         let releases_tab_task  = spawn(innertube::browse_releases_tab(self.client.clone(), self.config.clone(), ucid.clone(), progress.releases_tab.clone()));
-        let releases_home_task = spawn(innertube::browse_releases_homepage(self.client.clone(), self.config.clone(), ucid.clone(), progress.releases_tab.clone()));
+        let releases_home_task = spawn(innertube::browse_releases_homepage(self.client.clone(), self.config.clone(), ucid.clone(), progress.releases_home.clone()));
 
         let videos = videos_task.await.context("Video fetching task panicked")?.context("Failed to fetch all videos")?;
         let vods   = vods_task.await.context("VOD fetching task panicked")?.context("Failed to fetch all VODs")?;

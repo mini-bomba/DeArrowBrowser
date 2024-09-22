@@ -21,7 +21,7 @@ use std::{collections::{HashSet, VecDeque}, ops::Deref, sync::{atomic::Ordering,
 use actix_web::{get, http::StatusCode, web, Either, HttpResponse};
 use error_handling::{anyhow, bail, ErrContext, ErrorContext, ResContext};
 use dearrow_browser_api::sync::{InnertubeChannel, InnertubeVideo, self as api};
-use log::warn;
+use log::{debug, warn};
 use reqwest::Client;
 use tokio::{fs::File, io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter}, task::JoinSet};
 use tokio_stream::{wrappers::LinesStream, StreamExt};
@@ -217,19 +217,21 @@ pub async fn browse_channel(client: Client, config: Arc<AppConfig>, mode: &Brows
         let resp = resp.error_for_status().context("Browse request failed")?;
 
         let results = if is_continuation {
-            let mut resp: it::browse::out::RichGridContinuation = resp.json_debug().await.context("Failed to decode browse continuation response")?;
+            let mut resp: it::browse::out::RichGridContinuation = resp.json_debug(mode.tab_name).await.context("Failed to decode browse continuation response")?;
             
             resp.on_response_received_actions.pop().context("Failed to decode browse continuation response - decoded actions list was empty")?
                 .append_continuation_items_action.continuation_items
         } else {
-            let mut resp: it::browse::out::BrowseOutput = resp.json_debug().await.context("Failed to decode browse channel response")?;
+            let mut resp: it::browse::out::BrowseOutput = resp.json_debug(mode.tab_name).await.context("Failed to decode browse channel response")?;
 
             channel_name = Some(resp.microformat.microformat_data_renderer.title);
 
             let Some(tab) = resp.contents.two_column_browse_results_renderer.tabs.pop() else {
+                debug!("{} browsing aborted: tab unavailable", mode.tab_name);
                 break 'outer;  // tab not available
             };
             if !tab.tab_renderer.title.is_some_and(|s| s == mode.tab_name) {
+                debug!("{} browsing aborted: incorrect tab", mode.tab_name);
                 break 'outer;  // tab not available
             }
             #[allow(clippy::match_wildcard_for_single_variants)]
@@ -245,10 +247,12 @@ pub async fn browse_channel(client: Client, config: Arc<AppConfig>, mode: &Brows
                     let video_id = match content {
                         it::browse::out::RichItemContent::ReelItemRenderer { video_id } |
                         it::browse::out::RichItemContent::VideoRenderer { video_id } => video_id,
+                        it::browse::out::RichItemContent::ShortsLockupViewModel { on_tap } => on_tap.innertube_command.reel_watch_endpoint.video_id,
                         it::browse::out::RichItemContent::PlaylistRenderer { .. } => bail!("Found a playlist in a video grid"),
                     };
                     if cached_video_ids_set.contains(&*video_id) {
                         progress.videos_fetched.store(new_video_ids.len(), Ordering::Relaxed);
+                        debug!("{} browsing ended early: encountered a video already in cache", mode.tab_name);
                         break 'outer;
                     }
                     new_video_ids.push(video_id);
@@ -342,6 +346,7 @@ pub async fn browse_playlist(client: Client, config: Arc<AppConfig>, plid: Strin
             // playlist size unchanged, assume contents haven't changed 
             // (which isn't a great assumption tbh)
             progress.videos_in_fscache.fetch_add(cached_video_ids.len(), Ordering::Relaxed);
+            debug!("playlist browsing aborted: actual length equal to cached");
             return Ok(cached_video_ids);
         }
     }
@@ -361,12 +366,12 @@ pub async fn browse_playlist(client: Client, config: Arc<AppConfig>, plid: Strin
         let resp = resp.error_for_status().context("Browse request failed")?;
 
         let results = if is_continuation {
-            let mut resp: it::browse::out::PlaylistContinuation = resp.json_debug().await.context("Failed to decode browse continuation response")?;
+            let mut resp: it::browse::out::PlaylistContinuation = resp.json_debug("playlist").await.context("Failed to decode browse continuation response")?;
             
             resp.on_response_received_actions.pop().context("Failed to decode browse continuation response - decoded actions list was empty")?
                 .append_continuation_items_action.continuation_items
         } else {
-            let mut resp: it::browse::out::BrowseOutput = resp.json_debug().await.context("Failed to decode browse playlist response")?;
+            let mut resp: it::browse::out::BrowseOutput = resp.json_debug("playlist").await.context("Failed to decode browse playlist response")?;
 
             if count_hint.is_none() && !cached_video_ids.is_empty() {
                 if let it::browse::out::BrowseHeader::PlaylistHeaderRenderer { num_videos_text } = resp.header {
@@ -377,6 +382,7 @@ pub async fn browse_playlist(client: Client, config: Arc<AppConfig>, plid: Strin
                                 // playlist size unchanged, assume contents haven't changed 
                                 // (which isn't a great assumption tbh)
                                 progress.videos_in_fscache.fetch_add(cached_video_ids.len(), Ordering::Relaxed);
+                                debug!("playlist browsing aborted: actual length equal to cached");
                                 return Ok(cached_video_ids);
                             }
                         }
@@ -465,17 +471,19 @@ pub async fn browse_releases_tab(client: Client, config: Arc<AppConfig>, ucid: A
         let resp = resp.error_for_status().context("Browse request failed")?;
 
         let results = if is_continuation {
-            let mut resp: it::browse::out::RichGridContinuation = resp.json_debug().await.context("Failed to decode browse continuation response")?;
+            let mut resp: it::browse::out::RichGridContinuation = resp.json_debug("releases_tab").await.context("Failed to decode browse continuation response")?;
             
             resp.on_response_received_actions.pop().context("Failed to decode browse continuation response - decoded actions list was empty")?
                 .append_continuation_items_action.continuation_items
         } else {
-            let mut resp: it::browse::out::BrowseOutput = resp.json_debug().await.context("Failed to decode browse channel response")?;
+            let mut resp: it::browse::out::BrowseOutput = resp.json_debug("releases_tab").await.context("Failed to decode browse channel response")?;
 
             let Some(tab) = resp.contents.two_column_browse_results_renderer.tabs.pop() else {
+                debug!("release tab browsing aborted: tab unavailable");
                 break 'outer;  // tab not available
             };
             if !tab.tab_renderer.title.is_some_and(|s| s == IT_BROWSE_RELEASES.tab_name) {
+                debug!("release tab browsing aborted: incorrect tab");
                 break 'outer;  // tab not available
             }
             #[allow(clippy::match_wildcard_for_single_variants)]
@@ -539,17 +547,19 @@ pub async fn browse_releases_homepage(client: Client, config: Arc<AppConfig>, uc
         let resp = resp.error_for_status().context("Browse request failed")?;
 
         let results = if is_continuation {
-            let mut resp: it::browse::out::GridContinuation = resp.json_debug().await.context("Failed to decode browse continuation response")?;
+            let mut resp: it::browse::out::GridContinuation = resp.json_debug("releases_home").await.context("Failed to decode browse continuation response")?;
             
             resp.on_response_received_actions.pop().context("Failed to decode browse continuation response - decoded actions list was empty")?
                 .append_continuation_items_action.continuation_items
         } else {
-            let mut resp: it::browse::out::BrowseOutput = resp.json_debug().await.context("Failed to decode browse channel response")?;
+            let mut resp: it::browse::out::BrowseOutput = resp.json_debug("releases_home").await.context("Failed to decode browse channel response")?;
 
             let Some(tab) = resp.contents.two_column_browse_results_renderer.tabs.pop() else {
+                debug!("release browsing via homepage aborted: tab unavailable");
                 break 'outer;  // tab not available
             };
             if !tab.tab_renderer.title.is_some_and(|s| s == IT_BROWSE_HOME.tab_name) {
+                debug!("release browsing via homepage aborted: incorrect tab");
                 break 'outer;  // tab not available
             }
             #[allow(clippy::match_wildcard_for_single_variants)]
@@ -565,6 +575,7 @@ pub async fn browse_releases_homepage(client: Client, config: Arc<AppConfig>, uc
                     if title.runs.pop().is_some_and(|t| t.text == IT_RELEASES_SHELF_NAME) {
                         endpoint
                     } else {
+                        debug!("release browsing via homepage aborted: no releases shelf found");
                         return Ok(vec![]) // Not an autogenerated topic channel
                     }
                 },
@@ -584,7 +595,7 @@ pub async fn browse_releases_homepage(client: Client, config: Arc<AppConfig>, uc
                 params: None,
             }).send().await.context("Failed to send followup browse continuation request")?;
             let resp = resp.error_for_status().context("Followup browse continuation request failed")?;
-            let mut resp: it::browse::out::ShelfContinuation = resp.json_debug().await.context("Failed to decode followup browse continuation response")?;
+            let mut resp: it::browse::out::ShelfContinuation = resp.json_debug("releases_home").await.context("Failed to decode followup browse continuation response")?;
 
             resp.on_response_received_actions.pop().context("Failed to decode followup browse continuation response - decoded actions list was empty")?
                 .append_continuation_items_action.continuation_items.pop().context("Failed to decode followup browse continuation response - no grid renderer found")?
@@ -841,10 +852,31 @@ mod it {
                 ReelItemRenderer {
                     video_id: String,
                 },
+                ShortsLockupViewModel {
+                    on_tap: ShortsOnTap,
+                },
                 PlaylistRenderer {
                     playlist_id: String,
                     video_count: String,
                 }
+            }
+
+            #[derive(Deserialize, Clone)]
+            #[serde(rename_all="camelCase")]
+            pub struct ShortsOnTap {
+                pub innertube_command: InnertubeCommand,
+            }
+
+            #[derive(Deserialize, Clone)]
+            #[serde(rename_all="camelCase")]
+            pub struct InnertubeCommand {
+                pub reel_watch_endpoint: ReelWatchEndpoint,
+            }
+
+            #[derive(Deserialize, Clone)]
+            #[serde(rename_all="camelCase")]
+            pub struct ReelWatchEndpoint {
+                pub video_id: String,
             }
 
             #[derive(Deserialize, Clone)]

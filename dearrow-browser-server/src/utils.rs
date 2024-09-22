@@ -273,11 +273,11 @@ pub fn unix_timestamp() -> i128 {
 }
 
 pub trait ReqwestResponseExt {
-    async fn json_debug<T: DeserializeOwned>(self) -> std::result::Result<T, ErrorContext>;
+    async fn json_debug<T: DeserializeOwned>(self, name: &'static str) -> std::result::Result<T, ErrorContext>;
 }
 
 impl ReqwestResponseExt for reqwest::Response {
-    async fn json_debug<T: DeserializeOwned>(self) -> std::result::Result<T, ErrorContext> {
+    async fn json_debug<T: DeserializeOwned>(self, name: &'static str) -> std::result::Result<T, ErrorContext> {
         let body = self.bytes().await.context("Failed to receive response")?;
         let decoded = serde_json::from_slice(&body).context("Failed to decode response as JSON");
 
@@ -286,7 +286,7 @@ impl ReqwestResponseExt for reqwest::Response {
             let dump_result: std::io::Result<()> = async {
                 let mut path = PathBuf::from("./debug");
                 create_dir_all(&path).await?;
-                path.push(format!("{}.json", unix_timestamp()));
+                path.push(format!("{}-{name}.json", unix_timestamp()));
                 write(&path, &body).await?;
                 Ok(())
             }.await;

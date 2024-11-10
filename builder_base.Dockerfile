@@ -19,13 +19,13 @@ FROM docker.io/library/alpine:edge AS builder-base-base
 RUN echo https://dl-cdn.alpinelinux.org/alpine/edge/testing >> /etc/apk/repositories
 RUN apk --no-cache add git rust cargo pkgconfig openssl-dev
 
-FROM builder-base-base AS dep-builder
-# https://github.com/trunk-rs/trunk/pull/868, required for enable-threads=true (fails to build when disabled)
-RUN git clone https://github.com/trunk-rs/trunk /trunk
-WORKDIR /trunk
-RUN git fetch origin fe4fc9d2509843f787dfc65f89111adc1987e059 && git checkout fe4fc9d2509843f787dfc65f89111adc1987e059
-RUN --mount=type=cache,target=/root/.cargo,id=alpine_cargo_dir --mount=type=cache,target=/trunk/target,id=trunk_target cargo build --release --locked && mv target/release/trunk /trunk.bin
+# FROM builder-base-base AS dep-builder
+# # https://github.com/trunk-rs/trunk/pull/868, required for enable-threads=true (fails to build when disabled)
+# RUN git clone https://github.com/trunk-rs/trunk /trunk
+# WORKDIR /trunk
+# RUN git fetch origin fe4fc9d2509843f787dfc65f89111adc1987e059 && git checkout fe4fc9d2509843f787dfc65f89111adc1987e059
+# RUN --mount=type=cache,target=/root/.cargo,id=alpine_cargo_dir --mount=type=cache,target=/trunk/target,id=trunk_target cargo build --release --locked && mv target/release/trunk /trunk.bin
 
 FROM builder-base-base AS builder-base
-RUN apk --no-cache add rust-wasm binaryen dart-sass wasm-bindgen
-COPY --from=dep-builder /trunk.bin /usr/local/bin/trunk
+RUN apk --no-cache add rust-wasm binaryen dart-sass wasm-bindgen trunk
+# COPY --from=dep-builder /trunk.bin /usr/local/bin/trunk

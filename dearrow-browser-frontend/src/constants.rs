@@ -15,11 +15,13 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use std::sync::LazyLock;
+use std::{sync::LazyLock, time::Duration};
 
 use reqwest::{Url, Client};
 
 pub static REQWEST_CLIENT: LazyLock<Client> = LazyLock::new(Client::new);
+pub static USER_AGENT: LazyLock<&'static str> = LazyLock::new(create_useragent_string);
+pub const ASYNC_TASK_AUTO_DISMISS_DELAY: Duration = Duration::from_secs(15);
 
 // URLs
 
@@ -28,3 +30,12 @@ pub static YOUTUBE_OEMBED_URL: LazyLock<Url> = LazyLock::new(|| Url::parse("http
 pub static YOUTUBE_EMBED_URL:  LazyLock<Url> = LazyLock::new(|| Url::parse("https://www.youtube-nocookie.com/embed/").expect("should be able to parse the youtube embed url"));
 pub static THUMBNAIL_URL:      LazyLock<Url> = LazyLock::new(|| Url::parse("https://img.youtube.com/vi").expect("should be able to parse the youtube thumbnail URL"));
 pub static SBB_BASE:           LazyLock<Url> = LazyLock::new(|| Url::parse("https://sb.ltn.fi/").expect("should be able to parse sb.ltn.fi base URL"));
+pub const SBS_BRANDING_ENDPOINT: &[&str]     = &["api", "branding"];
+
+fn create_useragent_string() -> &'static str {
+    match (crate::built_info::GIT_COMMIT_HASH_SHORT, crate::built_info::GIT_DIRTY) {
+        (Some(hash), Some(true)) => format!("DeArrowBrowser/{}+g{hash}-dirty", crate::built_info::PKG_VERSION),
+        (Some(hash), _) => format!("DeArrowBrowser/{}+g{hash}", crate::built_info::PKG_VERSION),
+        _ => format!("DeArrowBrowser/{}", crate::built_info::PKG_VERSION),
+    }.leak()
+}

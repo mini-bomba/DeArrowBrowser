@@ -17,9 +17,11 @@
 */
 use yew::prelude::*;
 
+pub mod async_tasks;
 pub mod settings;
 pub mod status;
 pub mod thumbnail;
+pub mod voting;
 
 pub enum ModalMessage {
     Open(Html),

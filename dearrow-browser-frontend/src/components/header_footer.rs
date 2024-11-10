@@ -15,11 +15,15 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
+use std::rc::Rc;
+
 use chrono::DateTime;
 use yew::prelude::*;
+use yew::virtual_dom::VList;
+use yew_router::hooks::use_navigator;
 use yew_router::prelude::Link;
 
-use crate::components::modals::{settings::SettingsModal, status::StatusModal, ModalMessage};
+use crate::components::modals::{async_tasks::AsyncTasksModal, settings::SettingsModal, status::StatusModal, ModalMessage};
 use crate::components::icon::*;
 use crate::contexts::*;
 use crate::pages::MainRoute;
@@ -27,9 +31,50 @@ use crate::utils::render_datetime_with_delta;
 
 #[function_component]
 pub fn Header() -> Html {
+    let navigator = use_navigator().expect("Header should be placed in a Router");
     let modal_controls: ModalRendererControls = use_context().expect("Header should be placed inside a ModalRenderer");
-    let open_settings_modal = use_callback(modal_controls, |_, modal_controls| {
+    let user_context: UserContext = use_context().expect("Header should be placed inside a SettingsProvider");
+    let async_tasks_view: AsyncTaskList = use_context().expect("Header should be placed inside an AsyncTaskList");
+    let open_settings_modal = use_callback(modal_controls.clone(), |_, modal_controls| {
         modal_controls.emit(ModalMessage::Open(html! {<SettingsModal />}));
+    });
+    let open_user_page = use_callback(user_context.as_ref().map(|d| d.user_id.clone()), move |_: MouseEvent, public_id| {
+        if let Some(public_id) = public_id {
+            navigator.push(&MainRoute::User { id: AttrValue::Rc(public_id.clone()) });
+        }
+    });
+    let open_async_tasks_modal = use_callback(modal_controls, |_, modal_controls| {
+        modal_controls.emit(ModalMessage::Open(html! {<AsyncTasksModal />}));
+    });
+
+    let task_badge: Rc<Html> = use_memo(async_tasks_view.clone(), |async_tasks_view| {
+        let task_counts = async_tasks_view.count();
+        let mut segments = Vec::with_capacity(3);
+        if task_counts.pending != 0 {
+            segments.push(html! {
+                <span>
+                    {task_counts.pending.to_string()}
+                    <Icon r#type={IconType::Wait} />
+                </span>
+            });
+        }
+        if task_counts.success != 0 {
+            segments.push(html! {
+                <span>
+                    {task_counts.success.to_string()}
+                    <Icon r#type={IconType::Done} />
+                </span>
+            });
+        }
+        if task_counts.failed != 0 {
+            segments.push(html! {
+                <span>
+                    {task_counts.failed.to_string()}
+                    <Icon r#type={IconType::Removed} />
+                </span>
+            });
+        }
+        VList::with_children(segments, None).into()
     });
 
     html! {
@@ -37,6 +82,32 @@ pub fn Header() -> Html {
             <Link<MainRoute> to={MainRoute::Home}><img src="/icon/logo.svg" /></Link<MainRoute>>
             <div>
                 <h1 class="undecorated-link"><Link<MainRoute> to={MainRoute::Home}>{"DeArrow Browser"}</Link<MainRoute>></h1>
+                if !async_tasks_view.tasks.is_empty() {
+                    <div id="async-tasks-badge" class="clickable header-badge" onclick={open_async_tasks_modal}>
+                        {(*task_badge).clone()}
+                    </div>
+                }
+                if let Some(user_data) = user_context {
+                    <div id="current-user-badge" class="clickable header-badge" onclick={open_user_page}>
+                        <span>
+                            if let Some(Ok(user_details)) = user_data.data {
+                                if let Some(username) = user_details.username.clone().filter(|name| *name != user_data.user_id) {
+                                    <span id="current-user-name">{username}</span>
+                                } else {
+                                    <em>{"No username"}</em>
+                                }
+                                if user_details.vip {
+                                    {" "}<Icon r#type={IconType::VIP} tooltip={Some("VIP user")} />
+                                }
+                            } else if let Some(Err(..)) = user_data.data {
+                                <em>{"Error"}</em>
+                            } else {
+                                <em>{"Loading..."}</em>
+                            } 
+                        </span>
+                        <span id="current-user-id">{user_data.user_id}</span>
+                    </div>
+                }
                 <span id="settings-button" class="clickable" onclick={open_settings_modal}><Icon r#type={IconType::Settings} tooltip={"Open settings"} /></span>
             </div>
         </div>

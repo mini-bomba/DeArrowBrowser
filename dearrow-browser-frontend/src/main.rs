@@ -16,6 +16,7 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 use std::rc::Rc;
+use components::async_task_manager::AsyncTaskManager;
 use dearrow_browser_api::unsync::StatusResponse;
 use error_handling::ErrorContext;
 use gloo_console::error;
@@ -36,6 +37,7 @@ pub mod settings;
 pub mod utils;
 pub mod pages;
 pub mod thumbnails;
+pub mod sbserver;
 use contexts::*;
 use pages::*;
 
@@ -70,17 +72,19 @@ fn App() -> Html {
 
     html! {
         <ContextProvider<Rc<WindowContext>> context={window_context}>
+        <ContextProvider<StatusContext> context={status.data.clone()}>
         <SettingsProvider>
         <ThumbgenProvider>
-        <ContextProvider<StatusContext> context={status.data.clone()}>
         <ContextProvider<UpdateClock> context={*update_clock}>
+        <AsyncTaskManager>
             <BrowserRouter>
                 <Switch<MainRoute> render={render_main_route} />
             </BrowserRouter>
+        </AsyncTaskManager>
         </ContextProvider<UpdateClock>>
-        </ContextProvider<StatusContext>>
         </ThumbgenProvider>
         </SettingsProvider>
+        </ContextProvider<StatusContext>>
         </ContextProvider<Rc<WindowContext>>>
     }
 }

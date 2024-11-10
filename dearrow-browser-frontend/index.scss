@@ -80,16 +80,45 @@ body {
     align-items: center;
     flex-direction: row;
     flex-grow: 1;
-    justify-content: space-between;
+    gap: 2rem;
   }
   
   h1 {
     font-size: 2rem;
     margin: 0;
+    flex-grow: 1;
   }
 
   #settings-button {
     font-size: 2rem;
+  }
+
+  .header-badge {
+    background-color: $gray;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+  }
+
+  #current-user-badge {
+    display: flex;
+    flex-direction: column;
+
+    #current-user-id, #current-user-name {
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+    }
+    
+    #current-user-id {
+      contain: inline-size;
+    }
+  }
+
+  #async-tasks-badge {
+    display: flex;
+    flex-direction: row;
+    font-size: 1.5rem;
+    gap: 0.25em;
   }
 }
 
@@ -353,6 +382,100 @@ body {
   }
 }
 
+#async-tasks-modal {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 0.5rem;
+
+  > h2 {
+    grid-column: 1 / end;
+    grid-row: 1 / span 1;
+    text-align: center;
+  }
+
+  #async-tasks-controls {
+    grid-column: 1 / end;
+    grid-row: 2 / span 1;
+  }
+
+  #async-tasks-no-tasks {
+    grid-column: 1 / end;
+    grid-row: span 1;
+    text-align: center;
+    font-style: italic;
+  }
+
+  .async-task-item {
+    grid-column: 1 / end;
+    grid-row: span 1;
+    display: grid;
+    grid-template-columns: subgrid;
+    grid-template-rows: repeat(2, auto);
+
+    .async-task-status {
+      grid-column: 1 / span 1;
+      grid-row: 1/ end;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      font-size: 1.5rem;
+    }
+
+    .async-task-name {
+      grid-column: 2 / span 1;
+      grid-row: 1 / span 1;
+      font-weight: bold;
+    }
+
+    .async-task-summary {
+      grid-column: 2 / span 1;
+      grid-row: 2 /span 1
+    }
+
+    .async-task-actions {
+      grid-column: 3 / span 1;
+      grid-row: 1 / end;
+      display: grid;
+      grid-auto-columns: 1em;
+      align-items: center;
+      justify-items: center;
+      gap: 0.25rem;
+      font-size: 1.5rem;
+
+      :has(.icon-removed.grayscale) {
+        grid-column: 1 / span 1;
+      }
+
+      :has(.icon-replaced) {
+        grid-column: 2 / span 1;
+      }
+    }
+  }
+}
+
+#voting-modal {
+  @extend %flex-column, %flex-center;
+  text-align: center;
+  overflow: hidden;
+  max-height: 100%;
+  gap: 0.5rem;
+
+  h2 {
+    margin-bottom: 0;
+  }
+
+  .thumbnail {
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-height: 0;
+    max-height: 20vh;
+  }
+
+  td {
+    font-size: 2rem;
+  }
+}
+
 .clickable {
   cursor: pointer;
 }
@@ -499,6 +622,10 @@ fieldset {
   .setting-actions {
     grid-column: 3 / span 1;
   }
+
+  label[title] {
+    text-decoration: underline dotted;
+  }
 }
 
 #loading {
@@ -612,4 +739,16 @@ fieldset {
 }
 .icon-votes-missing {
   background-image: url("/icon/votes_missing.svg");
+}
+.icon-upvote-and-lock {
+  background-image: url("/icon/upvote_and_lock.svg");
+}
+.icon-downvote-and-remove {
+  background-image: url("/icon/downvote_and_remove.svg");
+}
+.icon-wait {
+  background-image: url("/icon/wait.svg");
+}
+.icon-done {
+  background-image: url("/icon/done.svg");
 }

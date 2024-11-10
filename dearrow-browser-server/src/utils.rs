@@ -22,7 +22,6 @@ use base64::prelude::{BASE64_URL_SAFE_NO_PAD, Engine};
 use error_handling::{ErrContext, ErrorContext, IntoErrorIterator, ResContext};
 use log::warn;
 use serde::de::DeserializeOwned;
-use sha2::{Sha256, Digest, digest::{typenum::U32, generic_array::GenericArray}};
 use tokio::fs::{create_dir_all, write, File};
 
 /// This extension will be present on a response if the response contains
@@ -88,12 +87,6 @@ impl Error {
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
-
-pub fn sha256(s: &str) -> GenericArray<u8, U32> {
-    let mut hasher = Sha256::new();
-    hasher.update(s);
-    hasher.finalize()
-}
 
 pub fn get_mtime(p: &Path) -> i64 {
     fs::metadata(p).ok()

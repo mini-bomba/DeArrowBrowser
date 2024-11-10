@@ -26,6 +26,7 @@ use dearrow_browser_api::sync::{*, self as api};
 use futures::join;
 use log::warn;
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 
 use crate::built_info;
 use crate::constants::*;
@@ -173,9 +174,9 @@ fn do_reload(db_lock: DBLock, string_set_lock: StringSetLock, config: web::Data<
 async fn request_reload(db_lock: DBLock, string_set_lock: StringSetLock, config: web::Data<AppConfig>, auth: web::Query<Auth>) -> HttpResponse {
     let provided_hash = match auth.auth.as_deref() {
         None => { return HttpResponse::NotFound().finish(); },
-        Some(s) => utils::sha256(s),
+        Some(s) => Sha256::digest(s),
     };
-    let actual_hash = utils::sha256(config.auth_secret.as_str());
+    let actual_hash = Sha256::digest(config.auth_secret.as_str());
 
     if provided_hash != actual_hash {
         return HttpResponse::Forbidden().finish();

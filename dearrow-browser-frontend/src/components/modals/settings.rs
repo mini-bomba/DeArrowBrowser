@@ -18,9 +18,11 @@
 
 use std::{convert::Infallible, fmt::Display, num::NonZeroUsize, rc::Rc, str::FromStr};
 
+use gloo_console::error;
 use reqwest::Url;
 use strum::VariantNames;
-use web_sys::{HtmlInputElement, HtmlSelectElement};
+use wasm_bindgen::JsCast;
+use web_sys::{ClipboardEvent, HtmlInputElement, HtmlSelectElement};
 use yew::prelude::*;
 
 use crate::{contexts::SettingsContext, settings::TableLayout};
@@ -193,12 +195,35 @@ verify_fn!(baseurl_verify: target -> Rc<str> => {
 verify_fn!(checkbox_verify: target -> bool => {
     Result::<bool, Infallible>::Ok(target.checked())
 });
+verify_fn!(priv_userid_verify: target -> Option<Rc<str>> => {
+    let userid = target.value();
+    if userid.is_empty() {
+        Ok(None)
+    } else if userid.len() < 30 {
+        Err("Private userID too short")
+    } else {
+        Ok(Some(userid.into()))
+    }
+});
 
 fn update_select<T>(input: &(NodeRef, T))
 where T: Into<&'static str> + Clone
 {
     if let Some(r#ref) = input.0.cast::<HtmlSelectElement>() {
         r#ref.set_value(input.1.clone().into());
+    }
+}
+
+trait ToStringExt {
+    fn to_string(&self) -> String;
+}
+
+impl<T: ToString> ToStringExt for Option<T> {
+    fn to_string(&self) -> String {
+        match self {
+            None => String::new(),
+            Some(t) => t.to_string(),
+        }
     }
 }
 
@@ -217,12 +242,25 @@ pub fn SettingsModal() -> Html {
     let baseurl_oninput = use_callback((), move |e: InputEvent, ()| {
         baseurl_verify(&e.target_unchecked_into());
     });
-    // let tablelayout_oninput = use_callback((), move |e: InputEvent, ()| {
-    //     fromstr_verify::<TableLayout>(&e.target_unchecked_into());
-    // });
+    let private_user_id_oninput = use_callback((), move |e: InputEvent, ()| {
+        priv_userid_verify(&e.target_unchecked_into());
+    });
+
+    let password_copy = use_callback((), move |e: Event, ()| {
+        let e: ClipboardEvent = e.dyn_into().expect("This should be a ClipboardEvent");
+        let input: HtmlInputElement = e.target_unchecked_into();
+        if let Err(err) = e.clipboard_data().expect("Clipboard data should be defined on ClipboardEvents fired by the browser")
+                           .set_data("text/plain", &input.value()) {
+            error!(".set_data() on a clipboard event failed lolwut", err);
+        } else {
+            e.prevent_default();
+        }
+    });
 
     let entries_per_page_revert           = use_callback(settings_context.clone(), esc_callback!(entries_per_page, fromstr_verify::<NonZeroUsize>));
     let thumbgen_api_base_url_revert      = use_callback(settings_context.clone(), esc_callback!(thumbgen_api_base_url, baseurl_verify));
+    let private_user_id_revert            = use_callback(settings_context.clone(), esc_callback!(private_user_id, priv_userid_verify));
+    let sponsorblock_api_base_url_revert  = use_callback(settings_context.clone(), esc_callback!(sponsorblock_api_base_url, baseurl_verify));
 
     let entries_per_page_save             = use_callback(settings_context.clone(), save_callback!(entries_per_page, fromstr_verify));
     let thumbgen_api_base_url_save        = use_callback(settings_context.clone(), save_callback!(thumbgen_api_base_url, baseurl_verify));
@@ -230,6 +268,8 @@ pub fn SettingsModal() -> Html {
     let thumbnail_table_layout_save       = use_callback(settings_context.clone(), save_callback!(thumbnail_table_layout, fromstr_verify));
     let render_thumbnails_in_tables_save  = use_callback(settings_context.clone(), save_callback!(render_thumbnails_in_tables, checkbox_verify));
     let disable_sharedworker_save         = use_callback(settings_context.clone(), save_callback!(disable_sharedworker, checkbox_verify));
+    let private_user_id_save              = use_callback(settings_context.clone(), save_callback!(private_user_id, priv_userid_verify));
+    let sponsorblock_api_base_url_save    = use_callback(settings_context.clone(), save_callback!(sponsorblock_api_base_url, baseurl_verify));
 
     let entries_per_page_undo             = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(entries_per_page));
     let thumbgen_api_base_url_undo        = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(thumbgen_api_base_url));
@@ -237,6 +277,8 @@ pub fn SettingsModal() -> Html {
     let thumbnail_table_layout_undo       = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(thumbnail_table_layout));
     let render_thumbnails_in_tables_undo  = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(render_thumbnails_in_tables));
     let disable_sharedworker_undo         = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(disable_sharedworker));
+    let private_user_id_undo              = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(private_user_id));
+    let sponsorblock_api_base_url_undo    = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(sponsorblock_api_base_url));
 
     let entries_per_page_reset            = use_callback(settings_context.clone(), reset_callback!(entries_per_page));
     let thumbgen_api_base_url_reset       = use_callback(settings_context.clone(), reset_callback!(thumbgen_api_base_url));
@@ -244,6 +286,8 @@ pub fn SettingsModal() -> Html {
     let thumbnail_table_layout_reset      = use_callback(settings_context.clone(), reset_callback!(thumbnail_table_layout));
     let render_thumbnails_in_tables_reset = use_callback(settings_context.clone(), reset_callback!(render_thumbnails_in_tables));
     let disable_sharedworker_reset        = use_callback(settings_context.clone(), reset_callback!(disable_sharedworker));
+    let private_user_id_reset             = use_callback(settings_context.clone(), reset_callback!(private_user_id));
+    let sponsorblock_api_base_url_reset   = use_callback(settings_context.clone(), reset_callback!(sponsorblock_api_base_url));
 
 
     // ~value doesnt work for <select>
@@ -357,7 +401,7 @@ pub fn SettingsModal() -> Html {
                     class={setting_class!(initial_settings, current_settings, thumbgen_api_base_url)} 
                     id="thumbgen_api_base_url" 
                     type="url" required=true 
-                    oninput={baseurl_oninput} 
+                    oninput={baseurl_oninput.clone()} 
                     onkeydown={thumbgen_api_base_url_revert} 
                     onchange={thumbgen_api_base_url_save} 
                     ~value={current_settings.thumbgen_api_base_url.to_string()} 
@@ -396,6 +440,58 @@ pub fn SettingsModal() -> Html {
                         <span 
                             class="clickable" title="Reset to default"
                             onclick={disable_sharedworker_reset}
+                        >{"🔄"}</span>
+                    }
+                </div>
+            </fieldset>
+            <fieldset>
+                <legend>{"Credentials & authenticated actions"}</legend>
+                <label for="private_user_id">{"Private userID: "}</label>
+                <input 
+                    class={setting_class!(initial_settings, current_settings, private_user_id)} 
+                    id="private_user_id" 
+                    type="password" minlength=30 
+                    oninput={private_user_id_oninput} 
+                    onkeydown={private_user_id_revert} 
+                    onchange={private_user_id_save} 
+                    oncopy={password_copy}
+                    ~value={current_settings.private_user_id.to_string()} 
+                />
+                <div class="setting-actions">
+                    if should_show_undo!(private_user_id, current_settings, initial_settings) {
+                        <span 
+                            class="clickable" title="Undo"
+                            onclick={private_user_id_undo}
+                        >{"↩️"}</span>
+                    }
+                    if should_show_reset!(private_user_id, current_settings, settings_context) {
+                        <span 
+                            class="clickable" title="Reset to default"
+                            onclick={private_user_id_reset}
+                        >{"🔄"}</span>
+                    }
+                </div>
+                <label for="sponsorblock_api_base_url">{"SponsorBlock/DeArrow API base URL: "}</label>
+                <input 
+                    class={setting_class!(initial_settings, current_settings, sponsorblock_api_base_url)} 
+                    id="sponsorblock_api_base_url" 
+                    type="url" required=true
+                    oninput={baseurl_oninput} 
+                    onkeydown={sponsorblock_api_base_url_revert} 
+                    onchange={sponsorblock_api_base_url_save} 
+                    ~value={current_settings.sponsorblock_api_base_url.to_string()} 
+                />
+                <div class="setting-actions">
+                    if should_show_undo!(sponsorblock_api_base_url, current_settings, initial_settings) {
+                        <span 
+                            class="clickable" title="Undo"
+                            onclick={sponsorblock_api_base_url_undo}
+                        >{"↩️"}</span>
+                    }
+                    if should_show_reset!(sponsorblock_api_base_url, current_settings, settings_context) {
+                        <span 
+                            class="clickable" title="Reset to default"
+                            onclick={sponsorblock_api_base_url_reset}
                         >{"🔄"}</span>
                     }
                 </div>

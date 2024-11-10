@@ -30,6 +30,8 @@ pub struct Settings {
     pub thumbnail_table_layout: TableLayout,
     pub render_thumbnails_in_tables: bool,
     pub disable_sharedworker: bool,
+    pub private_user_id: Option<Rc<str>>,
+    pub sponsorblock_api_base_url: Rc<str>,
 }
 
 impl Default for Settings {
@@ -41,6 +43,8 @@ impl Default for Settings {
             thumbnail_table_layout: TableLayout::Expanded,
             render_thumbnails_in_tables: false,
             disable_sharedworker: false,
+            private_user_id: None,
+            sponsorblock_api_base_url: "https://sponsor.ajay.app/".into(),
         }
     }
 }

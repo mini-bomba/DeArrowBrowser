@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2023-2024 mini_bomba
+*  Copyright (C) 2024 mini_bomba
 *  
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -34,6 +34,11 @@ pub enum IconType {
     Upvote,
     VIP,
     VotesMissing,
+    UpvoteAndLock,
+    DownvoteAndRemove,
+    Wait,
+    Done,
+    Close,
 }
 
 #[derive(Properties, PartialEq)]
@@ -46,23 +51,28 @@ pub struct IconProps {
 #[function_component]
 pub fn Icon(props: &IconProps) -> Html {
     let class = match props.r#type {
-        IconType::DABLogo => classes!("icon-dablogo"),
-        IconType::Downvote => classes!("icon-downvote"),
-        IconType::Locked => classes!("icon-locked"),
-        IconType::Original => classes!("icon-original"),
-        IconType::PartiallyHidden => classes!("icon-downvote", "grayscale"),
-        IconType::Removed => classes!("icon-removed"),
-        IconType::Replaced => classes!("icon-replaced"),
-        IconType::Settings => classes!("icon-settings"),
-        IconType::ShadowHidden => classes!("icon-shadowhidden"),
-        IconType::TimestampMissing => classes!("icon-timestamp-missing"),
-        IconType::Unverified => classes!("icon-unverified"),
-        IconType::Upvote => classes!("icon-upvote"),
-        IconType::VIP => classes!("icon-vip"),
-        IconType::VotesMissing => classes!("icon-votes-missing"),
+        IconType::DABLogo           => classes!("icon", "icon-dablogo"),
+        IconType::Downvote          => classes!("icon", "icon-downvote"),
+        IconType::Locked            => classes!("icon", "icon-locked"),
+        IconType::Original          => classes!("icon", "icon-original"),
+        IconType::PartiallyHidden   => classes!("icon", "icon-downvote", "grayscale"),
+        IconType::Removed           => classes!("icon", "icon-removed"),
+        IconType::Replaced          => classes!("icon", "icon-replaced"),
+        IconType::Settings          => classes!("icon", "icon-settings"),
+        IconType::ShadowHidden      => classes!("icon", "icon-shadowhidden"),
+        IconType::TimestampMissing  => classes!("icon", "icon-timestamp-missing"),
+        IconType::Unverified        => classes!("icon", "icon-unverified"),
+        IconType::Upvote            => classes!("icon", "icon-upvote"),
+        IconType::VIP               => classes!("icon", "icon-vip"),
+        IconType::VotesMissing      => classes!("icon", "icon-votes-missing"),
+        IconType::UpvoteAndLock     => classes!("icon", "icon-upvote-and-lock"),
+        IconType::DownvoteAndRemove => classes!("icon", "icon-downvote-and-remove"),
+        IconType::Wait              => classes!("icon", "icon-wait"),
+        IconType::Done              => classes!("icon", "icon-done"),
+        IconType::Close             => classes!("icon", "icon-removed", "grayscale"),
     };
 
     html! {
-        <span class={classes!("icon", class)} title={props.tooltip.clone()}></span>
+        <span {class} title={props.tooltip.clone()}></span>
     }
 }

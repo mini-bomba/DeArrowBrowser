@@ -24,17 +24,21 @@ use web_sys::HtmlInputElement;
 use yew::{prelude::*, suspense::SuspensionResult};
 use dearrow_browser_api::unsync::*;
 use error_handling::ErrorContext;
+use yew_router::prelude::Location;
+use yew_router::prelude::LocationHandle;
+use yew_router::prelude::RouterScopeExt;
 
 use crate::components::icon::*;
 use crate::components::links::*;
-use crate::components::modals::{thumbnail::ThumbnailModal, ModalMessage};
+use crate::components::modals::{thumbnail::ThumbnailModal, voting::{VotingDetail, VotingModal}};
 use crate::components::youtube::YoutubeVideoLink;
-use crate::contexts::{SettingsContext, StatusContext, ModalRendererControls};
+use crate::contexts::{ModalRendererControls, ModalMessage, SettingsContext, StatusContext, UserContext};
 use crate::hooks::{use_async_suspension, use_location_state};
 use crate::pages::LocationState;
 use crate::settings::TableLayout;
 use crate::thumbnails::components::{ContainerType, Thumbnail, ThumbnailCaption};
 use crate::utils::{api_request, html_length, render_datetime, RcEq};
+use crate::MainRoute;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum DetailType {
@@ -54,45 +58,99 @@ pub struct TableModeSwitchProps {
     pub entry_count: Option<usize>,
 }
 
-#[function_component]
-pub fn TableModeSwitch(props: &TableModeSwitchProps) -> Html {
-    let state_handle = use_location_state();
-    let state = state_handle.get_state();
+pub struct TableModeSwitch {
+    current_mode: DetailType,
 
-    let set_titles_mode = {
-        let state_handle = state_handle.clone();
-        Callback::from(move |_| {
-            state_handle.push_state(LocationState {
-                detail_table_mode: DetailType::Title,
-                detail_table_page: 0,
-            });
-        })
-    };
-    let set_thumbs_mode = {
-        Callback::from(move |_| {
-            state_handle.push_state(LocationState {
-                detail_table_mode: DetailType::Thumbnail,
-                detail_table_page: 0,
-            });
-        })
-    };
+    set_titles_mode_cb: Callback<MouseEvent>,
+    set_thumbs_mode_cb: Callback<MouseEvent>,
 
-    html! {
-        <div class="table-mode-switch">
-            <span class="table-mode button" onclick={set_titles_mode} selected={state.detail_table_mode == DetailType::Title}>{"Titles"}</span>
-            <span class="table-mode button" onclick={set_thumbs_mode} selected={state.detail_table_mode == DetailType::Thumbnail}>{"Thumbnails"}</span>
-            if let Some(count) = props.entry_count {
-                <span>
-                    if count == 1 {
-                        {"1 entry"}
-                    } else {
-                        {format!("{count} entries")}
-                    }
-                </span>
+    _location_handle: LocationHandle,
+}
+
+pub enum TableModeSwitchMessage {
+    UpdateMode(DetailType),
+    LocationUpdated(Location),
+}
+
+impl Component for TableModeSwitch {
+    type Properties = TableModeSwitchProps;
+    type Message = TableModeSwitchMessage;
+
+    fn create(ctx: &Context<Self>) -> Self {
+        let scope = ctx.link();
+
+        let location_state = match scope.location().unwrap().state::<LocationState>() {
+            Some(state) => *state,
+            None => {
+                let state = LocationState::default();
+                scope.navigator().unwrap().replace_with_state(&scope.route::<MainRoute>().unwrap(), state);
+                state
             }
-        </div>
+        };
+
+        TableModeSwitch { 
+            current_mode: location_state.detail_table_mode,
+
+            set_titles_mode_cb: scope.callback(|_| TableModeSwitchMessage::UpdateMode(DetailType::Title)),
+            set_thumbs_mode_cb: scope.callback(|_| TableModeSwitchMessage::UpdateMode(DetailType::Thumbnail)),
+
+            _location_handle: scope.add_location_listener(scope.callback(TableModeSwitchMessage::LocationUpdated)).unwrap(),
+        }
     }
-    
+
+    fn view(&self, ctx: &Context<Self>) -> Html {
+        html! {
+            <div class="table-mode-switch">
+                <span class="table-mode button" onclick={&self.set_titles_mode_cb} selected={self.current_mode == DetailType::Title}>{"Titles"}</span>
+                <span class="table-mode button" onclick={&self.set_thumbs_mode_cb} selected={self.current_mode == DetailType::Thumbnail}>{"Thumbnails"}</span>
+                if let Some(count) = ctx.props().entry_count {
+                    <span>
+                        if count == 1 {
+                            {"1 entry"}
+                        } else {
+                            {format!("{count} entries")}
+                        }
+                    </span>
+                }
+            </div>
+        }
+        
+    }
+
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+        #[allow(clippy::match_same_arms)]
+        match msg {
+            TableModeSwitchMessage::LocationUpdated(location) => {
+                let scope = ctx.link();
+                match location.state::<LocationState>().or_else(|| scope.location().unwrap().state()) {
+                    Some(state) if state.detail_table_mode != self.current_mode => {
+                        self.current_mode = state.detail_table_mode;
+                        true
+                    },
+                    Some(..) => false,
+                    None => {
+                        let state = LocationState::default();
+                        scope.navigator().unwrap().replace_with_state(&scope.route::<MainRoute>().unwrap(), state);
+                        if state.detail_table_mode == self.current_mode {
+                            false
+                        } else {
+                            self.current_mode = state.detail_table_mode;
+                            true
+                        }
+                    }
+                }
+            },
+            TableModeSwitchMessage::UpdateMode(new_mode) if new_mode != self.current_mode => {
+                self.current_mode = new_mode;
+                let scope = ctx.link();
+                let mut state = scope.location().unwrap().state::<LocationState>().as_deref().copied().unwrap_or_default();
+                state.detail_table_mode = new_mode;
+                scope.navigator().unwrap().replace_with_state(&scope.route::<MainRoute>().unwrap(), state);
+                true
+            },
+            TableModeSwitchMessage::UpdateMode(..) => false,
+        }
+    }
 }
 
 #[derive(Properties, PartialEq, Clone)]
@@ -449,6 +507,7 @@ fn DetailTableRow(props: &DetailTableRowProps) -> Html {
     let modal_controls: ModalRendererControls = use_context().expect("ModalRendererControls should be available");
     let settings_context: SettingsContext = use_context().expect("SettingsContext should be available");
     let settings = settings_context.settings();
+    let user_context: UserContext = use_context().expect("UserContext should be available");
     let original_thumb_indicator = html! {
         <Icon r#type={IconType::Original} tooltip="This is the original video thumbnail" />
     };
@@ -461,6 +520,20 @@ fn DetailTableRow(props: &DetailTableRowProps) -> Html {
             ThumbnailCaption::Html(original_thumb_indicator.clone())
         }
     });
+    let voting_modal_trigger = {
+        let modal_controls = modal_controls.clone();
+        use_callback((props.details.clone(), props.index), move |_: MouseEvent, (details, index)| {
+            let detail = match details {
+                DetailSlice::Titles(ref list) => VotingDetail::Title(list[*index].clone()),
+                DetailSlice::Thumbnails(ref list) => VotingDetail::Thumbnail(list[*index].clone()),
+            };
+            modal_controls.emit(ModalMessage::Open(html! {
+                <VotingModal {detail} />
+            }));
+        })
+    };
+    let voting_modal_trigger = user_context.is_some().then_some(voting_modal_trigger);
+    let score_col_class = classes!("score-col", "hoverswitch-trigger", user_context.is_some().then_some("clickable"));
 
 
     match props.details {
@@ -483,7 +556,7 @@ fn DetailTableRow(props: &DetailTableRowProps) -> Html {
                             <Icon r#type={IconType::Original} tooltip="This is the original video title" />
                         }
                     </td>
-                    <td class="score-col hoverswitch-trigger">
+                    <td class={score_col_class} onclick={voting_modal_trigger}>
                         {score_col!(title, t, expanded_layout)}
                     </td>
                     <td class="monospaced">{uuid_cell!(t.uuid, expanded_layout)}</td>
@@ -525,7 +598,7 @@ fn DetailTableRow(props: &DetailTableRowProps) -> Html {
                     } else {
                         <td {onclick} class="clickable">{t.timestamp.map_or(original_thumb_indicator, |ts| html! {{ts.to_string()}})}</td>
                     }
-                    <td class="score-col hoverswitch-trigger">
+                    <td class={score_col_class} onclick={voting_modal_trigger}>
                         {score_col!(thumb, t, expanded_layout)}
                     </td>
                     <td class="monospaced">{uuid_cell!(t.uuid, expanded_layout)}</td>

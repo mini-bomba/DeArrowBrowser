@@ -15,11 +15,12 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use std::{ops::Deref, rc::Rc};
+use std::{ops::Deref, rc::Rc, fmt::Write};
 
 use chrono::{DateTime, Utc, NaiveDateTime};
 use error_handling::{bail, ErrContext, ErrorContext, ResContext, SerializableError};
 use reqwest::Url;
+use sha2::{digest::array::Array, Digest, Sha256};
 use yew::Html;
 
 use crate::constants::{REQWEST_CLIENT, SBB_BASE};
@@ -287,4 +288,24 @@ pub fn html_length(html: &Html) -> usize {
         Html::VList(ref list) => list.iter().map(html_length).sum(),
         _ => 1,
     }
+}
+
+/// Hashes the input using SHA256 in a loop
+pub fn sponsorblock_hash(data: &[u8], times: usize) -> String {
+    let mut hash_buffer = Array([0u8; 32]);
+    let mut hex_buffer = String::with_capacity(64);
+    let mut source_buffer: &[u8] = data;
+    let mut hasher = Sha256::new();
+
+    for _ in 0..times {
+        hasher.update(source_buffer);
+        hasher.finalize_into_reset(&mut hash_buffer);
+        hex_buffer.clear();
+        for byte in &hash_buffer {
+            write!(hex_buffer, "{byte:02x}").unwrap();
+        }
+        source_buffer = hex_buffer.as_bytes();
+    }
+
+    hex_buffer
 }

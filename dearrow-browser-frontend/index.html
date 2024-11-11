@@ -31,7 +31,11 @@
     <body>
         <div id="loading">
             <h1 id="load-header">DeArrow Browser is loading...</h1>
-            <p id="load-text">DAB's WASM module has to be downloaded &amp; compiled before the UI is initialized.<br>This shouldn't take too long.</p>
+            <p id="load-text">
+                DAB's WASM module has to be downloaded &amp; compiled before the UI is initialized.<br>
+                This shouldn't take too long.
+                <span id="long-load"><br>... unless your internet is shit (or you've got steam downloading updates in the background)</span>
+            </p>
             <progress id="load-progress"></progress>
             <span id="load-detail">it's probably loading js or css right now idk</span>
         </div>

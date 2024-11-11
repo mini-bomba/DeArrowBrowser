@@ -648,6 +648,12 @@ fieldset {
     align-self: flex-end;
   }
 
+  #long-load {
+    opacity: 0;
+    animation: 5s ease-in 15s 1 loading_fadein;
+    animation-fill-mode: both;
+  }
+
   #load-progress {
     appearance: none;
     width: 100%;

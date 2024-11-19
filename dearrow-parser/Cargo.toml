@@ -17,4 +17,5 @@ error_handling = { path = "../error_handling" }
 enumflags2.workspace = true
 serde.workspace = true
 sha2.workspace = true
+strum.workspace = true
 log.workspace = true

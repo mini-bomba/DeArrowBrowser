@@ -97,6 +97,22 @@ pub struct VideoInfo {
     pub has_outro: bool,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Extension {
+    SponsorBlock,
+    DeArrow,
+}
+
+#[derive(Clone, Debug)]
+pub struct Warning {
+    pub warned_user_id: Arc<str>,
+    pub issuer_user_id: Arc<str>,
+    pub time_issued: i64,
+    pub extension: Extension,
+    pub message: Arc<str>,
+    pub active: bool,
+}
+
 #[derive(Default, Clone)]
 pub struct StringSet {
     pub set: HashSet<Arc<str>>
@@ -150,6 +166,14 @@ impl Dedupe for Username {
     }
 }
 
+impl Dedupe for Warning {
+    fn dedupe(&mut self, set: &mut StringSet) {
+        set.dedupe_arc(&mut self.warned_user_id);
+        set.dedupe_arc(&mut self.issuer_user_id);
+        set.dedupe_arc(&mut self.message);
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum ParseErrorKind {
     InvalidValue {
@@ -168,25 +192,16 @@ pub enum ParseErrorKind {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, strum::Display)]
 pub enum ObjectKind {
     Title,
     Thumbnail,
     Username,
+    Warning,
 }
 
 #[derive(Debug, Clone)]
 pub struct ParseError(ObjectKind, Box<ParseErrorKind>);
-
-impl Display for ObjectKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ObjectKind::Title => write!(f, "Title"),
-            ObjectKind::Thumbnail => write!(f, "Thumbnail"),
-            ObjectKind::Username => write!(f, "Username"),
-        }
-    }
-}
 
 impl std::error::Error for ParseError {}
 impl Display for ParseError {
@@ -208,6 +223,7 @@ pub struct DearrowDB {
     /// `VideoInfos` are grouped by hashprefix (a u16 value)
     /// Use `.get_video_info()` to get a specific `VideoInfo` object
     pub video_infos: Box<[Box<[VideoInfo]>]>,
+    pub warnings: Vec<Warning>,
 }
 
 pub struct DBPaths {
@@ -219,6 +235,7 @@ pub struct DBPaths {
     pub usernames: PathBuf,
     pub vip_users: PathBuf,
     pub sponsor_times: PathBuf,
+    pub warnings: PathBuf,
 }
 
 pub type LoadResult = (DearrowDB, Vec<ErrorContext>);
@@ -244,6 +261,7 @@ impl DearrowDB {
                 usernames: dir.join("userNames.csv"),
                 vip_users: dir.join("vipUsers.csv"),
                 sponsor_times: dir.join("sponsorTimes.csv"),
+                warnings: dir.join("warnings.csv"),
             },
             string_set,
         )
@@ -259,6 +277,7 @@ impl DearrowDB {
         File::open(&paths.usernames).context("Could not open the usernames file")?;
         File::open(&paths.vip_users).context("Could not open the VIP users file")?;
         File::open(&paths.sponsor_times).context("Could not open the SponsorBlock segments file")?;
+        File::open(&paths.warnings).context("Could not open the warnings file")?;
 
         // Create a vec for non-fatal deserialization errors
         let mut errors: Vec<ErrorContext> = Vec::new();
@@ -278,8 +297,11 @@ impl DearrowDB {
         info!("Extracting video info from SponsorBlock segments...");
         let video_infos = Self::load_video_info(paths, string_set, &mut errors)?;
 
+        info!("Loading warnings...");
+        let warnings = Self::load_warnings(paths, string_set, &mut errors)?;
+
         info!("DearrowDB loaded!");
-        Ok((DearrowDB {titles, thumbnails, usernames, vip_users, video_infos}, errors))
+        Ok((DearrowDB {titles, thumbnails, usernames, vip_users, video_infos, warnings}, errors))
     }
 
     fn load_thumbnails(paths: &DBPaths, string_set: &mut StringSet, errors: &mut Vec<ErrorContext>) -> Result<Vec<Thumbnail>> {
@@ -390,7 +412,7 @@ impl DearrowDB {
         Ok(csv::Reader::from_path(&paths.usernames)
             .context("could not initialize csv reader for usernames")?
             .into_deserialize::<csv_data::Username>()
-            .filter_map(|result| match result.context("Error while deserializing titles") {
+            .filter_map(|result| match result.context("Error while deserializing usernames") {
                 Ok(mut username) => {
                     username.dedupe(string_set);
                     TryInto::<Username>::try_into(username).map_err(|e| errors.push(e.context("Error while parsing username data"))).ok()
@@ -408,7 +430,7 @@ impl DearrowDB {
         Ok(csv::Reader::from_path(&paths.vip_users)
             .context("could not initialize csv reader for VIP users")?
             .into_deserialize::<csv_data::VIPUser>()
-            .filter_map(|result| match result.context("Error while deserializing titles") {
+            .filter_map(|result| match result.context("Error while deserializing vip users") {
                 Ok(mut vip) => {
                     vip.dedupe(string_set);
                     Some(vip.user_id)
@@ -517,6 +539,24 @@ impl DearrowDB {
                         })
                     })
                     .collect()
+            })
+            .collect())
+    }
+
+    fn load_warnings(paths: &DBPaths, string_set: &mut StringSet, errors: &mut Vec<ErrorContext>) -> Result<Vec<Warning>> {
+        const CONTEXT: &str = "Error while deserializing warnings";
+        Ok(csv::Reader::from_path(&paths.warnings)
+            .context("could not initialize csv reader for warnings")?
+            .into_deserialize::<csv_data::Warning>()
+            .filter_map(|result| match result.context(CONTEXT).and_then(|w| Warning::try_from(w).context(CONTEXT)) {
+                Ok(mut tip) => {
+                    tip.dedupe(string_set);
+                    Some(tip)
+                },
+                Err(error) => {
+                    errors.push(error);
+                    None
+                }
             })
             .collect())
     }
@@ -660,6 +700,19 @@ mod csv_data {
         pub time_submitted: i64,
     }
 
+    #[derive(Deserialize)]
+    pub struct Warning {
+        #[serde(rename="userID")]
+        pub user_id: Arc<str>,
+        #[serde(rename="issueTime")]
+        pub issue_time: i64,
+        #[serde(rename="issuerUserID")]
+        pub issuer_user_id: Arc<str>,
+        pub enabled: i8,
+        pub reason: Arc<str>,
+        pub r#type: i8,
+    }
+
     pub struct TrimmedSponsorTime {
         pub video_id: Arc<str>,
         pub start_time: f64,
@@ -684,6 +737,9 @@ mod csv_data {
         (uname $struct:expr, $field:ident) => {
             intbool!(! $struct, $field, ObjectKind::Username, user_id, 0, 1)
         };
+        (warn $struct:expr, $field:ident) => {
+            intbool!(! $struct, $field, ObjectKind::Warning, user_id, 0, 1)
+        };
         (thumb $struct:expr, $field:ident, $falseint: expr, $trueint:expr) => {
             intbool!(! $struct, $field, ObjectKind::Thumbnail, uuid, $falseint, $trueint)
         };
@@ -693,11 +749,14 @@ mod csv_data {
         (uname $struct:expr, $field:ident, $falseint: expr, $trueint:expr) => {
             intbool!(! $struct, $field, ObjectKind::Username, user_id, $falseint, $trueint)
         };
+        (warn $struct:expr, $field:ident, $falseint: expr, $trueint:expr) => {
+            intbool!(! $struct, $field, ObjectKind::Warning, user_id, $falseint, $trueint)
+        };
         (! $struct:expr, $field:ident, $kind:expr, $uuid:ident, $falseint:expr, $trueint:expr) => {
             match $struct.$field {
                 $falseint => false,
                 $trueint => true,
-                _ => return Err(ParseError($kind, Box::new(ParseErrorKind::InvalidValue { uuid: $struct.$uuid.clone(), field: stringify!($field), value: $struct.$field }))),
+                value => return Err(ParseError($kind, Box::new(ParseErrorKind::InvalidValue { uuid: $struct.$uuid.clone(), field: stringify!($field), value }))),
             }
         };
     }
@@ -833,6 +892,31 @@ mod csv_data {
         }
     }
 
+    impl TryFrom<Warning> for super::Warning {
+        type Error = ParseError;
+
+        fn try_from(value: Warning) -> Result<super::Warning> {
+            let active = intbool!(uname value, enabled);
+            let extension = match value.r#type {
+                0 => crate::Extension::SponsorBlock,
+                1 => crate::Extension::DeArrow,
+                v => return Err(ParseError(ObjectKind::Warning, Box::new(ParseErrorKind::InvalidValue { 
+                    uuid: value.user_id,
+                    field: "active",
+                    value: v
+                }))), 
+            };
+            Ok(super::Warning {
+                warned_user_id: value.user_id,
+                issuer_user_id: value.issuer_user_id,
+                time_issued: value.issue_time,
+                message: value.reason,
+                active,
+                extension
+            })
+        }
+    }
+
     impl Dedupe for Thumbnail {
         fn dedupe(&mut self, set: &mut StringSet) {
             set.dedupe_arc(&mut self.uuid);
@@ -890,6 +974,14 @@ mod csv_data {
     impl Dedupe for VideoDuration {
         fn dedupe(&mut self, set: &mut StringSet) {
             set.dedupe_arc(&mut self.video_id);
+        }
+    }
+
+    impl Dedupe for Warning {
+        fn dedupe(&mut self, set: &mut StringSet) {
+            set.dedupe_arc(&mut self.user_id);
+            set.dedupe_arc(&mut self.issuer_user_id);
+            set.dedupe_arc(&mut self.reason);
         }
     }
 }

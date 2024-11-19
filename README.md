@@ -48,6 +48,7 @@ To run a local development server without docker, you'll need:
   - `userNames.csv`
   - `vipUsers.csv`
   - `sponsorTimes.csv`
+  - `warnings.csv`
 2. Build the frontend:
   - `trunk build` in the `dearrow-browser-frontend` directory to make a one-time build
   - `trunk watch` in the `dearrow-browser-frontend` directory to rebuild every time source files are updated

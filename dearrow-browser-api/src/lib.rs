@@ -94,6 +94,22 @@ pub mod sync {
             res
         }
     }
+    #[cfg(feature = "dearrow-parser")]
+    impl From<&dearrow_parser::Warning> for ApiWarning {
+        fn from(value: &dearrow_parser::Warning) -> Self {
+            Self {
+                warned_user_id: value.warned_user_id.clone(),
+                issuer_user_id: value.issuer_user_id.clone(),
+                time_issued: value.time_issued,
+                message: value.message.clone(),
+                active: value.active,
+                extension: match value.extension {
+                    dearrow_parser::Extension::SponsorBlock => Extension::SponsorBlock,
+                    dearrow_parser::Extension::DeArrow => Extension::DeArrow,
+                }
+            }
+        }
+    }
 }
 #[cfg(feature = "unsync")]
 pub mod unsync {

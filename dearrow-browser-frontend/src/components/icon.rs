@@ -39,6 +39,8 @@ pub enum IconType {
     Wait,
     Done,
     Close,
+    Warning,
+    WarningInactive,
 }
 
 #[derive(Properties, PartialEq)]
@@ -70,6 +72,8 @@ pub fn Icon(props: &IconProps) -> Html {
         IconType::Wait              => classes!("icon", "icon-wait"),
         IconType::Done              => classes!("icon", "icon-done"),
         IconType::Close             => classes!("icon", "icon-removed", "grayscale"),
+        IconType::Warning           => classes!("icon", "icon-warning"),
+        IconType::WarningInactive   => classes!("icon", "icon-warning", "grayscale"),
     };
 
     html! {

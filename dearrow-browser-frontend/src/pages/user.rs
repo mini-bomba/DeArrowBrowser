@@ -22,6 +22,7 @@ use error_handling::ErrorContext;
 use yew::prelude::*;
 
 use crate::components::detail_table::*;
+use crate::components::icon::*;
 use crate::contexts::{StatusContext, WindowContext};
 use crate::hooks::{use_async_suspension, use_location_state};
 use crate::utils::{api_request, sbb_userid_link};
@@ -46,7 +47,12 @@ fn UserDetails(props: &UserDetailsProps) -> HtmlResult {
             <>
                 <div>{format!("UserID: {}", props.userid.clone())}
                 if user.vip {
-                   <span title="This user is a VIP">{"👑"}</span> 
+                    <Icon r#type={IconType::VIP} tooltip="This user is a VIP" />
+                }
+                if user.active_warning_count > 0 {
+                    <Icon r#type={IconType::Warning} tooltip="This user has an active warning" />
+                } else if user.warning_count > 0 {
+                    <Icon r#type={IconType::WarningInactive} tooltip="This user was previously warned" />
                 }
                 </div> 
                 <div>
@@ -56,7 +62,7 @@ fn UserDetails(props: &UserDetailsProps) -> HtmlResult {
                     {"Username: "}<em>{"No username set"}</em>
                 }
                 if user.username_locked {
-                    <span title="This user's username is locked">{"🔒"}</span>
+                    <Icon r#type={IconType::Locked} tooltip="This user's username is locked" />
                 }
                 </div>
                 <div>{format!("Titles: {}", user.title_count)}</div>

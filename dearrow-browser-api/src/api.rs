@@ -89,6 +89,8 @@ pub struct User {
     pub vip: bool,
     pub title_count: u64,
     pub thumbnail_count: u64,
+    pub warning_count: u64,
+    pub active_warning_count: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq)]
@@ -129,4 +131,20 @@ pub struct ChannelFetchProgress {
 pub struct BrowseProgress {
     pub videos_fetched: u64,
     pub videos_in_fscache: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+pub enum Extension {
+    SponsorBlock,
+    DeArrow,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct ApiWarning {
+    pub warned_user_id: RcStr,
+    pub issuer_user_id: RcStr,
+    pub time_issued: i64,
+    pub extension: Extension,
+    pub message: RcStr,
+    pub active: bool,
 }

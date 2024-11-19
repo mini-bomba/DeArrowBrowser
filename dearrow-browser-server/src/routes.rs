@@ -50,6 +50,7 @@ pub fn configure(app_config: web::Data<AppConfig>) -> impl FnOnce(&mut web::Serv
            .service(get_thumbnails_by_video_id)
            .service(get_thumbnails_by_user_id)
            .service(get_user_by_userid)
+           .service(get_user_warnings)
            .service(get_video)
            .service(get_status)
            .service(get_errors)
@@ -411,10 +412,21 @@ async fn get_user_by_userid(db_lock: DBLock, string_set: StringSetLock, path: we
             username_locked: false,
             vip: false, 
             title_count: 0,
-            thumbnail_count: 0
+            thumbnail_count: 0,
+            warning_count: 0,
+            active_warning_count: 0,
         },
         Some(user_id) => {
             let username = db.db.usernames.get(&user_id);
+            let (warning_count, active_warnings) = db.db.warnings.iter().fold((0,0), |acc, w| {
+                if w.warned_user_id != user_id {
+                    acc
+                } else if w.active {
+                    (acc.0+1, acc.1+1)
+                } else {
+                    (acc.0+1, acc.1)
+                }
+            });
             User {
                 user_id: user_id.clone(),
                 username: username.map(|u| u.username.clone()),
@@ -422,8 +434,21 @@ async fn get_user_by_userid(db_lock: DBLock, string_set: StringSetLock, path: we
                 vip: db.db.vip_users.contains(&user_id),
                 title_count: db.db.titles.iter().filter(|t| Arc::ptr_eq(&t.user_id, &user_id)).count() as u64,
                 thumbnail_count: db.db.thumbnails.iter().filter(|t| Arc::ptr_eq(&t.user_id, &user_id)).count() as u64,
+                warning_count,
+                active_warning_count: active_warnings,
             }
         }
+    }))
+}
+
+#[get("/users/user_id/{user_id}/warnings")]
+async fn get_user_warnings(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> JsonResult<Vec<ApiWarning>> {
+    let user_id = string_set.read().map_err(|_| SS_READ_ERR.clone())?
+        .set.get(path.as_str()).cloned();
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
+    Ok(web::Json(match user_id {
+        None => vec![],
+        Some(user_id) => db.db.warnings.iter().filter(|w| Arc::ptr_eq(&w.warned_user_id, &user_id)).map(ApiWarning::from).collect(),
     }))
 }
 

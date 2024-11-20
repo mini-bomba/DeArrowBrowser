@@ -24,7 +24,7 @@ use std::{sync::Arc, collections::HashMap};
 use actix_web::{get, http::StatusCode, post, web, CustomizeResponder, HttpResponse, Responder};
 use alea_js::Alea;
 use error_handling::anyhow;
-use dearrow_parser::{Title, TitleFlags, Thumbnail, ThumbnailFlags, VideoInfo};
+use dearrow_parser::{Extension, Thumbnail, ThumbnailFlags, Title, TitleFlags, VideoInfo};
 use serde::{Deserialize, Serialize};
 
 use crate::{middleware::ETagCache, state::{DBLock, StringSetLock}, utils};
@@ -323,6 +323,9 @@ struct UserInfo {
     titleSubmissionCount: usize,
     thumbnailSubmissionCount: usize,
     vip: bool,
+    warnings: usize,
+    warningReason: Option<Arc<str>>,
+    deArrowWarningReason: Option<Arc<str>>,
 }
 
 #[get("/api/userInfo", wrap = "ETagCache")]
@@ -333,14 +336,29 @@ async fn get_user_info(db_lock: DBLock, string_set: StringSetLock, query: web::Q
     Ok(web::Json(match user_id {
         None => {
             let user_id: Arc<str> = query.0.publicUserID.into();
-            UserInfo { userID: user_id.clone(), userName: user_id, titleSubmissionCount: 0, thumbnailSubmissionCount: 0, vip: false }
+            UserInfo { 
+                userID: user_id.clone(),
+                userName: user_id,
+                titleSubmissionCount: 0,
+                thumbnailSubmissionCount: 0,
+                vip: false,
+                warnings: 0,
+                warningReason: None,
+                deArrowWarningReason: None,
+            }
         },
-        Some(user_id) => UserInfo {
-            userName: db.db.usernames.get(&user_id).map_or_else(|| user_id.clone(), |u| u.username.clone()),
-            titleSubmissionCount: db.db.titles.iter().filter(|t| Arc::ptr_eq(&t.user_id, &user_id) && t.votes >= 0).count(),
-            thumbnailSubmissionCount: db.db.thumbnails.iter().filter(|t| Arc::ptr_eq(&t.user_id, &user_id) && t.votes >= 0).count(),
-            vip: db.db.vip_users.contains(&user_id),
-            userID: user_id,
+        Some(user_id) => {
+            let active_warnings: Vec<_> = db.db.warnings.iter().rev().filter(|w| w.active && Arc::ptr_eq(&w.warned_user_id, &user_id)).collect();
+            UserInfo {
+                userName: db.db.usernames.get(&user_id).map_or_else(|| user_id.clone(), |u| u.username.clone()),
+                titleSubmissionCount: db.db.titles.iter().filter(|t| Arc::ptr_eq(&t.user_id, &user_id) && t.votes >= 0).count(),
+                thumbnailSubmissionCount: db.db.thumbnails.iter().filter(|t| Arc::ptr_eq(&t.user_id, &user_id) && t.votes >= 0).count(),
+                vip: db.db.vip_users.contains(&user_id),
+                userID: user_id,
+                warnings: active_warnings.iter().filter(|w| w.extension == Extension::SponsorBlock).count(),
+                warningReason: active_warnings.iter().filter(|w| w.extension == Extension::SponsorBlock).map(|w| w.message.clone()).next(),
+                deArrowWarningReason: active_warnings.iter().filter(|w| w.extension == Extension::DeArrow).map(|w| w.message.clone()).next(),
+            }
         },
     }))
 }

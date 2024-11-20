@@ -27,7 +27,7 @@ Supported endpoints:
 - `GET /api/userInfo`
   - `userID` param (lookup by private id) not supported
   - `value(s)` params ignored completely
-    - endpoint will always return `userID`, `userName`, `vip`, `titleSubmissionCount` and `thumbnailSubmissionCount` fields.
+    - endpoint will always return `userID`, `userName`, `vip`, `titleSubmissionCount`, `thumbnailSubmissionCount`, `warnings`, `warningReason` and `deArrowWarningReason` fields.
 
 Unsupported endpoints:
 - `POST /api/branding`

@@ -51,6 +51,7 @@ pub fn configure(app_config: web::Data<AppConfig>) -> impl FnOnce(&mut web::Serv
            .service(get_thumbnails_by_user_id)
            .service(get_user_by_userid)
            .service(get_user_warnings)
+           .service(get_issued_warnings)
            .service(get_video)
            .service(get_status)
            .service(get_errors)
@@ -441,14 +442,25 @@ async fn get_user_by_userid(db_lock: DBLock, string_set: StringSetLock, path: we
     }))
 }
 
-#[get("/users/user_id/{user_id}/warnings")]
+#[get("/warnings/user_id/{user_id}/received")]
 async fn get_user_warnings(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> JsonResult<Vec<ApiWarning>> {
     let user_id = string_set.read().map_err(|_| SS_READ_ERR.clone())?
         .set.get(path.as_str()).cloned();
     let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     Ok(web::Json(match user_id {
         None => vec![],
-        Some(user_id) => db.db.warnings.iter().filter(|w| Arc::ptr_eq(&w.warned_user_id, &user_id)).map(ApiWarning::from).collect(),
+        Some(user_id) => db.db.warnings.iter().rev().filter(|w| Arc::ptr_eq(&w.warned_user_id, &user_id)).map(ApiWarning::from).collect(),
+    }))
+}
+
+#[get("/warnings/user_id/{user_id}/issued")]
+async fn get_issued_warnings(db_lock: DBLock, string_set: StringSetLock, path: web::Path<String>) -> JsonResult<Vec<ApiWarning>> {
+    let user_id = string_set.read().map_err(|_| SS_READ_ERR.clone())?
+        .set.get(path.as_str()).cloned();
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
+    Ok(web::Json(match user_id {
+        None => vec![],
+        Some(user_id) => db.db.warnings.iter().rev().filter(|w| Arc::ptr_eq(&w.issuer_user_id, &user_id)).map(ApiWarning::from).collect(),
     }))
 }
 

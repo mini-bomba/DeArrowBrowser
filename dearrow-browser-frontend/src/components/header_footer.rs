@@ -108,7 +108,7 @@ pub fn Header() -> Html {
                         <span id="current-user-id">{user_data.user_id}</span>
                     </div>
                 }
-                <span id="settings-button" class="clickable" onclick={open_settings_modal}><Icon r#type={IconType::Settings} tooltip={"Open settings"} /></span>
+                <Icon r#type={IconType::Settings} tooltip={"Open settings"} onclick={open_settings_modal} id="settings-button" />
             </div>
         </div>
     }

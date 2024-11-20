@@ -57,14 +57,10 @@ pub fn AsyncTasksModal() -> Html {
                 </div>
                 <div class="async-task-actions">
                     if let AsyncTaskState::ManualDismiss {..} | AsyncTaskState::DismissOrRetry {..} = task.state {
-                        <span class="clickable" onclick={create_dismiss_callback(async_task_control.clone(), task.id)}>
-                            <Icon r#type={IconType::Close} tooltip={Some("Dismiss")} />
-                        </span>
+                        <Icon r#type={IconType::Close} tooltip={Some("Dismiss")} onclick={create_dismiss_callback(async_task_control.clone(), task.id)} />
                     }
                     if let AsyncTaskState::DismissOrRetry {..} = task.state {
-                        <span class="clickable" onclick={create_retry_callback(async_task_control.clone(), task.id)}>
-                            <Icon r#type={IconType::Replaced} tooltip={Some("Retry")} />
-                        </span>
+                        <Icon r#type={IconType::Replaced} tooltip={Some("Retry")} onclick={create_retry_callback(async_task_control.clone(), task.id)} />
                     }
                 </div>
             </div>

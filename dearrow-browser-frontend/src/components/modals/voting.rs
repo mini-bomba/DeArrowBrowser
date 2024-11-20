@@ -195,14 +195,14 @@ pub fn VotingModal(params: &VotingParams) -> Html {
                 if is_vip {
                     <th>{"User"}</th>
                 }
-                <td class="clickable" onclick={upvote}><Icon r#type={IconType::Upvote} tooltip={"Upvote"} /></td>
-                <td class="clickable" onclick={downvote}><Icon r#type={IconType::Downvote} tooltip={"Downvote"} /></td>
+                <td><Icon r#type={IconType::Upvote} tooltip={"Upvote"} onclick={upvote} /></td>
+                <td><Icon r#type={IconType::Downvote} tooltip={"Downvote"} onclick={downvote} /></td>
             </tr>
             if is_vip {
                 <tr>
                     <th>{"VIP"}</th>
-                    <td class="clickable" onclick={upvote_lock}><Icon r#type={IconType::UpvoteAndLock} tooltip={"Upvote and lock"} /></td>
-                    <td class="clickable" onclick={downvote_remove}><Icon r#type={IconType::DownvoteAndRemove} tooltip={"Downvote and remove"} /></td>
+                    <td><Icon r#type={IconType::UpvoteAndLock} tooltip={"Upvote and lock"} onclick={upvote_lock} /></td>
+                    <td><Icon r#type={IconType::DownvoteAndRemove} tooltip={"Downvote and remove"} onclick={downvote_remove} /></td>
                 </tr>
             }
         </table>

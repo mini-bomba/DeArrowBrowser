@@ -48,11 +48,17 @@ pub struct IconProps {
     pub r#type: IconType,
     #[prop_or_default]
     pub tooltip: Option<AttrValue>,
+    #[prop_or_default]
+    pub onclick: Option<Callback<MouseEvent>>,
+    #[prop_or_default]
+    pub class: Classes,
+    #[prop_or_default]
+    pub id: Option<AttrValue>,
 }
 
 #[function_component]
 pub fn Icon(props: &IconProps) -> Html {
-    let class = match props.r#type {
+    let mut class = match props.r#type {
         IconType::DABLogo           => classes!("icon", "icon-dablogo"),
         IconType::Downvote          => classes!("icon", "icon-downvote"),
         IconType::Locked            => classes!("icon", "icon-locked"),
@@ -76,7 +82,12 @@ pub fn Icon(props: &IconProps) -> Html {
         IconType::WarningInactive   => classes!("icon", "icon-warning", "grayscale"),
     };
 
+    if props.onclick.is_some() {
+        class.push("clickable");
+    }
+    class.push(props.class.clone());
+
     html! {
-        <span {class} title={props.tooltip.clone()}></span>
+        <span id={props.id.clone()} {class} title={props.tooltip.clone()} onclick={props.onclick.clone()}></span>
     }
 }

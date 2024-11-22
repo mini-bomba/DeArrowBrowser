@@ -27,7 +27,7 @@ use tokio::{fs::File, io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter}
 use tokio_stream::{wrappers::LinesStream, StreamExt};
 
 use crate::{constants::*, utils::{ReqwestResponseExt, TemporaryFile}};
-use crate::middleware::{ETagCache, ETagCacheControl};
+use crate::middleware::etag::{ETagCache, ETagCacheControl};
 use crate::state::{self, AppConfig, DBLock, GetChannelOutput};
 use crate::utils::{self, ExtendResponder, ResponderExt};
 

@@ -104,9 +104,9 @@ async fn main() -> Result<(), ErrorContext> {
                 .app_data(db.clone())
                 .app_data(string_set_lock.clone())
                 .app_data(reqwest_client.clone())
-                .wrap(middleware::CustomStatusCodes)
-                .wrap(middleware::Timings)
-                .wrap(middleware::ErrorRepresentation)
+                .wrap(middleware::custom_status::CustomStatusCodes)
+                .wrap(middleware::timings::Timings)
+                .wrap(middleware::errors::ErrorRepresentation)
                 .service(web::scope("/api")
                     .configure(routes::configure(config.clone()))
                 );

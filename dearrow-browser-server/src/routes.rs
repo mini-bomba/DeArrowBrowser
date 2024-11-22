@@ -30,7 +30,7 @@ use sha2::{Digest, Sha256};
 
 use crate::built_info;
 use crate::constants::*;
-use crate::middleware::{ETagCache, ETagCacheControl};
+use crate::middleware::etag::{ETagCache, ETagCacheControl};
 use crate::sbserver_emulation::get_random_time_for_video;
 use crate::state::*;
 use crate::utils::{self, ExtendResponder, ResponderExt};

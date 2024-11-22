@@ -27,7 +27,7 @@ use error_handling::anyhow;
 use dearrow_parser::{Extension, Thumbnail, ThumbnailFlags, Title, TitleFlags, VideoInfo};
 use serde::{Deserialize, Serialize};
 
-use crate::{middleware::ETagCache, state::{DBLock, StringSetLock}, utils};
+use crate::{middleware::etag::ETagCache, state::{DBLock, StringSetLock}, utils};
 use crate::constants::*;
 
 type JsonResult<T> = utils::Result<web::Json<T>>;

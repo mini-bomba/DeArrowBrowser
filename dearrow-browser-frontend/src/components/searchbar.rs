@@ -39,28 +39,28 @@ pub fn Searchbar() -> Html {
 
     let uuid_search = {
         let navigator = navigator.clone();
-        Callback::from(move |e: KeyboardEvent| {
+        use_callback((), move |e: KeyboardEvent, ()| {
             if e.key() == "Enter" {
                 let input: HtmlInputElement = e.target_unchecked_into();
-                navigator.push(&MainRoute::UUID { id: input.value().into() });
+                navigator.push(&MainRoute::UUID { id: input.value().trim().to_owned().into() });
             }
         })
     };
     let uid_search = {
         let navigator = navigator.clone();
-        Callback::from(move |e: KeyboardEvent| {
+        use_callback((), move |e: KeyboardEvent, ()| {
             if e.key() == "Enter" {
                 let input: HtmlInputElement = e.target_unchecked_into();
-                navigator.push(&MainRoute::User {id: input.value().into()});
+                navigator.push(&MainRoute::User {id: input.value().trim().to_owned().into()});
             }
         })
     };
     let vid_search = { 
         let navigator = navigator.clone();
-        Callback::from(move |e: KeyboardEvent| {
+        use_callback((), move |e: KeyboardEvent, ()| {
             if e.key() == "Enter" {
                 let input: HtmlInputElement = e.target_unchecked_into();
-                let value = input.value();
+                let value = input.value().trim().to_owned();
                 navigator.push(&MainRoute::Video {
                     id: if let Ok(url) = Url::parse(&value) {  // Try to parse as URL
                         url.query_pairs().find(|(ref k, _)| k == "v").map(|(_, v)| v.to_string()).or_else(||  // Try to find a "v" query param
@@ -74,10 +74,10 @@ pub fn Searchbar() -> Html {
         })
     };
     let channel_search = { 
-        Callback::from(move |e: KeyboardEvent| {
+        use_callback((), move |e: KeyboardEvent, ()| {
             if e.key() == "Enter" {
                 let input: HtmlInputElement = e.target_unchecked_into();
-                let value = input.value();
+                let value = input.value().trim().to_owned();
                 navigator.push(&MainRoute::Channel {
                     id: if let Ok(url) = Url::parse(&value) {  // Try to parse as URL
                         url.path_segments().and_then(|it| it.filter(|s| !s.is_empty()).last()).map(ToString::to_string)  // Grab the last non-empty path segment

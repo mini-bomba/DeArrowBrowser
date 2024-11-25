@@ -19,6 +19,7 @@ dearrow-browser-api = { path = "../dearrow-browser-api", default-features = fals
 error_handling = { path = "../error_handling", features = ["serde"] }
 futures.workspace = true
 gloo-console = "0.3.0"
+regex.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true

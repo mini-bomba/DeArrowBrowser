@@ -17,6 +17,7 @@
 */
 use std::{sync::LazyLock, time::Duration};
 
+use regex::Regex;
 use reqwest::{Url, Client};
 
 pub static REQWEST_CLIENT: LazyLock<Client> = LazyLock::new(Client::new);
@@ -31,6 +32,14 @@ pub static YOUTUBE_EMBED_URL:  LazyLock<Url> = LazyLock::new(|| Url::parse("http
 pub static THUMBNAIL_URL:      LazyLock<Url> = LazyLock::new(|| Url::parse("https://img.youtube.com/vi").expect("should be able to parse the youtube thumbnail URL"));
 pub static SBB_BASE:           LazyLock<Url> = LazyLock::new(|| Url::parse("https://sb.ltn.fi/").expect("should be able to parse sb.ltn.fi base URL"));
 pub const SBS_BRANDING_ENDPOINT: &[&str]     = &["api", "branding"];
+
+// Regexes
+
+pub static UUID_REGEX:     LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[0-9a-f]{8}\-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$").expect("UUID_REGEX should be valid"));
+pub static SHA256_REGEX:   LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[0-9a-f]{64}$").expect("SHA256_REGEX should be valid"));
+pub static UCID_REGEX:     LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^UC(?-u:[\w-]){22}$").expect("UCID_REGEX should be valid"));
+pub static HANDLE_REGEX:   LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^@[\w.-]{3,30}$").expect("HANDLE_REGEX should be valid"));
+pub static VIDEO_ID_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[\w\d_-]{11}$").expect("VIDEO_ID_REGEX should be valid"));
 
 fn create_useragent_string() -> &'static str {
     match (crate::built_info::GIT_COMMIT_HASH_SHORT, crate::built_info::GIT_DIRTY) {

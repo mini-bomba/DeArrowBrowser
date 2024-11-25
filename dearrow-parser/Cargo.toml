@@ -12,7 +12,7 @@ workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-csv = "1.3.0"
+csv = "1.3.1"
 error_handling = { path = "../error_handling" }
 enumflags2.workspace = true
 serde.workspace = true

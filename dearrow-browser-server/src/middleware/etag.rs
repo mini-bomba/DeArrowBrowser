@@ -22,9 +22,9 @@ use actix_web::body::{BoxBody, EitherBody};
 use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform};
 use actix_web::error::Error;
 use actix_web::http::header::{CacheControl, CacheDirective, ETag, Header, IfNoneMatch};
+use actix_web::http::StatusCode;
 use actix_web::HttpResponseBuilder;
 use futures::{future::LocalBoxFuture, FutureExt};
-use reqwest::StatusCode;
 
 use crate::{constants::*, utils::HeaderMapExt};
 use crate::state::DBLock;

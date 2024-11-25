@@ -19,7 +19,7 @@
 use std::{num::NonZeroUsize, rc::Rc};
 
 use serde::{Deserialize, Serialize};
-use strum::{EnumString, EnumVariantNames, IntoStaticStr};
+use strum::{EnumString, VariantNames, IntoStaticStr};
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
 #[serde(default)]
@@ -52,7 +52,7 @@ impl Default for Settings {
 }
 
 // serde names set explicitly to avoid issues in the future if names changes
-#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumString, IntoStaticStr, EnumVariantNames, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumString, IntoStaticStr, VariantNames, Debug)]
 pub enum TableLayout {
     #[serde(rename="compressed")]
     Compressed,

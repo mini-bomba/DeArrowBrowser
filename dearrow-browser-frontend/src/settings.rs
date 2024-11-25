@@ -32,6 +32,7 @@ pub struct Settings {
     pub disable_sharedworker: bool,
     pub private_user_id: Option<Rc<str>>,
     pub sponsorblock_api_base_url: Rc<str>,
+    pub enable_autosearch: bool,
 }
 
 impl Default for Settings {
@@ -45,6 +46,7 @@ impl Default for Settings {
             disable_sharedworker: false,
             private_user_id: None,
             sponsorblock_api_base_url: "https://sponsor.ajay.app/".into(),
+            enable_autosearch: true,
         }
     }
 }

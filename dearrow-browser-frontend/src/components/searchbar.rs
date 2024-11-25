@@ -21,7 +21,9 @@ use web_sys::HtmlInputElement;
 use yew::prelude::*;
 use yew_router::{hooks::use_navigator, prelude::Link};
 
-use crate::{constants::{HANDLE_REGEX, SHA256_REGEX, UCID_REGEX, UUID_REGEX, VIDEO_ID_REGEX}, pages::MainRoute};
+use crate::constants::{HANDLE_REGEX, SHA256_REGEX, UCID_REGEX, UUID_REGEX, VIDEO_ID_REGEX};
+use crate::pages::MainRoute;
+use crate::contexts::SettingsContext;
 
 macro_rules! search_block {
     ($id:expr, $name:expr, $keydown_callback:expr, $input_callback:expr) => {
@@ -64,21 +66,27 @@ fn url_query_or_last_segment(value: &str, query_key: &str) -> Option<String> {
 #[function_component]
 pub fn Searchbar() -> Html {
     let navigator = use_navigator().expect("navigator should exist");
+    let settings_ctx: SettingsContext = use_context().expect("settings context should be available");
+    let settings = settings_ctx.settings();
+    let autosearch = settings.enable_autosearch;
 
     let uuid_search = {
         let navigator = navigator.clone();
         use_callback((), move |e: KeyboardEvent, ()| {
-            if e.key() == "Enter" {
-                let input: HtmlInputElement = e.target_unchecked_into();
-                navigator.push(&MainRoute::UUID { id: input.value().trim().to_owned().into() });
-            }
+            if e.key() != "Enter" { return; }
+            let input: HtmlInputElement = e.target_unchecked_into();
+            let value = input.value().trim().to_owned();
+
+            navigator.push(&MainRoute::UUID { id: value.into() });
         })
     };
     let uuid_paste = {
         let navigator = navigator.clone();
-        use_callback((), move |e: InputEvent, ()| {
+        use_callback(autosearch, move |e: InputEvent, autosearch| {
+            if !autosearch { return; }
             if e.input_type() != "insertFromPaste" { return; }
             let Some(data) = e.data() else { return; };
+
             let data = data.trim();
             let data = last_url_segment(data).unwrap_or_else(|| data.to_owned());
 
@@ -90,20 +98,22 @@ pub fn Searchbar() -> Html {
     let uid_search = {
         let navigator = navigator.clone();
         use_callback((), move |e: KeyboardEvent, ()| {
-            if e.key() == "Enter" {
-                let input: HtmlInputElement = e.target_unchecked_into();
-                let value = input.value().trim().to_owned();
-                navigator.push(&MainRoute::User {
-                    id: last_url_segment(&value).unwrap_or(value).into()
-                });
-            }
+            if e.key() != "Enter" { return; }
+            let input: HtmlInputElement = e.target_unchecked_into();
+            let value = input.value().trim().to_owned();
+
+            navigator.push(&MainRoute::User {
+                id: last_url_segment(&value).unwrap_or(value).into()
+            });
         })
     };
     let uid_paste = {
         let navigator = navigator.clone();
-        use_callback((), move |e: InputEvent, ()| {
+        use_callback(autosearch, move |e: InputEvent, autosearch| {
+            if !autosearch { return; }
             if e.input_type() != "insertFromPaste" { return; }
             let Some(data) = e.data() else { return; };
+
             let data = data.trim();
             let data = last_url_segment(data).unwrap_or_else(|| data.to_owned());
 
@@ -115,20 +125,22 @@ pub fn Searchbar() -> Html {
     let vid_search = { 
         let navigator = navigator.clone();
         use_callback((), move |e: KeyboardEvent, ()| {
-            if e.key() == "Enter" {
-                let input: HtmlInputElement = e.target_unchecked_into();
-                let value = input.value().trim().to_owned();
-                navigator.push(&MainRoute::Video {
-                    id: url_query_or_last_segment(&value, "v").unwrap_or(value).into()
-                });
-            }
+            if e.key() != "Enter" { return; }
+            let input: HtmlInputElement = e.target_unchecked_into();
+            let value = input.value().trim().to_owned();
+
+            navigator.push(&MainRoute::Video {
+                id: url_query_or_last_segment(&value, "v").unwrap_or(value).into()
+            });
         })
     };
     let vid_paste = {
         let navigator = navigator.clone();
-        use_callback((), move |e: InputEvent, ()| {
+        use_callback(autosearch, move |e: InputEvent, autosearch| {
+            if !autosearch { return; }
             if e.input_type() != "insertFromPaste" { return; }
             let Some(data) = e.data() else { return; };
+
             let data = data.trim();
             let data = last_url_segment(data).unwrap_or_else(|| data.to_owned());
 
@@ -140,19 +152,21 @@ pub fn Searchbar() -> Html {
     let channel_search = { 
         let navigator = navigator.clone();
         use_callback((), move |e: KeyboardEvent, ()| {
-            if e.key() == "Enter" {
-                let input: HtmlInputElement = e.target_unchecked_into();
-                let value = input.value().trim().to_owned();
-                navigator.push(&MainRoute::Channel {
-                    id: last_url_segment(&value).unwrap_or(value).into()
-                });
-            }
+            if e.key() != "Enter" { return; }
+            let input: HtmlInputElement = e.target_unchecked_into();
+            let value = input.value().trim().to_owned();
+
+            navigator.push(&MainRoute::Channel {
+                id: last_url_segment(&value).unwrap_or(value).into()
+            });
         })
     };
     let channel_paste = {
-        use_callback((), move |e: InputEvent, ()| {
+        use_callback(autosearch, move |e: InputEvent, autosearch| {
+            if !autosearch { return; }
             if e.input_type() != "insertFromPaste" { return; }
             let Some(data) = e.data() else { return; };
+
             let data = data.trim();
             let data = last_url_segment(data).unwrap_or_else(|| data.to_owned());
 

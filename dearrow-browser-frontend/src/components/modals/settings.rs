@@ -28,6 +28,7 @@ use yew::prelude::*;
 use crate::{contexts::SettingsContext, settings::TableLayout};
 
 const DISABLE_SW_TITLE: &str = "This is meant for debugging only - this disables sharing the thumbnail cache between all open tabs and makes the current tab handle all thumbnail fetching on it's own. Changes require a refresh to apply";
+const AUTOSEARCH_TITLE: &str = "If enabled, pasting valid query data or URLs into search fields will immediately trigger the search";
 
 /// Generator macro for a revert callback (Esc key pressed)
 ///
@@ -267,6 +268,7 @@ pub fn SettingsModal() -> Html {
     let title_table_layout_save           = use_callback(settings_context.clone(), save_callback!(title_table_layout, fromstr_verify));
     let thumbnail_table_layout_save       = use_callback(settings_context.clone(), save_callback!(thumbnail_table_layout, fromstr_verify));
     let render_thumbnails_in_tables_save  = use_callback(settings_context.clone(), save_callback!(render_thumbnails_in_tables, checkbox_verify));
+    let enable_autosearch_save            = use_callback(settings_context.clone(), save_callback!(enable_autosearch, checkbox_verify));
     let disable_sharedworker_save         = use_callback(settings_context.clone(), save_callback!(disable_sharedworker, checkbox_verify));
     let private_user_id_save              = use_callback(settings_context.clone(), save_callback!(private_user_id, priv_userid_verify));
     let sponsorblock_api_base_url_save    = use_callback(settings_context.clone(), save_callback!(sponsorblock_api_base_url, baseurl_verify));
@@ -276,6 +278,7 @@ pub fn SettingsModal() -> Html {
     let title_table_layout_undo           = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(title_table_layout));
     let thumbnail_table_layout_undo       = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(thumbnail_table_layout));
     let render_thumbnails_in_tables_undo  = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(render_thumbnails_in_tables));
+    let enable_autosearch_undo            = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(enable_autosearch));
     let disable_sharedworker_undo         = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(disable_sharedworker));
     let private_user_id_undo              = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(private_user_id));
     let sponsorblock_api_base_url_undo    = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(sponsorblock_api_base_url));
@@ -285,6 +288,7 @@ pub fn SettingsModal() -> Html {
     let title_table_layout_reset          = use_callback(settings_context.clone(), reset_callback!(title_table_layout));
     let thumbnail_table_layout_reset      = use_callback(settings_context.clone(), reset_callback!(thumbnail_table_layout));
     let render_thumbnails_in_tables_reset = use_callback(settings_context.clone(), reset_callback!(render_thumbnails_in_tables));
+    let enable_autosearch_reset           = use_callback(settings_context.clone(), reset_callback!(enable_autosearch));
     let disable_sharedworker_reset        = use_callback(settings_context.clone(), reset_callback!(disable_sharedworker));
     let private_user_id_reset             = use_callback(settings_context.clone(), reset_callback!(private_user_id));
     let sponsorblock_api_base_url_reset   = use_callback(settings_context.clone(), reset_callback!(sponsorblock_api_base_url));
@@ -393,6 +397,31 @@ pub fn SettingsModal() -> Html {
                         }
                     </div>
                 }
+            </fieldset>
+            <fieldset>
+                <legend>{"Site behaviour"}</legend>
+                <label for="enable_autosearch" title={AUTOSEARCH_TITLE}>{"Enable autosearch: "}</label>
+                <input 
+                    class={setting_class!(initial_settings, current_settings, enable_autosearch)} 
+                    id="enable_autosearch" 
+                    type="checkbox"
+                    onchange={enable_autosearch_save} 
+                    ~checked={current_settings.enable_autosearch} 
+                />
+                <div class="setting-actions">
+                    if should_show_undo!(enable_autosearch, current_settings, initial_settings) {
+                        <span 
+                            class="clickable" title="Undo"
+                            onclick={enable_autosearch_undo}
+                        >{"↩️"}</span>
+                    }
+                    if should_show_reset!(enable_autosearch, current_settings, settings_context) {
+                        <span 
+                            class="clickable" title="Reset to default"
+                            onclick={enable_autosearch_reset}
+                        >{"🔄"}</span>
+                    }
+                </div>
             </fieldset>
             <fieldset>
                 <legend>{"Thumbnail generator"}</legend>

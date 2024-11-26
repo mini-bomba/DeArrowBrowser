@@ -142,7 +142,7 @@ pub fn Searchbar() -> Html {
             let Some(data) = e.data() else { return; };
 
             let data = data.trim();
-            let data = last_url_segment(data).unwrap_or_else(|| data.to_owned());
+            let data = url_query_or_last_segment(data, "v").unwrap_or_else(|| data.to_owned());
 
             if VIDEO_ID_REGEX.is_match(&data) {
                 navigator.push(&MainRoute::Video { id: data.into() });

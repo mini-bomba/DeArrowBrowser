@@ -100,10 +100,11 @@ pub fn Searchbar() -> Html {
         use_callback((), move |e: KeyboardEvent, ()| {
             if e.key() != "Enter" { return; }
             let input: HtmlInputElement = e.target_unchecked_into();
-            let value = input.value().trim().to_owned();
+            let value = input.value();
+            let value = value.trim();
 
             navigator.push(&MainRoute::User {
-                id: last_url_segment(&value).unwrap_or(value).into()
+                id: last_url_segment(value).unwrap_or_else(|| value.to_owned()).into()
             });
         })
     };
@@ -127,10 +128,11 @@ pub fn Searchbar() -> Html {
         use_callback((), move |e: KeyboardEvent, ()| {
             if e.key() != "Enter" { return; }
             let input: HtmlInputElement = e.target_unchecked_into();
-            let value = input.value().trim().to_owned();
+            let value = input.value();
+            let value = value.trim();
 
             navigator.push(&MainRoute::Video {
-                id: url_query_or_last_segment(&value, "v").unwrap_or(value).into()
+                id: url_query_or_last_segment(value, "v").unwrap_or_else(|| value.to_owned()).into()
             });
         })
     };
@@ -154,10 +156,11 @@ pub fn Searchbar() -> Html {
         use_callback((), move |e: KeyboardEvent, ()| {
             if e.key() != "Enter" { return; }
             let input: HtmlInputElement = e.target_unchecked_into();
-            let value = input.value().trim().to_owned();
+            let value = input.value();
+            let value = value.trim();
 
             navigator.push(&MainRoute::Channel {
-                id: last_url_segment(&value).unwrap_or(value).into()
+                id: last_url_segment(value).unwrap_or_else(|| value.to_owned()).into()
             });
         })
     };

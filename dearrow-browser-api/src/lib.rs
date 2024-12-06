@@ -1,7 +1,7 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
 *  Copyright (C) 2023-2024 mini_bomba
-*  
+*
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
 *  the Free Software Foundation, either version 3 of the License, or
@@ -22,90 +22,103 @@ pub mod sync {
     include!("api.rs");
 
     #[cfg(feature = "dearrow-parser")]
-    pub trait IntoWithDatabase<T> {
-        fn into_with_db(self, db: &dearrow_parser::DearrowDB) -> T;
-    }
+    pub use dearrow_parser_traits::*;
 
     #[cfg(feature = "dearrow-parser")]
-    impl From<&dearrow_parser::Title> for ApiTitle {
-        fn from(value: &dearrow_parser::Title) -> Self {
-            use dearrow_parser::TitleFlags;
-            let unverified = value.flags.contains(TitleFlags::Unverified);
-            Self { 
-                uuid: value.uuid.clone(),
-                video_id: value.video_id.clone(),
-                title: value.title.clone(),
-                user_id: value.user_id.clone(),
-                time_submitted: value.time_submitted,
-                votes: value.votes,
-                downvotes: value.downvotes,
-                original: value.flags.contains(TitleFlags::Original),
-                locked: value.flags.contains(TitleFlags::Locked),
-                shadow_hidden: value.flags.contains(TitleFlags::ShadowHidden),
-                unverified,
-                removed: value.flags.contains(TitleFlags::Removed),
-                votes_missing: value.flags.contains(TitleFlags::MissingVotes),
-                score: value.votes - value.downvotes - i8::from(unverified),
-                username: None,
-                vip: false,
-            }
-        }
-    }
-    #[cfg(feature = "dearrow-parser")]
-    impl IntoWithDatabase<ApiTitle> for &dearrow_parser::Title {
-        fn into_with_db(self, db: &dearrow_parser::DearrowDB) -> ApiTitle {
-            let mut res: ApiTitle = self.into();
-            res.username = db.usernames.get(&res.user_id).map(|u| u.username.clone());
-            res.vip = db.vip_users.contains(&res.user_id);
-            res
-        }
-    }
+    mod dearrow_parser_traits {
+        use super::*;
 
-    #[cfg(feature = "dearrow-parser")]
-    impl From<&dearrow_parser::Thumbnail> for ApiThumbnail {
-        fn from(value: &dearrow_parser::Thumbnail) -> Self {
-            use dearrow_parser::ThumbnailFlags;
-            Self {
-                uuid: value.uuid.clone(),
-                video_id: value.video_id.clone(),
-                user_id: value.user_id.clone(),
-                time_submitted: value.time_submitted,
-                timestamp: value.timestamp,
-                votes: value.votes,
-                downvotes: value.downvotes,
-                original: value.flags.contains(ThumbnailFlags::Original),
-                locked: value.flags.contains(ThumbnailFlags::Locked),
-                shadow_hidden: value.flags.contains(ThumbnailFlags::ShadowHidden),
-                removed: value.flags.contains(ThumbnailFlags::Removed),
-                votes_missing: value.flags.contains(ThumbnailFlags::MissingVotes),
-                timestamp_missing: value.flags.contains(ThumbnailFlags::MissingTimestamp),
-                score: value.votes - value.downvotes,
-                username: None,
-                vip: false,
+        pub trait IntoWithDatabase<T> {
+            fn into_with_db(self, db: &dearrow_parser::DearrowDB) -> T;
+        }
+
+        impl From<&dearrow_parser::Title> for ApiTitle {
+            fn from(value: &dearrow_parser::Title) -> Self {
+                use dearrow_parser::TitleFlags;
+                let unverified = value.flags.contains(TitleFlags::Unverified);
+                Self {
+                    uuid: value.uuid.clone(),
+                    video_id: value.video_id.clone(),
+                    title: value.title.clone(),
+                    user_id: value.user_id.clone(),
+                    time_submitted: value.time_submitted,
+                    votes: value.votes,
+                    downvotes: value.downvotes,
+                    original: value.flags.contains(TitleFlags::Original),
+                    locked: value.flags.contains(TitleFlags::Locked),
+                    shadow_hidden: value.flags.contains(TitleFlags::ShadowHidden),
+                    unverified,
+                    removed: value.flags.contains(TitleFlags::Removed),
+                    votes_missing: value.flags.contains(TitleFlags::MissingVotes),
+                    score: value.votes - value.downvotes - i8::from(unverified),
+                    username: None,
+                    vip: false,
+                }
             }
         }
-    }
-    #[cfg(feature = "dearrow-parser")]
-    impl IntoWithDatabase<ApiThumbnail> for &dearrow_parser::Thumbnail {
-        fn into_with_db(self, db: &dearrow_parser::DearrowDB) -> ApiThumbnail {
-            let mut res: ApiThumbnail = self.into();
-            res.username = db.usernames.get(&res.user_id).map(|u| u.username.clone());
-            res.vip = db.vip_users.contains(&res.user_id);
-            res
+        impl IntoWithDatabase<ApiTitle> for &dearrow_parser::Title {
+            fn into_with_db(self, db: &dearrow_parser::DearrowDB) -> ApiTitle {
+                let mut res: ApiTitle = self.into();
+                res.username = db.usernames.get(&res.user_id).map(|u| u.username.clone());
+                res.vip = db.vip_users.contains(&res.user_id);
+                res
+            }
         }
-    }
-    #[cfg(feature = "dearrow-parser")]
-    impl From<&dearrow_parser::Warning> for ApiWarning {
-        fn from(value: &dearrow_parser::Warning) -> Self {
-            Self {
-                warned_user_id: value.warned_user_id.clone(),
-                issuer_user_id: value.issuer_user_id.clone(),
-                time_issued: value.time_issued,
-                message: value.message.clone(),
-                active: value.active,
-                extension: match value.extension {
-                    dearrow_parser::Extension::SponsorBlock => Extension::SponsorBlock,
-                    dearrow_parser::Extension::DeArrow => Extension::DeArrow,
+
+        impl From<&dearrow_parser::Thumbnail> for ApiThumbnail {
+            fn from(value: &dearrow_parser::Thumbnail) -> Self {
+                use dearrow_parser::ThumbnailFlags;
+                Self {
+                    uuid: value.uuid.clone(),
+                    video_id: value.video_id.clone(),
+                    user_id: value.user_id.clone(),
+                    time_submitted: value.time_submitted,
+                    timestamp: value.timestamp,
+                    votes: value.votes,
+                    downvotes: value.downvotes,
+                    original: value.flags.contains(ThumbnailFlags::Original),
+                    locked: value.flags.contains(ThumbnailFlags::Locked),
+                    shadow_hidden: value.flags.contains(ThumbnailFlags::ShadowHidden),
+                    removed: value.flags.contains(ThumbnailFlags::Removed),
+                    votes_missing: value.flags.contains(ThumbnailFlags::MissingVotes),
+                    timestamp_missing: value.flags.contains(ThumbnailFlags::MissingTimestamp),
+                    score: value.votes - value.downvotes,
+                    username: None,
+                    vip: false,
+                }
+            }
+        }
+        impl IntoWithDatabase<ApiThumbnail> for &dearrow_parser::Thumbnail {
+            fn into_with_db(self, db: &dearrow_parser::DearrowDB) -> ApiThumbnail {
+                let mut res: ApiThumbnail = self.into();
+                res.username = db.usernames.get(&res.user_id).map(|u| u.username.clone());
+                res.vip = db.vip_users.contains(&res.user_id);
+                res
+            }
+        }
+
+        impl IntoWithDatabase<ApiWarning> for &dearrow_parser::Warning {
+            fn into_with_db(self, db: &dearrow_parser::DearrowDB) -> ApiWarning {
+                let warned_username = db
+                    .usernames
+                    .get(&self.warned_user_id)
+                    .map(|u| u.username.clone());
+                let issuer_username = db
+                    .usernames
+                    .get(&self.issuer_user_id)
+                    .map(|u| u.username.clone());
+                ApiWarning {
+                    warned_user_id: self.warned_user_id.clone(),
+                    warned_username,
+                    issuer_user_id: self.issuer_user_id.clone(),
+                    issuer_username,
+                    time_issued: self.time_issued,
+                    message: self.message.clone(),
+                    active: self.active,
+                    extension: match self.extension {
+                        dearrow_parser::Extension::SponsorBlock => Extension::SponsorBlock,
+                        dearrow_parser::Extension::DeArrow => Extension::DeArrow,
+                    },
                 }
             }
         }

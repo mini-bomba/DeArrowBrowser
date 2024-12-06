@@ -1,7 +1,7 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
 *  Copyright (C) 2023-2024 mini_bomba
-*  
+*
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
 *  the Free Software Foundation, either version 3 of the License, or
@@ -18,7 +18,7 @@
 // NOTE: This file is used as a template for dearrow-browser-api::sync and ::unsync modules.
 //       The RcStr type will be defined externally with the correct smart pointer variant for the
 //       module.
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct StatusResponse {
@@ -142,7 +142,9 @@ pub enum Extension {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ApiWarning {
     pub warned_user_id: RcStr,
+    pub warned_username: Option<RcStr>,
     pub issuer_user_id: RcStr,
+    pub issuer_username: Option<RcStr>,
     pub time_issued: i64,
     pub extension: Extension,
     pub message: RcStr,

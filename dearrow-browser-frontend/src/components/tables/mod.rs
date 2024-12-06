@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2023-2024 mini_bomba
+*  Copyright (C) 2024 mini_bomba
 *
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -16,11 +16,6 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub mod async_task_manager;
-pub mod header_footer;
-pub mod icon;
-pub mod links;
-pub mod modals;
-pub mod searchbar;
-pub mod tables;
-pub mod youtube;
+pub mod details;
+pub mod switch;
+pub mod warnings;

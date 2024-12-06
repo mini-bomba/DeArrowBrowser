@@ -1,7 +1,7 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
 *  Copyright (C) 2023-2024 mini_bomba
-*  
+*
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
 *  the Free Software Foundation, either version 3 of the License, or
@@ -21,8 +21,10 @@ use dearrow_browser_api::unsync::User;
 use error_handling::ErrorContext;
 use yew::prelude::*;
 
-use crate::components::detail_table::*;
 use crate::components::icon::*;
+use crate::components::tables::details::*;
+use crate::components::tables::switch::{ModeSubtype, TableMode, TableModeSwitch};
+use crate::components::tables::warnings::PaginatedWarningsTable;
 use crate::contexts::{StatusContext, WindowContext};
 use crate::hooks::{use_async_suspension, use_location_state};
 use crate::utils::{api_request, sbb_userid_link};
@@ -36,11 +38,14 @@ struct UserDetailsProps {
 fn UserDetails(props: &UserDetailsProps) -> HtmlResult {
     let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
     let status: StatusContext = use_context().expect("StatusResponse should be defined");
-    let url = window_context.origin_join_segments(&["api","users","user_id", &props.userid]);
-    let result: Rc<Result<User, ErrorContext>> = use_async_suspension(|(url, _)| async move {
-        api_request(url.clone()).await
-    }, (url, status.map(|s| s.last_updated)))?;
-    let sbb_url: Rc<AttrValue> = use_memo(props.userid.clone(), |uid| AttrValue::Rc(sbb_userid_link(uid).as_str().into()));
+    let url = window_context.origin_join_segments(&["api", "users", "user_id", &props.userid]);
+    let result: Rc<Result<User, ErrorContext>> = use_async_suspension(
+        |(url, _)| async move { api_request(url.clone()).await },
+        (url, status.map(|s| s.last_updated)),
+    )?;
+    let sbb_url: Rc<AttrValue> = use_memo(props.userid.clone(), |uid| {
+        AttrValue::Rc(sbb_userid_link(uid).as_str().into())
+    });
 
     Ok(match *result {
         Ok(ref user) => html! {
@@ -54,7 +59,7 @@ fn UserDetails(props: &UserDetailsProps) -> HtmlResult {
                 } else if user.warning_count > 0 {
                     <Icon r#type={IconType::WarningInactive} tooltip="This user was previously warned" />
                 }
-                </div> 
+                </div>
                 <div>
                 if let Some(username) = &user.username {
                     {format!("Username: {username}")}
@@ -75,7 +80,7 @@ fn UserDetails(props: &UserDetailsProps) -> HtmlResult {
                 <div>{"Failed to fetch user data"}<br/><pre>{format!("{e:?}")}</pre></div>
                 <div><a href={&*sbb_url}>{"View on SB Browser"}</a></div>
             </>
-        }
+        },
     })
 }
 
@@ -88,13 +93,7 @@ pub struct UserPageProps {
 pub fn UserPage(props: &UserPageProps) -> Html {
     let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
     let state = use_location_state().get_state();
-    // let table_mode = use_state_eq(|| DetailType::Title);
     let entry_count = use_state_eq(|| None);
-
-    let url = use_memo((state.detail_table_mode, props.userid.clone()), |(dtm, userid)| match dtm {
-        DetailType::Title => window_context.origin_join_segments(&["api", "titles", "user_id", userid]),
-        DetailType::Thumbnail => window_context.origin_join_segments(&["api", "thumbnails", "user_id", userid]),
-    });
 
     let details_fallback = html! {
         <div><b>{"Loading..."}</b></div>
@@ -102,7 +101,54 @@ pub fn UserPage(props: &UserPageProps) -> Html {
     let table_fallback = html! {
         <center><b>{"Loading..."}</b></center>
     };
-    
+
+    let table_html = use_memo(
+        (state.detail_table_mode, props.userid.clone()),
+        |(dtm, userid)| match dtm {
+            TableMode::Titles => {
+                let url = Rc::new(
+                    window_context.origin_join_segments(&["api", "titles", "user_id", userid]),
+                );
+                html! {
+                    <Suspense fallback={table_fallback.clone()}>
+                        <PaginatedDetailTableRenderer mode={DetailType::Title} {url} entry_count={entry_count.setter()} hide_userid=true hide_username=true />
+                    </Suspense>
+                }
+            }
+            TableMode::Thumbnails => {
+                let url = Rc::new(window_context.origin_join_segments(&[
+                    "api",
+                    "thumbnails",
+                    "user_id",
+                    userid,
+                ]));
+                html! {
+                    <Suspense fallback={table_fallback.clone()}>
+                        <PaginatedDetailTableRenderer mode={DetailType::Thumbnail} {url} entry_count={entry_count.setter()} hide_userid=true hide_username=true />
+                    </Suspense>
+                }
+            }
+            TableMode::WarningsIssued => {
+                let url = Rc::new(
+                    window_context
+                        .origin_join_segments(&["api", "warnings", "user_id", userid, "issued"]),
+                );
+                html! {
+                    <PaginatedWarningsTable {url} entry_count={entry_count.setter()} hide_issuer=true />
+                }
+            }
+            TableMode::WarningsReceived => {
+                let url = Rc::new(
+                    window_context
+                        .origin_join_segments(&["api", "warnings", "user_id", userid, "received"]),
+                );
+                html! {
+                    <PaginatedWarningsTable {url} entry_count={entry_count.setter()} hide_receiver=true />
+                }
+            }
+        },
+    );
+
     html! {
         <>
             <div class="page-details">
@@ -110,10 +156,8 @@ pub fn UserPage(props: &UserPageProps) -> Html {
                     <Suspense fallback={details_fallback}><UserDetails userid={props.userid.clone()} /></Suspense>
                 </div>
             </div>
-            <TableModeSwitch entry_count={*entry_count} />
-            <Suspense fallback={table_fallback}>
-                <PaginatedDetailTableRenderer mode={state.detail_table_mode} {url} {entry_count} hide_userid=true hide_username=true />
-            </Suspense>
+            <TableModeSwitch entry_count={*entry_count} types={ModeSubtype::Details | ModeSubtype::Warnings} />
+            {(*table_html).clone()}
         </>
     }
 }

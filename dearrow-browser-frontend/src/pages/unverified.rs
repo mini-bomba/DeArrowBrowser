@@ -1,7 +1,7 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
 *  Copyright (C) 2023-2024 mini_bomba
-*  
+*
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
 *  the Free Software Foundation, either version 3 of the License, or
@@ -19,20 +19,22 @@ use std::rc::Rc;
 
 use yew::prelude::*;
 
+use crate::components::tables::details::*;
 use crate::contexts::WindowContext;
-use crate::components::detail_table::*;
 
 #[function_component]
 pub fn UnverifiedPage() -> Html {
     let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
     let entry_count = use_state_eq(|| None);
 
-    let url = use_memo((), |()| window_context.origin_join_segments(&["api", "titles", "unverified"]));
+    let url = use_memo((), |()| {
+        window_context.origin_join_segments(&["api", "titles", "unverified"])
+    });
 
     let fallback = html! {
         <center><b>{"Loading..."}</b></center>
     };
-    
+
     html! {
         <>
             <h2>{"Unverified titles"}</h2>
@@ -46,7 +48,7 @@ pub fn UnverifiedPage() -> Html {
                 </span>
             }
             <Suspense {fallback}>
-                <PaginatedDetailTableRenderer mode={DetailType::Title} {url} {entry_count} />
+                <PaginatedDetailTableRenderer mode={DetailType::Title} {url} entry_count={entry_count.setter()} />
             </Suspense>
         </>
     }

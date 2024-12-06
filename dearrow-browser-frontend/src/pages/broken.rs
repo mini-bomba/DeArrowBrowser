@@ -1,7 +1,7 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
 *  Copyright (C) 2023-2024 mini_bomba
-*  
+*
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
 *  the Free Software Foundation, either version 3 of the License, or
@@ -20,7 +20,8 @@ use std::rc::Rc;
 
 use yew::prelude::*;
 
-use crate::components::detail_table::{DetailType, TableModeSwitch, PaginatedDetailTableRenderer};
+use crate::components::tables::details::{DetailType, PaginatedDetailTableRenderer};
+use crate::components::tables::switch::{ModeSubtype, TableModeSwitch};
 use crate::contexts::WindowContext;
 use crate::hooks::use_location_state;
 
@@ -30,22 +31,34 @@ pub fn BrokenPage() -> Html {
     let state = use_location_state().get_state();
     let entry_count = use_state_eq(|| None);
 
-    let url = use_memo(state.detail_table_mode, |dtm| match dtm {
-        DetailType::Title => window_context.origin_join_segments(&["api", "titles", "broken"]),
-        DetailType::Thumbnail => window_context.origin_join_segments(&["api", "thumbnails", "broken"]),
+    let url_and_mode = use_memo(state.detail_table_mode, |dtm| {
+        DetailType::try_from(*dtm).ok().map(|dtm| match dtm {
+            DetailType::Title => (
+                Rc::new(window_context.origin_join_segments(&["api", "titles", "broken"])),
+                dtm,
+            ),
+            DetailType::Thumbnail => (
+                Rc::new(window_context.origin_join_segments(&["api", "thumbnails", "broken"])),
+                dtm,
+            ),
+        })
     });
 
     let table_fallback = html! {
         <center><b>{"Loading..."}</b></center>
     };
-    
+
     html! {
         <>
             <h2>{"Broken database entries"}</h2>
-            <TableModeSwitch entry_count={*entry_count} />
-            <Suspense fallback={table_fallback}>
-                <PaginatedDetailTableRenderer mode={state.detail_table_mode} {url} {entry_count} />
-            </Suspense>
+            <TableModeSwitch entry_count={*entry_count} types={ModeSubtype::Details} />
+            if let Some((url, mode)) = url_and_mode.as_ref() {
+                <Suspense fallback={table_fallback}>
+                    <PaginatedDetailTableRenderer mode={*mode} url={url.clone()} entry_count={entry_count.setter()} />
+                </Suspense>
+            } else {
+                {table_fallback}
+            }
         </>
     }
 }

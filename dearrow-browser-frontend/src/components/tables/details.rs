@@ -1,7 +1,7 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
 *  Copyright (C) 2023-2024 mini_bomba
-*  
+*
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
 *  the Free Software Foundation, either version 3 of the License, or
@@ -16,198 +16,35 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 use std::rc::Rc;
-use std::str::FromStr;
 
 use chrono::DateTime;
-use reqwest::Url;
-use web_sys::HtmlInputElement;
-use yew::{prelude::*, suspense::SuspensionResult};
 use dearrow_browser_api::unsync::*;
 use error_handling::ErrorContext;
-use yew_router::prelude::Location;
-use yew_router::prelude::LocationHandle;
-use yew_router::prelude::RouterScopeExt;
+use reqwest::Url;
+use yew::{prelude::*, suspense::SuspensionResult};
 
-use crate::components::icon::*;
-use crate::components::links::*;
-use crate::components::modals::{thumbnail::ThumbnailModal, voting::{VotingDetail, VotingModal}};
-use crate::components::youtube::YoutubeVideoLink;
-use crate::contexts::{ModalRendererControls, ModalMessage, SettingsContext, StatusContext, UserContext};
+use crate::components::{
+    icon::*,
+    links::*,
+    modals::{
+        thumbnail::ThumbnailModal,
+        voting::{VotingDetail, VotingModal},
+    },
+    tables::switch::PageSelect,
+    youtube::YoutubeVideoLink,
+};
+use crate::contexts::{
+    ModalMessage, ModalRendererControls, SettingsContext, StatusContext, UserContext,
+};
 use crate::hooks::{use_async_suspension, use_location_state};
-use crate::pages::LocationState;
 use crate::settings::TableLayout;
 use crate::thumbnails::components::{ContainerType, Thumbnail, ThumbnailCaption};
 use crate::utils::{api_request, html_length, render_datetime, RcEq};
-use crate::MainRoute;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum DetailType {
     Title,
     Thumbnail,
-}
-
-impl Default for DetailType {
-    fn default() -> Self {
-        Self::Title
-    }
-}
-
-#[derive(Properties, PartialEq)]
-pub struct TableModeSwitchProps {
-    #[prop_or_default]
-    pub entry_count: Option<usize>,
-}
-
-pub struct TableModeSwitch {
-    current_mode: DetailType,
-
-    set_titles_mode_cb: Callback<MouseEvent>,
-    set_thumbs_mode_cb: Callback<MouseEvent>,
-
-    _location_handle: LocationHandle,
-}
-
-pub enum TableModeSwitchMessage {
-    UpdateMode(DetailType),
-    LocationUpdated(Location),
-}
-
-impl Component for TableModeSwitch {
-    type Properties = TableModeSwitchProps;
-    type Message = TableModeSwitchMessage;
-
-    fn create(ctx: &Context<Self>) -> Self {
-        let scope = ctx.link();
-
-        let location_state = match scope.location().unwrap().state::<LocationState>() {
-            Some(state) => *state,
-            None => {
-                let state = LocationState::default();
-                scope.navigator().unwrap().replace_with_state(&scope.route::<MainRoute>().unwrap(), state);
-                state
-            }
-        };
-
-        TableModeSwitch { 
-            current_mode: location_state.detail_table_mode,
-
-            set_titles_mode_cb: scope.callback(|_| TableModeSwitchMessage::UpdateMode(DetailType::Title)),
-            set_thumbs_mode_cb: scope.callback(|_| TableModeSwitchMessage::UpdateMode(DetailType::Thumbnail)),
-
-            _location_handle: scope.add_location_listener(scope.callback(TableModeSwitchMessage::LocationUpdated)).unwrap(),
-        }
-    }
-
-    fn view(&self, ctx: &Context<Self>) -> Html {
-        html! {
-            <div class="table-mode-switch">
-                <span class="table-mode button" onclick={&self.set_titles_mode_cb} selected={self.current_mode == DetailType::Title}>{"Titles"}</span>
-                <span class="table-mode button" onclick={&self.set_thumbs_mode_cb} selected={self.current_mode == DetailType::Thumbnail}>{"Thumbnails"}</span>
-                if let Some(count) = ctx.props().entry_count {
-                    <span>
-                        if count == 1 {
-                            {"1 entry"}
-                        } else {
-                            {format!("{count} entries")}
-                        }
-                    </span>
-                }
-            </div>
-        }
-        
-    }
-
-    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
-        #[allow(clippy::match_same_arms)]
-        match msg {
-            TableModeSwitchMessage::LocationUpdated(location) => {
-                let scope = ctx.link();
-                match location.state::<LocationState>().or_else(|| scope.location().unwrap().state()) {
-                    Some(state) if state.detail_table_mode != self.current_mode => {
-                        self.current_mode = state.detail_table_mode;
-                        true
-                    },
-                    Some(..) => false,
-                    None => {
-                        let state = LocationState::default();
-                        scope.navigator().unwrap().replace_with_state(&scope.route::<MainRoute>().unwrap(), state);
-                        if state.detail_table_mode == self.current_mode {
-                            false
-                        } else {
-                            self.current_mode = state.detail_table_mode;
-                            true
-                        }
-                    }
-                }
-            },
-            TableModeSwitchMessage::UpdateMode(new_mode) if new_mode != self.current_mode => {
-                self.current_mode = new_mode;
-                let scope = ctx.link();
-                let mut state = scope.location().unwrap().state::<LocationState>().as_deref().copied().unwrap_or_default();
-                state.detail_table_mode = new_mode;
-                scope.navigator().unwrap().replace_with_state(&scope.route::<MainRoute>().unwrap(), state);
-                true
-            },
-            TableModeSwitchMessage::UpdateMode(..) => false,
-        }
-    }
-}
-
-#[derive(Properties, PartialEq, Clone)]
-pub struct PageSelectProps {
-    pub page_count: usize,
-}
-
-#[function_component]
-pub fn PageSelect(props: &PageSelectProps) -> Html {
-    let state_handle = use_location_state();
-    let state = state_handle.get_state();
-
-    let prev_page = {
-        let state_handle = state_handle.clone();
-        Callback::from(move |_| {
-            let mut state = state;
-            state.detail_table_page = state.detail_table_page.saturating_sub(1);
-            state_handle.replace_state(state);
-        })
-    };
-    let next_page = {
-        let state_handle = state_handle.clone();
-        let max_page = props.page_count-1;
-        Callback::from(move |_| {
-            let mut state = state;
-            state.detail_table_page = max_page.min(state.detail_table_page+1);
-            state_handle.replace_state(state);
-        })
-    };
-    let input_changed = {
-        let state_handle = state_handle.clone();
-        let page_count = props.page_count;
-        Callback::from(move |e: Event| {
-            let input: HtmlInputElement = e.target_unchecked_into();
-            let mut state = state;
-            match usize::from_str(&input.value()) {
-                Err(_) => {},
-                Ok(new_page) => {
-                    state.detail_table_page = new_page.clamp(1,page_count)-1;
-                    state_handle.replace_state(state);
-                },
-            };
-            input.set_value(&format!("{}", state.detail_table_page+1));
-        })
-    };
-
-    html! {
-        <div class="page-select">
-            <div class="button" onclick={prev_page}>{"prev"}</div>
-            <div>
-                {"page"}
-                <input type="number" min=1 max={format!("{}", props.page_count)} ~value={format!("{}", state.detail_table_page+1)} onchange={input_changed} />
-                {format!("/{}", props.page_count)}
-            </div>
-            <div class="button" onclick={next_page}>{"next"}</div>
-        </div>
-    }
 }
 
 pub enum DetailList {
@@ -232,22 +69,35 @@ impl DetailList {
 }
 
 #[hook]
-pub fn use_detail_download(url: Rc<Url>, mode: DetailType, sort: bool) -> SuspensionResult<Rc<Result<DetailSlice, ErrorContext>>> {
+pub fn use_detail_download(
+    url: Rc<Url>,
+    mode: DetailType,
+    sort: bool,
+) -> SuspensionResult<Rc<Result<DetailSlice, ErrorContext>>> {
     let status: StatusContext = use_context().expect("StatusResponse should be defined");
-    use_async_suspension(|(mode, url, sort, _)| async move {
-        let mut result = match mode {
-            DetailType::Thumbnail => DetailSlice::Thumbnails(RcEq(api_request((*url).clone()).await?)),
-            DetailType::Title => DetailSlice::Titles(RcEq(api_request((*url).clone()).await?)),
-        };
-        if sort {
-        // Sort by time submited, most to least recent
-            match result {
-                DetailSlice::Thumbnails(ref mut list) => Rc::get_mut(&mut list.0).expect("should be get mutable reference here").sort_unstable_by(|a, b| b.time_submitted.cmp(&a.time_submitted)),
-                DetailSlice::Titles(ref mut list) => Rc::get_mut(&mut list.0).expect("should be get mutable reference here").sort_unstable_by(|a, b| b.time_submitted.cmp(&a.time_submitted)),
+    use_async_suspension(
+        |(mode, url, sort, _)| async move {
+            let mut result = match mode {
+                DetailType::Thumbnail => {
+                    DetailSlice::Thumbnails(RcEq(api_request((*url).clone()).await?))
+                }
+                DetailType::Title => DetailSlice::Titles(RcEq(api_request((*url).clone()).await?)),
+            };
+            if sort {
+                // Sort by time submited, most to least recent
+                match result {
+                    DetailSlice::Thumbnails(ref mut list) => Rc::get_mut(&mut list.0)
+                        .expect("should be get mutable reference here")
+                        .sort_unstable_by(|a, b| b.time_submitted.cmp(&a.time_submitted)),
+                    DetailSlice::Titles(ref mut list) => Rc::get_mut(&mut list.0)
+                        .expect("should be get mutable reference here")
+                        .sort_unstable_by(|a, b| b.time_submitted.cmp(&a.time_submitted)),
+                }
             }
-        }
-        Ok(result)
-    }, (mode, url, sort, status.map(|s| s.last_updated)))
+            Ok(result)
+        },
+        (mode, url, sort, status.map(|s| s.last_updated)),
+    )
 }
 
 #[derive(Properties, PartialEq)]
@@ -266,7 +116,7 @@ pub struct DetailTableRendererProps {
     pub url: Rc<Url>,
     pub mode: DetailType,
     #[prop_or_default]
-    pub entry_count: Option<UseStateHandle<Option<usize>>>,
+    pub entry_count: Option<UseStateSetter<Option<usize>>>,
     #[prop_or_default]
     pub hide_userid: bool,
     #[prop_or_default]
@@ -301,31 +151,48 @@ impl DetailSlice {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum DetailIndex {
-    Page {
-        size: usize,
-        index: usize,
-    },
+    Page { size: usize, index: usize },
     All,
 }
 
 #[hook]
 pub fn use_detail_slice(details: Option<DetailSlice>, index: DetailIndex) -> DetailSlice {
-    (*use_memo((details, index), |(details, index)|
+    (*use_memo((details, index), |(details, index)| {
         match (details, index) {
-            (None, _)                                                                 
-                => DetailSlice::Thumbnails((&[] as &[ApiThumbnail]).into()), // dummy slice on error
+            (None, _) => DetailSlice::Thumbnails((&[] as &[ApiThumbnail]).into()), // dummy slice on error
 
-            (Some(DetailSlice::Thumbnails(ref thumbs)), DetailIndex::Page { size, index }) 
-                => DetailSlice::Thumbnails(if size*(index+1) > thumbs.len() {thumbs.get(size*index..)} else {thumbs.get(size*index..size*(index+1))}.unwrap_or(&[]).into()),
-            (Some(DetailSlice::Thumbnails(ref thumbs)), DetailIndex::All)                  
-                => DetailSlice::Thumbnails((&**thumbs).into()),
+            (Some(DetailSlice::Thumbnails(ref thumbs)), DetailIndex::Page { size, index }) => {
+                DetailSlice::Thumbnails(
+                    if size * (index + 1) > thumbs.len() {
+                        thumbs.get(size * index..)
+                    } else {
+                        thumbs.get(size * index..size * (index + 1))
+                    }
+                    .unwrap_or(&[])
+                    .into(),
+                )
+            }
+            (Some(DetailSlice::Thumbnails(ref thumbs)), DetailIndex::All) => {
+                DetailSlice::Thumbnails((&**thumbs).into())
+            }
 
-            (Some(DetailSlice::Titles(ref titles)), DetailIndex::Page { size, index })     
-                => DetailSlice::Titles(if size*(index+1) > titles.len() {titles.get(size*index..)} else {titles.get(size*index..size*(index+1))}.unwrap_or(&[]).into()),
-            (Some(DetailSlice::Titles(ref titles)), DetailIndex::All)                      
-                => DetailSlice::Titles((&**titles).into()),
+            (Some(DetailSlice::Titles(ref titles)), DetailIndex::Page { size, index }) => {
+                DetailSlice::Titles(
+                    if size * (index + 1) > titles.len() {
+                        titles.get(size * index..)
+                    } else {
+                        titles.get(size * index..size * (index + 1))
+                    }
+                    .unwrap_or(&[])
+                    .into(),
+                )
+            }
+            (Some(DetailSlice::Titles(ref titles)), DetailIndex::All) => {
+                DetailSlice::Titles((&**titles).into())
+            }
         }
-    )).clone()
+    }))
+    .clone()
 }
 
 fn title_flags(title: &ApiTitle) -> Html {
@@ -432,7 +299,7 @@ macro_rules! score_col {
                     if $expanded {<br />} else {{" | "}}
                     {detail_flags!($type, $detail)}
                 </>
-            }   
+            }
         } else if $expanded {
             html! {
                 <>
@@ -444,7 +311,7 @@ macro_rules! score_col {
                     {detail_flags!($type, $detail)}
                 </>
             }
-            
+
         } else {
             html! {
                 <>
@@ -504,15 +371,19 @@ struct DetailTableRowProps {
 
 #[function_component]
 fn DetailTableRow(props: &DetailTableRowProps) -> Html {
-    let modal_controls: ModalRendererControls = use_context().expect("ModalRendererControls should be available");
-    let settings_context: SettingsContext = use_context().expect("SettingsContext should be available");
+    let modal_controls: ModalRendererControls =
+        use_context().expect("ModalRendererControls should be available");
+    let settings_context: SettingsContext =
+        use_context().expect("SettingsContext should be available");
     let settings = settings_context.settings();
     let user_context: UserContext = use_context().expect("UserContext should be available");
     let original_thumb_indicator = html! {
         <Icon r#type={IconType::Original} tooltip="This is the original video thumbnail" />
     };
     let thumb_caption = use_memo((props.details.clone(), props.index), |(details, index)| {
-        let DetailSlice::Thumbnails(ref thumbs) = details else { return ThumbnailCaption::None };
+        let DetailSlice::Thumbnails(ref thumbs) = details else {
+            return ThumbnailCaption::None;
+        };
         let thumb = &thumbs[*index];
         if let Some(timestamp) = thumb.timestamp {
             ThumbnailCaption::Text(format!("{timestamp}").into())
@@ -522,30 +393,39 @@ fn DetailTableRow(props: &DetailTableRowProps) -> Html {
     });
     let voting_modal_trigger = {
         let modal_controls = modal_controls.clone();
-        use_callback((props.details.clone(), props.index), move |_: MouseEvent, (details, index)| {
-            let detail = match details {
-                DetailSlice::Titles(ref list) => VotingDetail::Title(list[*index].clone()),
-                DetailSlice::Thumbnails(ref list) => VotingDetail::Thumbnail(list[*index].clone()),
-            };
-            modal_controls.emit(ModalMessage::Open(html! {
-                <VotingModal {detail} />
-            }));
-        })
+        use_callback(
+            (props.details.clone(), props.index),
+            move |_: MouseEvent, (details, index)| {
+                let detail = match details {
+                    DetailSlice::Titles(ref list) => VotingDetail::Title(list[*index].clone()),
+                    DetailSlice::Thumbnails(ref list) => {
+                        VotingDetail::Thumbnail(list[*index].clone())
+                    }
+                };
+                modal_controls.emit(ModalMessage::Open(html! {
+                    <VotingModal {detail} />
+                }));
+            },
+        )
     };
     let voting_modal_trigger = user_context.is_some().then_some(voting_modal_trigger);
-    let score_col_class = classes!("score-col", "hoverswitch-trigger", user_context.is_some().then_some("clickable"));
-
+    let score_col_class = classes!(
+        "score-col",
+        "hoverswitch-trigger",
+        user_context.is_some().then_some("clickable")
+    );
 
     match props.details {
         DetailSlice::Titles(ref list) => {
             let t = &list[props.index];
             let expanded_layout = settings.title_table_layout == TableLayout::Expanded;
             let compressed_layout = settings.title_table_layout == TableLayout::Compressed;
-            let rows = if compressed_layout { "1" } else { "2" }; 
-            let title_column_classes = classes!("title-col", compressed_layout.then_some("compressed"));
+            let rows = if compressed_layout { "1" } else { "2" };
+            let title_column_classes =
+                classes!("title-col", compressed_layout.then_some("compressed"));
             html! {
                 <tr>
-                    <td>{DateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), render_datetime)}</td>
+                    <td>{DateTime::from_timestamp_millis(t.time_submitted).map_or_else(|| t.time_submitted.to_string(), render_datetime)}</td>
                     if !props.hide_videoid {
                         <td class="monospaced"><YoutubeVideoLink videoid={t.video_id.clone()} multiline={expanded_layout} /></td>
                     }
@@ -568,12 +448,12 @@ fn DetailTableRow(props: &DetailTableRowProps) -> Html {
                     }
                 </tr>
             }
-        },
+        }
         DetailSlice::Thumbnails(ref list) => {
             let t = &list[props.index];
             let expanded_layout = settings.thumbnail_table_layout == TableLayout::Expanded;
             let compressed_layout = settings.thumbnail_table_layout == TableLayout::Compressed;
-            let rows = if compressed_layout { "1" } else { "2" }; 
+            let rows = if compressed_layout { "1" } else { "2" };
             let render_thumbnails = settings.render_thumbnails_in_tables && expanded_layout;
             let onclick = {
                 let list = list.clone();
@@ -587,7 +467,7 @@ fn DetailTableRow(props: &DetailTableRowProps) -> Html {
             };
             html! {
                 <tr>
-                    <td>{DateTime::from_timestamp_millis(t.time_submitted).map_or(t.time_submitted.to_string(), render_datetime)}</td>
+                    <td>{DateTime::from_timestamp_millis(t.time_submitted).map_or_else(|| t.time_submitted.to_string(), render_datetime)}</td>
                     if !props.hide_videoid {
                         <td class="monospaced"><YoutubeVideoLink videoid={t.video_id.clone()} multiline={expanded_layout} /></td>
                     }
@@ -616,9 +496,11 @@ fn DetailTableRow(props: &DetailTableRowProps) -> Html {
 
 #[function_component]
 pub fn BaseDetailTableRenderer(props: &BaseDetailTableRendererProps) -> Html {
-    let settings_context: SettingsContext = use_context().expect("SettingsContext should be available");
+    let settings_context: SettingsContext =
+        use_context().expect("SettingsContext should be available");
     let settings = settings_context.settings();
-    let rendering_thumbnails = settings.render_thumbnails_in_tables && settings.thumbnail_table_layout == TableLayout::Expanded;
+    let rendering_thumbnails = settings.render_thumbnails_in_tables
+        && settings.thumbnail_table_layout == TableLayout::Expanded;
     let row_props = DetailTableRowProps {
         details: props.details.clone(),
         index: 0,
@@ -696,14 +578,14 @@ pub fn UnpaginatedDetailTableRenderer(props: &DetailTableRendererProps) -> HtmlR
     }
 
     if let Err(ref e) = *details {
-        return Ok(html!{
+        return Ok(html! {
             <center>
                 <b>{"Failed to fetch details from the API :/"}</b>
                 <pre>{format!("{e:?}")}</pre>
             </center>
         });
     }
-    
+
     Ok(html! {
         <BaseDetailTableRenderer details={detail_slice} hide_videoid={props.hide_videoid} hide_userid={props.hide_userid} hide_username={props.hide_username} />
     })
@@ -711,20 +593,27 @@ pub fn UnpaginatedDetailTableRenderer(props: &DetailTableRendererProps) -> HtmlR
 
 #[function_component]
 pub fn BasePaginatedDetailTableRenderer(props: &BaseDetailTableRendererProps) -> Html {
-    let settings_context: SettingsContext = use_context().expect("SettingsContext should be available");
+    let settings_context: SettingsContext =
+        use_context().expect("SettingsContext should be available");
     let settings = settings_context.settings();
     let entries_per_page: usize = settings.entries_per_page.into();
     let state = use_location_state().get_state();
-    let detail_slice = use_detail_slice(Some(props.details.clone()), DetailIndex::Page { size: entries_per_page, index: state.detail_table_page });
+    let detail_slice = use_detail_slice(
+        Some(props.details.clone()),
+        DetailIndex::Page {
+            size: entries_per_page,
+            index: state.detail_table_page,
+        },
+    );
 
     let detail_count = props.details.len();
-    let page_count = (detail_count+entries_per_page-1)/entries_per_page;
+    let page_count = (detail_count + entries_per_page - 1) / entries_per_page;
 
     let inner_props = BaseDetailTableRendererProps {
         details: detail_slice,
         ..*props
     };
-    
+
     html! {
         <>
             <BaseDetailTableRenderer ..{inner_props} />
@@ -749,14 +638,14 @@ pub fn PaginatedDetailTableRenderer(props: &DetailTableRendererProps) -> HtmlRes
     }
 
     if let Err(ref e) = *details {
-        return Ok(html!{
+        return Ok(html! {
             <center>
                 <b>{"Failed to fetch details from the API :/"}</b>
                 <pre>{format!("{e:?}")}</pre>
             </center>
         });
     }
-    
+
     Ok(html! {
         <BasePaginatedDetailTableRenderer details={detail_slice} hide_videoid={props.hide_videoid} hide_userid={props.hide_userid} hide_username={props.hide_username} />
     })

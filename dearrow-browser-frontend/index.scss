@@ -207,6 +207,17 @@ body {
       &.score-col {
         min-width: 7em;
       }
+
+      &.warning-message-col {
+        max-width: calc(100vw - 40rem);
+        text-wrap: auto;
+        text-align: left;
+
+        pre {
+          max-width: inherit;
+          text-wrap: auto
+        }
+      }
     }
 
     tr {

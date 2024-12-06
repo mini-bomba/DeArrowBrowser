@@ -670,6 +670,7 @@ dependencies = [
  "built",
  "chrono",
  "dearrow-browser-api",
+ "enumflags2",
  "error_handling",
  "futures",
  "gloo-console 0.3.0",

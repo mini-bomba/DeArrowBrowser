@@ -94,8 +94,9 @@ fn create_voting_task(url: Url, body: PostBrandingBody, action_name: &'static st
     }.boxed_local(), html! {{"Sending request..."}})
 }
 
+type VotingCallbackDeps = (VotingDetail, Option<Rc<str>>, Rc<str>);
 fn voting_callback(async_task_control: AsyncTaskControl, modal_control: ModalRendererControls, voting_mode: VotingMode) 
-    -> impl Fn(MouseEvent, &(VotingDetail, Option<Rc<str>>, Rc<str>)) 
+    -> impl Fn(MouseEvent, &VotingCallbackDeps) 
 {
     move |_, (detail, user_id, sbs_base)| {
         let Some(user_id) = user_id.clone() else { return; };

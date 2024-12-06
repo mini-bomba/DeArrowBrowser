@@ -110,11 +110,11 @@ impl WorkerContext {
         }))
     }
 
-    fn get_connect_event_closure(&'static self) -> &Closure<dyn FnMut(MessageEvent)> {
+    fn get_connect_event_closure(&'static self) -> &'static Closure<dyn FnMut(MessageEvent)> {
         self.connect_event_closure.get_or_init(|| Closure::new(|e| self.handle_connect_event(e)))
     }
 
-    fn get_message_event_closure(&'static self) -> &Closure<dyn FnMut(MessageEvent)> {
+    fn get_message_event_closure(&'static self) -> &'static Closure<dyn FnMut(MessageEvent)> {
         self.message_event_closure.get_or_init(|| Closure::new(|e| self.handle_message_event(e)))
     }
 
@@ -122,7 +122,7 @@ impl WorkerContext {
         self.message_error_event_closure.get_or_init(|| Closure::new(Self::handle_message_error_event))
     }
 
-    fn get_client_sweep_closure(&'static self) -> &Closure<dyn FnMut()> {
+    fn get_client_sweep_closure(&'static self) -> &'static Closure<dyn FnMut()> {
         self.client_sweep_closure.get_or_init(|| Closure::new(|| self.client_sweep()))
     }
 

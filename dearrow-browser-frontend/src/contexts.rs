@@ -184,7 +184,7 @@ impl Component for UserContextProvider {
                     }
                 }
             },
-            UserContextProviderMessage::StatusUpdate(Some(last_updated)) if !self.last_update.is_some_and(|v| v == last_updated) => {
+            UserContextProviderMessage::StatusUpdate(Some(last_updated)) if self.last_update.is_none_or(|v| v != last_updated) => {
                 self.last_update.replace(last_updated).is_some()
             },
             // Some(last_updated == self.last_update) - we don't care

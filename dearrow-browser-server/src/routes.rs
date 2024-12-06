@@ -40,7 +40,7 @@ use crate::state::*;
 use crate::utils::{self, ExtendResponder, ResponderExt};
 
 pub fn configure(app_config: web::Data<AppConfig>) -> impl FnOnce(&mut web::ServiceConfig) {
-    return move |cfg| {
+    move |cfg| {
         cfg.service(helo)
             .service(get_titles)
             .service(get_unverified_titles)
@@ -74,7 +74,7 @@ pub fn configure(app_config: web::Data<AppConfig>) -> impl FnOnce(&mut web::Serv
                 web::route().to(innertube_disabled),
             );
         }
-    };
+    }
 }
 
 type JsonResult<T> = utils::Result<web::Json<T>>;

@@ -230,7 +230,7 @@ pub async fn browse_channel(client: Client, config: Arc<AppConfig>, mode: &Brows
                 debug!("{} browsing aborted: tab unavailable", mode.tab_name);
                 break 'outer;  // tab not available
             };
-            if !tab.tab_renderer.title.is_some_and(|s| s == mode.tab_name) {
+            if tab.tab_renderer.title.is_none_or(|s| s != mode.tab_name) {
                 debug!("{} browsing aborted: incorrect tab", mode.tab_name);
                 break 'outer;  // tab not available
             }
@@ -482,7 +482,7 @@ pub async fn browse_releases_tab(client: Client, config: Arc<AppConfig>, ucid: A
                 debug!("release tab browsing aborted: tab unavailable");
                 break 'outer;  // tab not available
             };
-            if !tab.tab_renderer.title.is_some_and(|s| s == IT_BROWSE_RELEASES.tab_name) {
+            if tab.tab_renderer.title.is_none_or(|s| s != IT_BROWSE_RELEASES.tab_name) {
                 debug!("release tab browsing aborted: incorrect tab");
                 break 'outer;  // tab not available
             }
@@ -558,7 +558,7 @@ pub async fn browse_releases_homepage(client: Client, config: Arc<AppConfig>, uc
                 debug!("release browsing via homepage aborted: tab unavailable");
                 break 'outer;  // tab not available
             };
-            if !tab.tab_renderer.title.is_some_and(|s| s == IT_BROWSE_HOME.tab_name) {
+            if tab.tab_renderer.title.is_none_or(|s| s != IT_BROWSE_HOME.tab_name) {
                 debug!("release browsing via homepage aborted: incorrect tab");
                 break 'outer;  // tab not available
             }
@@ -658,7 +658,7 @@ mod it {
         pub visitor_data: Option<&'a str>,
     }
 
-    impl<'a> Default for Client<'a> {
+    impl Default for Client<'_> {
         fn default() -> Self {
             Self {
                 client_name: "WEB",

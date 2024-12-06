@@ -36,7 +36,7 @@ pub fn YoutubeIframe(props: &YoutubeProps) -> Html {
     let embed_url: Rc<AttrValue> = use_memo(props.videoid.clone(), |vid| {
         let mut url = YOUTUBE_EMBED_URL.clone();
         url.extend_segments(&[vid]).unwrap();
-        return AttrValue::Rc(url.as_str().into())
+        AttrValue::Rc(url.as_str().into())
     });
 
     html! {<iframe src={&*embed_url} allowfullscreen=true />}

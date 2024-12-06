@@ -67,7 +67,7 @@ pub fn HomePage() -> Html {
         })
     });
     let page_count =
-        detail_count.map(|detail_count| (detail_count + (entries_per_page - 1)) / entries_per_page);
+        detail_count.map(|detail_count| detail_count.div_ceil(entries_per_page));
 
     html! {
         <>

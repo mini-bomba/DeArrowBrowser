@@ -607,7 +607,7 @@ pub fn BasePaginatedDetailTableRenderer(props: &BaseDetailTableRendererProps) ->
     );
 
     let detail_count = props.details.len();
-    let page_count = (detail_count + entries_per_page - 1) / entries_per_page;
+    let page_count = detail_count.div_ceil(entries_per_page);
 
     let inner_props = BaseDetailTableRendererProps {
         details: detail_slice,

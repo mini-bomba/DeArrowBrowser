@@ -1,7 +1,7 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
 *  Copyright (C) 2023-2024 mini_bomba
-*  
+*
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
 *  the Free Software Foundation, either version 3 of the License, or
@@ -15,17 +15,36 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use actix_web::{http::header::EntityTag, rt::{spawn, time::sleep}, web};
+use actix_web::{
+    http::header::EntityTag,
+    rt::{spawn, time::sleep},
+    web,
+};
 use chrono::{DateTime, Utc};
 use dearrow_browser_api::sync as api;
 use dearrow_parser::{DearrowDB, StringSet};
 use error_handling::{bail, ErrContext, ErrorContext, ResContext};
-use futures::{channel::oneshot, future::{BoxFuture, Shared}, join, lock::Mutex, select_biased, FutureExt};
+use futures::{
+    channel::oneshot,
+    future::{BoxFuture, Shared},
+    join,
+    lock::Mutex,
+    select_biased, FutureExt,
+};
 use log::warn;
 use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::{HashMap, HashSet},
+    ffi::OsString,
+    path::{Path, PathBuf},
+    sync::{
+        atomic::{AtomicUsize, Ordering::Relaxed},
+        Arc, RwLock,
+    },
+    time::Instant,
+};
 use tokio::fs::read_dir;
-use std::{collections::{HashMap, HashSet}, ffi::OsString, path::{Path, PathBuf}, sync::{atomic::{AtomicUsize, Ordering::Relaxed}, Arc, RwLock}, time::Instant};
-use serde::{Serialize, Deserialize};
 
 use crate::{constants::*, innertube, utils::random_b64};
 
@@ -46,6 +65,7 @@ pub struct AppConfig {
     pub innertube: InnertubeConfig,
     pub enable_timings_header: bool,
     pub cache_path: PathBuf,
+    pub enable_fakeapi: bool,
 }
 
 impl Default for AppConfig {
@@ -60,7 +80,8 @@ impl Default for AppConfig {
             startup_timestamp: Utc::now(),
             innertube: InnertubeConfig::default(),
             enable_timings_header: false,
-            cache_path: PathBuf::from("./cache")
+            cache_path: PathBuf::from("./cache"),
+            enable_fakeapi: false,
         }
     }
 }
@@ -125,17 +146,21 @@ impl DatabaseState {
     }
 
     pub fn calculate_uncut_segment_count(&self) -> usize {
-        self.db.video_infos.iter().map(|chunk| chunk.iter().map(|v| v.uncut_segments.len()).sum::<usize>()).sum()
+        self.db
+            .video_infos
+            .iter()
+            .map(|chunk| chunk.iter().map(|v| v.uncut_segments.len()).sum::<usize>())
+            .sum()
     }
 
     pub fn generate_etag(&self) -> EntityTag {
         EntityTag::new_weak(format!(
             "{}:{}:{}+{}+{}+{}+{}+{}",
-            self.last_updated, 
-            self.last_modified, 
-            self.db.titles.len(), 
-            self.db.thumbnails.len(), 
-            self.db.usernames.len(), 
+            self.last_updated,
+            self.last_modified,
+            self.db.titles.len(),
+            self.db.thumbnails.len(),
+            self.db.usernames.len(),
             self.db.vip_users.len(),
             self.video_info_count,
             self.uncut_segment_count,
@@ -170,7 +195,10 @@ impl FSCacheCountCache {
         let mut reader = match read_dir(path).await {
             Ok(r) => r,
             Err(e) => {
-                warn!("Failed to list files in directory '{}': {e}", path.display());
+                warn!(
+                    "Failed to list files in directory '{}': {e}",
+                    path.display()
+                );
                 return set;
             }
         };
@@ -179,9 +207,12 @@ impl FSCacheCountCache {
                 Ok(Some(entry)) => set.insert(entry.file_name()),
                 Ok(None) => break,
                 Err(e) => {
-                    warn!("Got an error while listing files in directory '{}': {e}", path.display());
+                    warn!(
+                        "Got an error while listing files in directory '{}': {e}",
+                        path.display()
+                    );
                     break;
-                },
+                }
             };
         }
         set
@@ -191,14 +222,18 @@ impl FSCacheCountCache {
         let vids_path = config.cache_path.join(IT_BROWSE_VIDEOS.cache_dir);
         let vods_path = config.cache_path.join(IT_BROWSE_LIVE.cache_dir);
         let shorts_path = config.cache_path.join(IT_BROWSE_SHORTS.cache_dir);
-        let (mut videos, vods, shorts) = join!(Self::list_dir(&vids_path), Self::list_dir(&vods_path), Self::list_dir(&shorts_path));
+        let (mut videos, vods, shorts) = join!(
+            Self::list_dir(&vids_path),
+            Self::list_dir(&vods_path),
+            Self::list_dir(&shorts_path)
+        );
         videos.extend(vods);
         videos.extend(shorts);
         videos.len()
     }
 
     pub fn new(config: Arc<AppConfig>) -> FSCacheCountCache {
-        FSCacheCountCache { 
+        FSCacheCountCache {
             future: Self::count(config).boxed().shared(),
             timestamp: Instant::now(),
         }
@@ -270,10 +305,14 @@ pub enum GetChannelOutput {
 }
 
 impl ChannelCache {
-    pub fn new(string_set: Arc<RwLock<StringSet>>, config: Arc<AppConfig>, client: Client) -> ChannelCache {
-        ChannelCache { 
+    pub fn new(
+        string_set: Arc<RwLock<StringSet>>,
+        config: Arc<AppConfig>,
+        client: Client,
+    ) -> ChannelCache {
+        ChannelCache {
             handle_to_ucid_cache: Arc::default(),
-            data_cache: Arc::default(), 
+            data_cache: Arc::default(),
             fscache_count_cache: Arc::default(),
             string_set,
             config,
@@ -282,9 +321,9 @@ impl ChannelCache {
     }
 
     pub fn reset(&self) -> ChannelCache {
-        ChannelCache { 
+        ChannelCache {
             handle_to_ucid_cache: Arc::default(),
-            data_cache: Arc::default(), 
+            data_cache: Arc::default(),
             fscache_count_cache: self.fscache_count_cache.clone(),
             string_set: self.string_set.clone(),
             config: self.config.clone(),
@@ -311,47 +350,108 @@ impl ChannelCache {
     }
 
     async fn handle_to_ucid(client: Client, handle: Arc<str>) -> UCIDFutureResult {
-        innertube::handle_to_ucid(&client, &handle).await.map(Into::into)
+        innertube::handle_to_ucid(&client, &handle)
+            .await
+            .map(Into::into)
     }
 
-    async fn fetch_channel(&self, ucid: &Arc<str>, progress: ChannelFetchProgress) -> Result<Arc<ChannelData>, ErrorContext> {
-        let videos_task = spawn(innertube::browse_channel(self.client.clone(), self.config.clone(), &IT_BROWSE_VIDEOS, ucid.clone(), progress.videos.clone()));
-        let vods_task   = spawn(innertube::browse_channel(self.client.clone(), self.config.clone(), &IT_BROWSE_LIVE,   ucid.clone(), progress.vods.clone()));
-        let shorts_task = spawn(innertube::browse_channel(self.client.clone(), self.config.clone(), &IT_BROWSE_SHORTS, ucid.clone(), progress.shorts.clone()));
-        let releases_tab_task  = spawn(innertube::browse_releases_tab(self.client.clone(), self.config.clone(), ucid.clone(), progress.releases_tab.clone()));
-        let releases_home_task = spawn(innertube::browse_releases_homepage(self.client.clone(), self.config.clone(), ucid.clone(), progress.releases_home.clone()));
+    async fn fetch_channel(
+        &self,
+        ucid: &Arc<str>,
+        progress: ChannelFetchProgress,
+    ) -> Result<Arc<ChannelData>, ErrorContext> {
+        let videos_task = spawn(innertube::browse_channel(
+            self.client.clone(),
+            self.config.clone(),
+            &IT_BROWSE_VIDEOS,
+            ucid.clone(),
+            progress.videos.clone(),
+        ));
+        let vods_task = spawn(innertube::browse_channel(
+            self.client.clone(),
+            self.config.clone(),
+            &IT_BROWSE_LIVE,
+            ucid.clone(),
+            progress.vods.clone(),
+        ));
+        let shorts_task = spawn(innertube::browse_channel(
+            self.client.clone(),
+            self.config.clone(),
+            &IT_BROWSE_SHORTS,
+            ucid.clone(),
+            progress.shorts.clone(),
+        ));
+        let releases_tab_task = spawn(innertube::browse_releases_tab(
+            self.client.clone(),
+            self.config.clone(),
+            ucid.clone(),
+            progress.releases_tab.clone(),
+        ));
+        let releases_home_task = spawn(innertube::browse_releases_homepage(
+            self.client.clone(),
+            self.config.clone(),
+            ucid.clone(),
+            progress.releases_home.clone(),
+        ));
 
-        let videos = videos_task.await.context("Video fetching task panicked")?.context("Failed to fetch all videos")?;
-        let vods   = vods_task.await.context("VOD fetching task panicked")?.context("Failed to fetch all VODs")?;
-        let shorts = shorts_task.await.context("Shorts fetching task panicked")?.context("Failed to fetch all shorts")?;
-        let releases_tab = releases_tab_task.await.context("Releases (via tab) fetching task panicked")?.context("Failed to fetch all releases from the tab")?;
-        let releases_home = releases_home_task.await.context("Releases (via homepage) fetching task panicked")?.context("Failed to fetch all releases from the homepage")?;
+        let videos = videos_task
+            .await
+            .context("Video fetching task panicked")?
+            .context("Failed to fetch all videos")?;
+        let vods = vods_task
+            .await
+            .context("VOD fetching task panicked")?
+            .context("Failed to fetch all VODs")?;
+        let shorts = shorts_task
+            .await
+            .context("Shorts fetching task panicked")?
+            .context("Failed to fetch all shorts")?;
+        let releases_tab = releases_tab_task
+            .await
+            .context("Releases (via tab) fetching task panicked")?
+            .context("Failed to fetch all releases from the tab")?;
+        let releases_home = releases_home_task
+            .await
+            .context("Releases (via homepage) fetching task panicked")?
+            .context("Failed to fetch all releases from the homepage")?;
 
         let string_set = self.string_set.read().map_err(|_| SS_READ_ERR.clone())?;
-        let num_releases = releases_tab.iter().map(Vec::len).sum::<usize>() + releases_home.iter().map(Vec::len).sum::<usize>();
+        let num_releases = releases_tab.iter().map(Vec::len).sum::<usize>()
+            + releases_home.iter().map(Vec::len).sum::<usize>();
         Ok(Arc::new(ChannelData {
             channel_name: videos.name.into(),
             num_videos: videos.video_ids.len(),
             num_vods: vods.video_ids.len(),
             num_shorts: shorts.video_ids.len(),
             num_releases,
-            total_videos: videos.video_ids.len() + vods.video_ids.len() + shorts.video_ids.len() + num_releases,
-            video_ids: videos.video_ids.into_iter()
+            total_videos: videos.video_ids.len()
+                + vods.video_ids.len()
+                + shorts.video_ids.len()
+                + num_releases,
+            video_ids: videos
+                .video_ids
+                .into_iter()
                 .chain(vods.video_ids.into_iter())
                 .chain(shorts.video_ids.into_iter())
                 .chain(releases_tab.into_iter().flat_map(Vec::into_iter))
                 .chain(releases_home.into_iter().flat_map(Vec::into_iter))
-                .filter_map(|vid| string_set.set.get(vid.as_str()).cloned()).collect(),
+                .filter_map(|vid| string_set.set.get(vid.as_str()).cloned())
+                .collect(),
         }))
     }
 
-    async fn fetch_channel_task(cache: ChannelCache, ucid: Arc<str>, progress: ChannelFetchProgress, output: oneshot::Sender<Result<Arc<ChannelData>, ErrorContext>>) {
+    async fn fetch_channel_task(
+        cache: ChannelCache,
+        ucid: Arc<str>,
+        progress: ChannelFetchProgress,
+        output: oneshot::Sender<Result<Arc<ChannelData>, ErrorContext>>,
+    ) {
         let result = cache.fetch_channel(&ucid, progress).await;
         let _ = output.send(result.clone());
         let mut data_cache = cache.data_cache.lock().await;
         match result {
             Ok(res) => data_cache.insert(ucid, ChannelDataCacheEntry::Resolved(res)),
-            Err(err) => data_cache.insert(ucid, ChannelDataCacheEntry::Failed(err))
+            Err(err) => data_cache.insert(ucid, ChannelDataCacheEntry::Failed(err)),
         };
     }
 
@@ -372,23 +472,40 @@ impl ChannelCache {
 
             let ucid_future = {
                 let mut ucid_cache = self.handle_to_ucid_cache.lock().await;
-                ucid_cache.entry(handle).or_insert_with_key(|handle| Self::handle_to_ucid(self.client.clone(), handle.clone()).boxed().shared()).clone()
+                ucid_cache
+                    .entry(handle)
+                    .or_insert_with_key(|handle| {
+                        Self::handle_to_ucid(self.client.clone(), handle.clone())
+                            .boxed()
+                            .shared()
+                    })
+                    .clone()
             };
 
-            ucid_future.await.context("Failed to convert handle to UCID")?
+            ucid_future
+                .await
+                .context("Failed to convert handle to UCID")?
         };
 
         let channel_data_entry = {
             let mut channel_data_cache = self.data_cache.lock().await;
-            channel_data_cache.entry(ucid).or_insert_with_key(|ucid| {
-                let progress: ChannelFetchProgress = ChannelFetchProgress::default();
-                let (sender, receiver) = oneshot::channel();
-                spawn(Self::fetch_channel_task(self.clone(), ucid.clone(), progress.clone(), sender));
-                ChannelDataCacheEntry::Pending { 
-                    future: receiver.shared(),
-                    progress,
-                }
-            }).clone()
+            channel_data_cache
+                .entry(ucid)
+                .or_insert_with_key(|ucid| {
+                    let progress: ChannelFetchProgress = ChannelFetchProgress::default();
+                    let (sender, receiver) = oneshot::channel();
+                    spawn(Self::fetch_channel_task(
+                        self.clone(),
+                        ucid.clone(),
+                        progress.clone(),
+                        sender,
+                    ));
+                    ChannelDataCacheEntry::Pending {
+                        future: receiver.shared(),
+                        progress,
+                    }
+                })
+                .clone()
         };
 
         Ok::<usize, ErrorContext>(0)?;
@@ -396,10 +513,13 @@ impl ChannelCache {
         match channel_data_entry {
             ChannelDataCacheEntry::Resolved(res) => Ok(GetChannelOutput::Resolved(res)),
             ChannelDataCacheEntry::Failed(err) => Err(err.context("Failed to fetch channel data")),
-            ChannelDataCacheEntry::Pending { mut future, progress } => select_biased! {
+            ChannelDataCacheEntry::Pending {
+                mut future,
+                progress,
+            } => select_biased! {
                 res = future => Ok(GetChannelOutput::Resolved(res.context("Failed to fetch channel data")?.context("Failed to fetch channel data")?)),
                 () = sleep(IT_TIMEOUT).fuse() => Ok(GetChannelOutput::Pending(progress)),
-            }
+            },
         }
     }
 }

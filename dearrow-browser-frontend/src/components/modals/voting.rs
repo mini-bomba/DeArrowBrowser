@@ -50,7 +50,7 @@ struct VotingMode {
     auto_lock: bool,
 }
 
-fn create_voting_task(url: Url, body: PostBrandingBody) -> (AsyncTaskFuture, Html) {
+fn create_voting_task(url: Url, body: PostBrandingBody, action_name: &'static str) -> (AsyncTaskFuture, Html) {
     (async move {
         let resp = REQWEST_CLIENT.post(url.clone())
             .json(&body)
@@ -59,7 +59,7 @@ fn create_voting_task(url: Url, body: PostBrandingBody) -> (AsyncTaskFuture, Htm
             Err(e) => {
                 error!(format!("Failed to send voting request: {e:?}"));
                 (
-                    AsyncTaskResult::DismissOrRetry { success: false, retry: Box::new(move || create_voting_task(url, body)) },
+                    AsyncTaskResult::DismissOrRetry { success: false, retry: Box::new(move || create_voting_task(url, body, action_name)) },
                     html! {{"Failed to send request. Check console for details."}}
                 )
             },
@@ -68,21 +68,21 @@ fn create_voting_task(url: Url, body: PostBrandingBody) -> (AsyncTaskFuture, Htm
                 if status.is_success() {
                     (
                         AsyncTaskResult::AutoDismiss { success: true },
-                        html! {{format!("Upvoted successfully! (status code {status})")}},
+                        html! {{format!("{action_name} successfully! (status code {status})")}},
                     )
                 } else {
                     match resp.text().await {
                         Ok(text) => {
                             error!(format!("Failed to send vote: status code {status}, response body:\n{text}"));
                             (
-                                AsyncTaskResult::DismissOrRetry { success: false, retry: Box::new(move || create_voting_task(url, body)) },
+                                AsyncTaskResult::DismissOrRetry { success: false, retry: Box::new(move || create_voting_task(url, body, action_name)) },
                                 html! {{format!("Failed to vote. Check console for details. (status code {status})")}}
                             )
                         },
                         Err(..) => {
                             error!(format!("Failed to send vote: status code {status}, could not decode body"));
                             (
-                                AsyncTaskResult::DismissOrRetry { success: false, retry: Box::new(move || create_voting_task(url, body)) },
+                                AsyncTaskResult::DismissOrRetry { success: false, retry: Box::new(move || create_voting_task(url, body, action_name)) },
                                 html! {{format!("Failed to vote. Check console for details. (status code {status})")}}
                             )
                         },
@@ -112,7 +112,7 @@ fn voting_callback(async_task_control: AsyncTaskControl, modal_control: ModalRen
                 url
             }
         };
-        let (body, task_name) = match detail {
+        let (body, (task_name, action_name)) = match detail {
             VotingDetail::Title(ref title) => (PostBrandingBody {
                 video_id: title.video_id.clone(),
                 user_id,
@@ -125,10 +125,10 @@ fn voting_callback(async_task_control: AsyncTaskControl, modal_control: ModalRen
                 downvote: voting_mode.downvote,
                 auto_lock: voting_mode.auto_lock,
             }, match voting_mode {
-                VotingMode { downvote: false, auto_lock: false } => format!("Upvoting title {}",   title.uuid),
-                VotingMode { downvote: true,  auto_lock: false } => format!("Downvoting title {}", title.uuid),
-                VotingMode { downvote: false, auto_lock: true  } => format!("Locking title {}",    title.uuid),
-                VotingMode { downvote: true,  auto_lock: true  } => format!("Removing title {}",   title.uuid),
+                VotingMode { downvote: false, auto_lock: false } => (format!("Upvoting title {}",   title.uuid), "Upvoted"),
+                VotingMode { downvote: true,  auto_lock: false } => (format!("Downvoting title {}", title.uuid), "Downvoted"),
+                VotingMode { downvote: false, auto_lock: true  } => (format!("Locking title {}",    title.uuid), "Locked"),
+                VotingMode { downvote: true,  auto_lock: true  } => (format!("Removing title {}",   title.uuid), "Removed"),
             }),
             VotingDetail::Thumbnail(ref thumb) => (PostBrandingBody {
                 video_id: thumb.video_id.clone(),
@@ -143,13 +143,13 @@ fn voting_callback(async_task_control: AsyncTaskControl, modal_control: ModalRen
                 downvote: voting_mode.downvote,
                 auto_lock: voting_mode.auto_lock,
             }, match voting_mode {
-                VotingMode { downvote: false, auto_lock: false } => format!("Upvoting thumbnail {}",   thumb.uuid),
-                VotingMode { downvote: true,  auto_lock: false } => format!("Downvoting thumbnail {}", thumb.uuid),
-                VotingMode { downvote: false, auto_lock: true  } => format!("Locking thumbnail {}",    thumb.uuid),
-                VotingMode { downvote: true,  auto_lock: true  } => format!("Removing thumbnail {}",   thumb.uuid),
+                VotingMode { downvote: false, auto_lock: false } => (format!("Upvoting thumbnail {}",   thumb.uuid), "Upvoted"),
+                VotingMode { downvote: true,  auto_lock: false } => (format!("Downvoting thumbnail {}", thumb.uuid), "Downvoted"),
+                VotingMode { downvote: false, auto_lock: true  } => (format!("Locking thumbnail {}",    thumb.uuid), "Locked"),
+                VotingMode { downvote: true,  auto_lock: true  } => (format!("Removing thumbnail {}",   thumb.uuid), "Removed"),
             }),
         };
-        let (task, summary) = create_voting_task(url, body);
+        let (task, summary) = create_voting_task(url, body, action_name);
         async_task_control.submit_task(task_name.into(), summary, task);
         modal_control.emit(ModalMessage::CloseTop);
         

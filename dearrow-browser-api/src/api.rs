@@ -29,6 +29,7 @@ pub struct StatusResponse {
     pub thumbnails: usize,
     pub vip_users: usize,
     pub usernames: usize,
+    pub warnings: usize,
     pub errors: usize,
     pub string_count: Option<usize>,
     pub video_infos: usize,

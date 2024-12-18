@@ -1,7 +1,7 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
 *  Copyright (C) 2024 mini_bomba
-*  
+*
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
 *  the Free Software Foundation, either version 3 of the License, or
@@ -17,62 +17,71 @@
 */
 use std::rc::Rc;
 
+use chrono::DateTime;
 use yew::platform::spawn_local;
 use yew::prelude::*;
-use chrono::DateTime;
 use yew_hooks::{use_async, use_interval};
 
-use crate::contexts::{StatusContext, WindowContext};
-use crate::thumbnails::components::{TRExt, Thumbgen, ThumbgenContext, ThumbgenContextExt, ThumbgenRefreshContext};
-use crate::utils::{render_datetime, RenderNumber};
 use crate::built_info;
+use crate::contexts::{StatusContext, WindowContext};
+use crate::thumbnails::components::{
+    TRExt, Thumbgen, ThumbgenContext, ThumbgenContextExt, ThumbgenRefreshContext,
+};
+use crate::utils::{render_datetime, RenderNumber};
 
 macro_rules! number_hoverswitch {
     ($switch_element: tt, $n: expr) => {
         if $n >= 1000 {
-            html!{
+            html! {
                 <$switch_element class="hoverswitch">
                     <span>{$n.abbreviate_int()}</span>
                     <span>{$n.render_int()}</span>
                 </$switch_element>
             }
         } else {
-            html!{
+            html! {
                 <$switch_element>{$n}</$switch_element>
             }
         }
     };
 }
 
-
 #[function_component]
 pub fn StatusModal() -> Html {
     let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
     let status: StatusContext = use_context().expect("StatusContext should be defined");
     let thumbgen: ThumbgenContext = use_context().expect("ThumbgenContext should be available");
-    let thumbgen_refresh: ThumbgenRefreshContext = use_context().expect("ThumbgenRefreshContext should be available");
+    let thumbgen_refresh: ThumbgenRefreshContext =
+        use_context().expect("ThumbgenRefreshContext should be available");
     let update_clock: UseStateHandle<bool> = use_state(|| false);
 
-    let errors_url: Rc<AttrValue> = use_memo(window_context, |wc| wc.origin_join_segments(&["api", "errors"]).as_str().to_owned().into());
+    let errors_url: Rc<AttrValue> = use_memo(window_context, |wc| {
+        wc.origin_join_segments(&["api", "errors"])
+            .as_str()
+            .to_owned()
+            .into()
+    });
 
     let thumbgen_impl = match &thumbgen {
         None => None,
         Some(Thumbgen::Remote(..)) => Some("SharedWorker"),
-        Some(Thumbgen::Local{..}) => Some("Local"),
+        Some(Thumbgen::Local { .. }) => Some("Local"),
     };
 
     let thumbgen_fallback_reason: Rc<Option<AttrValue>> = use_memo(
         match &thumbgen {
-            Some(Thumbgen::Local{ error, .. }) => Some(error.clone()),
+            Some(Thumbgen::Local { error, .. }) => Some(error.clone()),
             _ => None,
         },
-        |err| err.as_ref().map(|err| format!("{:?}", err.0).into())
+        |err| err.as_ref().map(|err| format!("{:?}", err.0).into()),
     );
 
-    let thumbgen_stats = { 
+    let thumbgen_stats = {
         let thumbgen = thumbgen.clone();
         use_async(async move {
-            let Some(thumbgen) = thumbgen else { return Err(()) };
+            let Some(thumbgen) = thumbgen else {
+                return Err(());
+            };
             thumbgen.get_stats().await.map_err(|_| ())
         })
     };
@@ -85,9 +94,12 @@ pub fn StatusModal() -> Html {
     }
     {
         let update_clock = update_clock.clone();
-        use_interval(move || {
-            update_clock.set(!*update_clock);
-        }, 5*1000);
+        use_interval(
+            move || {
+                update_clock.set(!*update_clock);
+            },
+            5 * 1000,
+        );
     }
 
     let clear_errors = use_callback(thumbgen.clone(), move |_: MouseEvent, thumbgen| {
@@ -269,6 +281,10 @@ pub fn StatusModal() -> Html {
                         <tr class="hoverswitch-trigger">
                             <th>{"VIPs"}</th>
                             {number_hoverswitch!(td, status.vip_users)}
+                        </tr>
+                        <tr class="hoverswitch-trigger">
+                            <th>{"Warnings"}</th>
+                            {number_hoverswitch!(td, status.warnings)}
                         </tr>
                         <tr class="hoverswitch-trigger">
                             <th>{"Unique strings"}</th>

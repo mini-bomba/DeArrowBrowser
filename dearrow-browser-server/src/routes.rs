@@ -140,6 +140,7 @@ async fn get_status(
         thumbnails: db.db.thumbnails.len(),
         vip_users: db.db.vip_users.len(),
         usernames: db.db.usernames.len(),
+        warnings: db.db.warnings.len(),
         errors: db.errors.len(),
         string_count: strings,
         video_infos: db.video_info_count,

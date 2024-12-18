@@ -155,7 +155,7 @@ impl DatabaseState {
 
     pub fn generate_etag(&self) -> EntityTag {
         EntityTag::new_weak(format!(
-            "{}:{}:{}+{}+{}+{}+{}+{}",
+            "{}:{}:{}+{}+{}+{}+{}+{}+{}",
             self.last_updated,
             self.last_modified,
             self.db.titles.len(),
@@ -164,6 +164,7 @@ impl DatabaseState {
             self.db.vip_users.len(),
             self.video_info_count,
             self.uncut_segment_count,
+            self.db.warnings.len(),
         ))
     }
 }

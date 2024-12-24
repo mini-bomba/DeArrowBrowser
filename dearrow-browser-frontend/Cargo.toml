@@ -15,9 +15,9 @@ workspace = true
 [dependencies]
 bincode = "1.3.3"
 chrono = { workspace = true, features = ["wasmbind", "alloc", "clock"] }
+cloneable_errors.workspace = true
 dearrow-browser-api = { path = "../dearrow-browser-api", default-features = false, features = ["unsync"] }
 enumflags2.workspace = true
-error_handling = { path = "../error_handling", features = ["serde"] }
 futures.workspace = true
 gloo-console = "0.3.0"
 regex.workspace = true

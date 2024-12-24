@@ -23,7 +23,7 @@ use actix_web::{
 use chrono::Utc;
 use dearrow_browser_api::sync::{self as api, *};
 use dearrow_parser::{DearrowDB, ThumbnailFlags, TitleFlags};
-use error_handling::{
+use cloneable_errors::{
     anyhow, bail, ErrorContext, IntoErrorIterator, ResContext, SerializableError,
 };
 use futures::join;

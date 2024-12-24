@@ -18,7 +18,7 @@
 use std::rc::Rc;
 
 use dearrow_browser_api::unsync::User;
-use error_handling::ErrorContext;
+use cloneable_errors::ErrorContext;
 use yew::prelude::*;
 
 use crate::components::icon::*;

@@ -10,8 +10,8 @@ This repository is split into 4 main crates:
 - dearrow-browser-api - definitions of API structures
 - dearrow-browser-frontend - the frontend, uses Yew, functions as a single page application
 
-and 1 utility crate:
-- error_handling - basically the core of anyhow, written from scratch to make errors cloneable
+This repository previously hosted 1 utility crate:
+- error_handling - basically the core of anyhow, written from scratch to make errors cloneable. Renamed, moved to [it's own repository](https://github.com/mini-bomba/cloneable_errors) and published on [crates.io as `cloneable_errors`](https://crates.io/crates/cloneable_errors)
 
 ## SponsorBlockServer emulation
 DeArrow Browser can emulate a limited set of SponsorBlockServer endpoints, specifically used by the DeArrow extension, allowing it to be used as an API mirror.<br>

@@ -19,7 +19,7 @@ use std::rc::Rc;
 
 use chrono::DateTime;
 use dearrow_browser_api::unsync::*;
-use error_handling::ErrorContext;
+use cloneable_errors::ErrorContext;
 use reqwest::Url;
 use yew::{prelude::*, suspense::SuspensionResult};
 

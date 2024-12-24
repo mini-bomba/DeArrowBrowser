@@ -18,7 +18,7 @@
 use std::rc::Rc;
 
 use dearrow_browser_api::unsync::{ChannelFetchProgress, InnertubeChannel};
-use error_handling::{bail, ErrorContext, ResContext};
+use cloneable_errors::{bail, ErrorContext, ResContext};
 use gloo_console::warn;
 use yew::prelude::*;
 

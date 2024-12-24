@@ -18,7 +18,7 @@
 use std::rc::Rc;
 use components::async_task_manager::AsyncTaskManager;
 use dearrow_browser_api::unsync::StatusResponse;
-use error_handling::ErrorContext;
+use cloneable_errors::ErrorContext;
 use gloo_console::error;
 use reqwest::Url;
 use thumbnails::components::ThumbgenProvider;

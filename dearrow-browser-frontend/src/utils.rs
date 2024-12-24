@@ -18,7 +18,7 @@
 use std::{ops::Deref, rc::Rc, fmt::Write};
 
 use chrono::{DateTime, Utc, NaiveDateTime};
-use error_handling::{bail, ErrContext, ErrorContext, ResContext, SerializableError};
+use cloneable_errors::{bail, ErrContext, ErrorContext, ResContext, SerializableError};
 use reqwest::Url;
 use sha2::{digest::array::Array, Digest, Sha256};
 use yew::Html;

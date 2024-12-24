@@ -18,7 +18,7 @@
 
 use std::{cell::{Cell, OnceCell, RefCell}, collections::HashMap, fmt::{Debug, Display}, rc::Rc};
 
-use error_handling::ResContext;
+use cloneable_errors::ResContext;
 use gloo_console::{error, warn};
 use futures::{channel::oneshot::*, select_biased, future::FutureExt};
 use wasm_bindgen::{closure::Closure, JsCast, JsValue};

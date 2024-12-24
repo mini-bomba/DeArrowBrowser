@@ -18,7 +18,7 @@
 use std::rc::Rc;
 
 use dearrow_browser_api::unsync::{InnertubeVideo, Video};
-use error_handling::{anyhow, ErrContext, ErrorContext, ResContext};
+use cloneable_errors::{anyhow, ErrContext, ErrorContext, ResContext};
 use gloo_console::error;
 use yew::prelude::*;
 use yew_hooks::{use_async_with_options, UseAsyncHandle, UseAsyncOptions};

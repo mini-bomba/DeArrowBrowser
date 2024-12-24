@@ -19,12 +19,12 @@ use std::{ffi::CString, fmt::{Debug, Display}, fs, mem::MaybeUninit, ops::{Deref
 
 use actix_web::{dev::Extensions, http::{header::{HeaderMap, TryIntoHeaderPair}, StatusCode}, HttpResponse, Responder, ResponseError};
 use base64::prelude::{BASE64_URL_SAFE_NO_PAD, Engine};
-use error_handling::{ErrContext, ErrorContext, IntoErrorIterator, ResContext};
+use cloneable_errors::{ErrContext, ErrorContext, IntoErrorIterator, ResContext};
 use serde::de::DeserializeOwned;
 use tokio::fs::File;
 
 /// This extension will be present on a response if the response contains
-/// a [`error_handling::SerializableError`] encoded as json
+/// a [`cloneable_errors::SerializableError`] encoded as json
 pub struct SerializableErrorResponseMarker;
 
 pub enum Error {

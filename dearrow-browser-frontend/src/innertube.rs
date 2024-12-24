@@ -16,7 +16,7 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use error_handling::{ErrorContext, ResContext};
+use cloneable_errors::{ErrorContext, ResContext};
 use reqwest::Url;
 use serde::Deserialize;
 

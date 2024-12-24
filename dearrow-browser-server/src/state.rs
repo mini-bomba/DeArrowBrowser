@@ -23,7 +23,7 @@ use actix_web::{
 use chrono::{DateTime, Utc};
 use dearrow_browser_api::sync as api;
 use dearrow_parser::{DearrowDB, StringSet};
-use error_handling::{bail, ErrContext, ErrorContext, ResContext};
+use cloneable_errors::{bail, ErrContext, ErrorContext, ResContext};
 use futures::{
     channel::oneshot,
     future::{BoxFuture, Shared},

@@ -17,7 +17,7 @@
 */
 use csv_data::WithWarnings;
 use enumflags2::{bitflags, BitFlags};
-use error_handling::{ErrContext, ErrorContext, ResContext};
+use cloneable_errors::{ErrContext, ErrorContext, ResContext};
 use log::info;
 use sha2::{Digest, Sha256};
 use std::{

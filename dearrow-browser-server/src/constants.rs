@@ -17,7 +17,7 @@
 */
 use std::{sync::{Arc, LazyLock}, time::Duration};
 use chrono::DateTime;
-use error_handling::{ErrorContext, anyhow};
+use cloneable_errors::{ErrorContext, anyhow};
 use regex::Regex;
 use actix_web::http::StatusCode;
 

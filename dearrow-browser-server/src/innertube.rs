@@ -19,7 +19,7 @@
 use std::{collections::{HashSet, VecDeque}, ops::Deref, sync::{atomic::Ordering, Arc}, str::FromStr};
 
 use actix_web::{get, http::StatusCode, web, Either, HttpResponse};
-use error_handling::{anyhow, bail, ErrContext, ErrorContext, ResContext};
+use cloneable_errors::{anyhow, bail, ErrContext, ErrorContext, ResContext};
 use dearrow_browser_api::sync::{InnertubeChannel, InnertubeVideo, self as api};
 use log::{debug, warn};
 use reqwest::Client;

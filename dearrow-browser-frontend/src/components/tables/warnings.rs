@@ -20,7 +20,7 @@ use std::{num::NonZeroUsize, rc::Rc};
 
 use chrono::DateTime;
 use dearrow_browser_api::unsync::{ApiWarning, Extension};
-use error_handling::ErrorContext;
+use cloneable_errors::ErrorContext;
 use reqwest::Url;
 use yew::prelude::*;
 use yew_router::prelude::*;

@@ -23,7 +23,7 @@ use std::{sync::Arc, collections::HashMap};
 
 use actix_web::{get, http::StatusCode, post, web, CustomizeResponder, HttpResponse, Responder};
 use alea_js::Alea;
-use error_handling::anyhow;
+use cloneable_errors::anyhow;
 use dearrow_parser::{Extension, Thumbnail, ThumbnailFlags, Title, TitleFlags, VideoInfo};
 use serde::{Deserialize, Serialize};
 

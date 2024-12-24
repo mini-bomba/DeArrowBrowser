@@ -25,7 +25,7 @@ use chrono::Utc;
 use constants::CONFIG_PATH;
 use dearrow_parser::{DearrowDB, StringSet};
 use env_logger::Env;
-use error_handling::{bail, ErrorContext, ResContext};
+use cloneable_errors::{bail, ErrorContext, ResContext};
 use log::info;
 use std::{
     fs::{create_dir_all, set_permissions, File, Permissions},

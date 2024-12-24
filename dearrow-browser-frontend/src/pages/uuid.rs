@@ -20,7 +20,7 @@ use std::rc::Rc;
 
 use chrono::DateTime;
 use dearrow_browser_api::unsync::{ApiThumbnail, ApiTitle};
-use error_handling::ResContext;
+use cloneable_errors::ResContext;
 use reqwest::StatusCode;
 use yew::prelude::*;
 

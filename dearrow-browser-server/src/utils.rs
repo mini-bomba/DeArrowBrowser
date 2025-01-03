@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2023-2024 mini_bomba
+*  Copyright (C) 2023-2025 mini_bomba
 *  
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -270,25 +270,26 @@ pub trait ReqwestResponseExt {
 }
 
 impl ReqwestResponseExt for reqwest::Response {
-    #[allow(unused_variables)]
     async fn json_debug<T: DeserializeOwned>(self, name: &'static str) -> std::result::Result<T, ErrorContext> {
+        let status = self.status();
         let body = self.bytes().await.context("Failed to receive response")?;
-        let decoded = serde_json::from_slice(&body).context("Failed to decode response as JSON");
+        let decoded = serde_json::from_slice(&body);
 
-        #[cfg(debug_assertions)]
-        if decoded.is_err() || std::env::var_os("DAB_IT_DUMP_ALL").is_some() {
+        if (decoded.is_err() && std::env::var_os("DAB_IT_DUMP_ERRORS").is_some()) || std::env::var_os("DAB_IT_DUMP_ALL").is_some() {
+            let mut path = PathBuf::from("./debug");
+            path.push(format!("{}-{name}.json", unix_timestamp()));
             let dump_result: std::io::Result<()> = async {
-                let mut path = PathBuf::from("./debug");
                 tokio::fs::create_dir_all(&path).await?;
-                path.push(format!("{}-{name}.json", unix_timestamp()));
                 tokio::fs::write(&path, &body).await?;
                 Ok(())
             }.await;
             if let Err(e) = dump_result {
                 log::warn!("Failed to dump contents of a response: {e}");
+            } else {
+                return decoded.with_context(|| format!("Failed to decode '{status}' response as JSON - body dumped to {}", path.to_string_lossy()));
             }
         }
 
-        decoded
+        decoded.with_context(|| format!("Failed to decode '{status}' response as JSON"))
     }
 } 

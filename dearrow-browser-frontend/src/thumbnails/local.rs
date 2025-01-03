@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2024 mini_bomba
+*  Copyright (C) 2024-2025 mini_bomba
 *  
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -34,7 +34,9 @@ const ASYNCGEN_ERROR_MSG: &str = "Thumbnail not generated yet";
 const ASYNCGEN_RETRY_DELAY: u32 = 20_000;
 const TIMEOUT_ERROR_MSG: &str = "Failed to generate thumbnail due to timeout";
 const TIMEOUT_RETRY_DELAY: u32 = 5_000;
-const MAX_RETRIES: u8 = 3;
+const QUEUE_ERROR_MSG: &str = "Failed to generate thumbnail due to queue being too big";
+const QUEUE_RETRY_DELAY: u32 = 5_000;
+const MAX_RETRIES: u8 = 5;
 
 /// Represents ownership of the underlying object URL (aka bloblink)
 ///
@@ -217,16 +219,26 @@ impl LocalThumbGenerator {
                 break new_state;
             }
             if let LocalThumbnailState::Failed(ThumbnailGenerationError::ServerError(ref err)) = new_state {
-                if &**err == ASYNCGEN_ERROR_MSG {
-                    log!("Retrying after an asyncgen response");
-                    retries_left = retries_left.saturating_sub(1);
-                    sleep(ASYNCGEN_RETRY_DELAY).await;
-                    continue;
-                } else if &**err == TIMEOUT_ERROR_MSG {
-                    log!("Retrying after a timeout response");
-                    retries_left = retries_left.saturating_sub(1);
-                    sleep(TIMEOUT_RETRY_DELAY).await;
-                    continue;
+                match &**err {
+                    ASYNCGEN_ERROR_MSG => {
+                        log!("Retrying after an asyncgen response");
+                        retries_left = retries_left.saturating_sub(1);
+                        sleep(ASYNCGEN_RETRY_DELAY).await;
+                        continue;
+                    },
+                    TIMEOUT_ERROR_MSG => {
+                        log!("Retrying after a timeout response");
+                        retries_left = retries_left.saturating_sub(1);
+                        sleep(TIMEOUT_RETRY_DELAY).await;
+                        continue;
+                    },
+                    QUEUE_ERROR_MSG => {
+                        log!("Retrying after a queue full response");
+                        retries_left = retries_left.saturating_sub(1);
+                        sleep(QUEUE_RETRY_DELAY).await;
+                        continue;
+                    },
+                    _ => (),
                 }
             }
             break new_state;

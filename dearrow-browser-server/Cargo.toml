@@ -38,3 +38,6 @@ libc = "0.2.165"
 
 [build-dependencies]
 built.workspace = true
+chrono.workspace = true
+cloneable_errors = { workspace = true, features = [] }
+git2.workspace = true

@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2024 mini_bomba
+*  Copyright (C) 2024-2025 mini_bomba
 *  
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -17,12 +17,20 @@
 */
 use std::{sync::LazyLock, time::Duration};
 
+use chrono::{DateTime, FixedOffset};
 use regex::Regex;
 use reqwest::{Url, Client};
 
+use crate::built_info;
+
 pub static REQWEST_CLIENT: LazyLock<Client> = LazyLock::new(Client::new);
-pub static USER_AGENT: LazyLock<&'static str> = LazyLock::new(create_useragent_string);
 pub const ASYNC_TASK_AUTO_DISMISS_DELAY: Duration = Duration::from_secs(15);
+
+// Data based on build-time constants
+
+pub static USER_AGENT:  LazyLock<&'static str>                  = LazyLock::new(create_useragent_string);
+pub static BUILD_TIME:  LazyLock<Option<DateTime<FixedOffset>>> = LazyLock::new(|| DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC).ok());
+pub static COMMIT_TIME: LazyLock<Option<DateTime<FixedOffset>>> = LazyLock::new(|| built_info::GIT_COMMIT_TIMESTAMP.and_then(|t| DateTime::parse_from_rfc3339(t).ok()));
 
 // URLs
 

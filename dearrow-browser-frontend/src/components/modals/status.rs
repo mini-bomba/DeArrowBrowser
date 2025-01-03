@@ -22,7 +22,7 @@ use yew::platform::spawn_local;
 use yew::prelude::*;
 use yew_hooks::{use_async, use_interval};
 
-use crate::built_info;
+use crate::{built_info, constants};
 use crate::contexts::{StatusContext, WindowContext};
 use crate::thumbnails::components::{
     TRExt, Thumbgen, ThumbgenContext, ThumbgenContextExt, ThumbgenRefreshContext,
@@ -140,7 +140,7 @@ pub fn StatusModal() -> Html {
                     <tr>
                         <th>{"Build date"}</th>
                         <td>
-                            if let Ok(dt) = DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC) {
+                            if let Some(dt) = *constants::BUILD_TIME {
                                 {render_datetime(dt.into())}
                             } else {
                                 <em>{"Unknown"}</em>

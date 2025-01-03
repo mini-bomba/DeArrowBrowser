@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2023-2024 mini_bomba
+*  Copyright (C) 2023-2025 mini_bomba
 *  
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,7 @@
 */
 use std::rc::Rc;
 
-use chrono::DateTime;
+use chrono::{DateTime, Datelike, Local};
 use yew::prelude::*;
 use yew::virtual_dom::VList;
 use yew_router::hooks::use_navigator;
@@ -25,7 +25,7 @@ use yew_router::prelude::Link;
 
 use crate::components::modals::{async_tasks::AsyncTasksModal, settings::SettingsModal, status::StatusModal, ModalMessage};
 use crate::components::icon::*;
-use crate::contexts::*;
+use crate::{constants, contexts::*};
 use crate::pages::MainRoute;
 use crate::utils::render_datetime_with_delta;
 
@@ -123,6 +123,15 @@ pub fn Footer() -> Html {
         modal_controls.emit(ModalMessage::Open(html! {<StatusModal />}));
     });
 
+    let copyright = use_memo((), |()| {
+        let dt = constants::COMMIT_TIME.or(*constants::BUILD_TIME);
+        let year = match dt {
+            Some(dt) => dt.year(),
+            None => Local::now().year(),
+        };
+        AttrValue::from(format!(" © mini_bomba 2023-{year}, licensed under "))
+    });
+
     let last_updated = match status.as_ref().and_then(|status| DateTime::from_timestamp_millis(status.last_updated)) {
         None => AttrValue::from("..."),
         Some(time) => AttrValue::from(render_datetime_with_delta(time)),
@@ -148,7 +157,7 @@ pub fn Footer() -> Html {
                 <table>
                     <tr><td>
                         <a href="https://github.com/mini-bomba/DeArrowBrowser">{"DeArrow Browser"}</a>
-                        {" © mini_bomba 2023-2024, licensed under "}
+                        {AttrValue::clone(&copyright)}
                         <a href="https://www.gnu.org/licenses/agpl-3.0.en.html">{"AGPL v3"}</a>
                     </td></tr>
                     <tr><td>

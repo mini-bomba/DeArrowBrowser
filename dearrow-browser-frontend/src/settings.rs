@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2024 mini_bomba
+*  Copyright (C) 2024-2025 mini_bomba
 *  
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -38,7 +38,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            thumbgen_api_base_url: "https://dearrow-thumb.minibomba.pro/".into(),
+            thumbgen_api_base_url: "https://dearrow-thumb.ajay.app/".into(),
             entries_per_page: 50.try_into().unwrap(),
             title_table_layout: TableLayout::Expanded,
             thumbnail_table_layout: TableLayout::Expanded,

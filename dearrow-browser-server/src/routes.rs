@@ -615,7 +615,7 @@ async fn get_user_by_userid(
             User {
                 user_id: user_id.clone(),
                 username: username.map(|u| u.username.clone()),
-                username_locked: username.map_or(false, |u| u.locked),
+                username_locked: username.is_some_and(|u| u.locked),
                 vip: db.db.vip_users.contains(&user_id),
                 title_count: db
                     .db
@@ -636,7 +636,7 @@ async fn get_user_by_userid(
     }))
 }
 
-#[get("/warnings/user_id/{user_id}/received")]
+#[get("/warnings/user_id/{user_id}/received", wrap = "ETagCache")]
 async fn get_user_warnings(
     db_lock: DBLock,
     string_set: StringSetLock,
@@ -662,7 +662,7 @@ async fn get_user_warnings(
     }))
 }
 
-#[get("/warnings/user_id/{user_id}/issued")]
+#[get("/warnings/user_id/{user_id}/issued", wrap = "ETagCache")]
 async fn get_issued_warnings(
     db_lock: DBLock,
     string_set: StringSetLock,

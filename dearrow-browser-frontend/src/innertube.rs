@@ -46,6 +46,6 @@ pub fn youtu_be_link(vid: &str) -> Url {
 
 pub fn original_thumbnail_url(vid: &str) -> Url {
     let mut url = THUMBNAIL_URL.clone();
-    url.extend_segments(&[vid, "maxresdefault.jpg"]).expect("youtube thumbnail url should be a valid base");
+    url.extend_segments(&[vid, "hqdefault.jpg"]).expect("youtube thumbnail url should be a valid base");
     url
 }

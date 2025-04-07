@@ -851,58 +851,62 @@ mod csv_data {
 
     macro_rules! intbool {
         (thumb $struct:expr, $field:ident) => {
-            intbool!(!$struct, $field, ObjectKind::Thumbnail, uuid, 0, 1)
+            intbool!(!$struct, $field, ObjectKind::Thumbnail, uuid, 0, 1, strict)
         };
         (title $struct:expr, $field:ident) => {
-            intbool!(!$struct, $field, ObjectKind::Title, uuid, 0, 1)
+            intbool!(!$struct, $field, ObjectKind::Title, uuid, 0, 1, strict)
         };
         (uname $struct:expr, $field:ident) => {
-            intbool!(!$struct, $field, ObjectKind::Username, user_id, 0, 1)
+            intbool!(!$struct, $field, ObjectKind::Username, user_id, 0, 1, strict)
         };
         (warn $struct:expr, $field:ident) => {
-            intbool!(!$struct, $field, ObjectKind::Warning, user_id, 0, 1)
+            intbool!(!$struct, $field, ObjectKind::Warning, user_id, 0, 1, strict)
         };
-        (thumb $struct:expr, $field:ident, $falseint: expr, $trueint:expr) => {
+        (thumb $struct:expr, $field:ident, $falseint: expr, $trueint:expr, $forgiving:tt) => {
             intbool!(
                 !$struct,
                 $field,
                 ObjectKind::Thumbnail,
                 uuid,
                 $falseint,
-                $trueint
+                $trueint,
+                $forgiving
             )
         };
-        (title $struct:expr, $field:ident, $falseint: expr, $trueint:expr) => {
+        (title $struct:expr, $field:ident, $falseint: expr, $trueint:expr, $forgiving:tt) => {
             intbool!(
                 !$struct,
                 $field,
                 ObjectKind::Title,
                 uuid,
                 $falseint,
-                $trueint
+                $trueint,
+                $forgiving
             )
         };
-        (uname $struct:expr, $field:ident, $falseint: expr, $trueint:expr) => {
+        (uname $struct:expr, $field:ident, $falseint: expr, $trueint:expr, $forgiving:tt) => {
             intbool!(
                 !$struct,
                 $field,
                 ObjectKind::Username,
                 user_id,
                 $falseint,
-                $trueint
+                $trueint,
+                $forgiving
             )
         };
-        (warn $struct:expr, $field:ident, $falseint: expr, $trueint:expr) => {
+        (warn $struct:expr, $field:ident, $falseint: expr, $trueint:expr, $forgiving:tt) => {
             intbool!(
                 !$struct,
                 $field,
                 ObjectKind::Warning,
                 user_id,
                 $falseint,
-                $trueint
+                $trueint,
+                $forgiving
             )
         };
-        (! $struct:expr, $field:ident, $kind:expr, $uuid:ident, $falseint:expr, $trueint:expr) => {
+        (! $struct:expr, $field:ident, $kind:expr, $uuid:ident, $falseint:expr, $trueint:expr, strict) => {
             match $struct.$field {
                 $falseint => false,
                 $trueint => true,
@@ -916,6 +920,13 @@ mod csv_data {
                         }),
                     ))
                 }
+            }
+        };
+        (! $struct:expr, $field:ident, $kind:expr, $uuid:ident, $falseint:expr, $trueint:expr, forgiving) => {
+            match $struct.$field {
+                $falseint => false,
+                $trueint => true,
+                _ => true,
             }
         };
     }
@@ -969,7 +980,7 @@ mod csv_data {
             flags.set(ThumbnailFlags::Locked, intbool!(thumb votes, locked));
             flags.set(
                 ThumbnailFlags::ShadowHidden,
-                intbool!(thumb votes, shadow_hidden),
+                intbool!(thumb votes, shadow_hidden, 0, 1, forgiving),
             );
             flags.set(ThumbnailFlags::Removed, intbool!(thumb votes, removed));
             if !flags.contains(ThumbnailFlags::Original) && timestamps.is_none() {
@@ -1034,11 +1045,11 @@ mod csv_data {
             flags.set(TitleFlags::Locked, intbool!(title votes, locked));
             flags.set(
                 TitleFlags::ShadowHidden,
-                intbool!(title votes, shadow_hidden),
+                intbool!(title votes, shadow_hidden, 0, 1, forgiving),
             );
             flags.set(
                 TitleFlags::Unverified,
-                intbool!(title votes, verification, 0, -1),
+                intbool!(title votes, verification, 0, -1, strict),
             );
             flags.set(TitleFlags::Removed, intbool!(title votes, removed));
             Ok(WithWarnings {

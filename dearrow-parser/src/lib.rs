@@ -949,7 +949,7 @@ mod csv_data {
                     ));
                 }
                 _ => {}
-            };
+            }
             match &votes {
                 Some(votes) if self.uuid != votes.uuid => {
                     return Err(ParseError(
@@ -962,7 +962,7 @@ mod csv_data {
                     ));
                 }
                 _ => {}
-            };
+            }
             let mut warnings = Vec::new();
             let mut flags = ThumbnailFlags::empty();
             if votes.is_none() {
@@ -1027,7 +1027,7 @@ mod csv_data {
                     ));
                 }
                 _ => {}
-            };
+            }
             let mut warnings = Vec::new();
             let mut flags = TitleFlags::empty();
             if votes.is_none() {

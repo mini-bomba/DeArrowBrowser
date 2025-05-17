@@ -48,7 +48,7 @@ impl Drop for RemoteBlobLink {
     fn drop(&mut self) {
         if let Err(err) = self.worker.post_request(ThumbnailWorkerRequest::BlobLinkDropped { ref_id: self.ref_id }) {
             err.log("Failed to notify worker about a RemoteBlobLink being dropped");
-        };
+        }
     }
 }
 
@@ -101,7 +101,8 @@ struct InnerTW {
 
 #[derive(PartialEq)]
 pub enum Error {
-    Bincode(RcEq<bincode::Error>),
+    BincodeS(RcEq<bincode::error::EncodeError>),
+    BincodeD(RcEq<bincode::error::DecodeError>),
     JS(JsValue),
     Cancelled(Canceled),
     /// worker couldn't deserialize the request
@@ -126,7 +127,8 @@ impl Error {
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Bincode(RcEq(err)) => write!(f, "Message serialization failed: {err:?}"),
+            Self::BincodeS(RcEq(err)) => write!(f, "Message serialization failed: {err:?}"),
+            Self::BincodeD(RcEq(err)) => write!(f, "Message deserialization failed: {err:?}"),
             Self::Cancelled(err) => write!(f, "Waiting for response got cancelled: {err:?}"),
             Self::ProtocolError => write!(f, "Window-worker protocol mismatch"),
             Self::WorkerInitializationTimeout => write!(f, "Timed out waiting for the worker to initialize"),
@@ -178,7 +180,7 @@ impl ThumbnailWorker {
                 git_dirty: built_info::GIT_DIRTY, 
             },
         };
-        let message = bincode::serialize(&message).map_err(|e| Error::Bincode(RcEq::new(e)))?;
+        let message = bincode::encode_to_vec(&message, BINCODE_CONFIG).map_err(|e| Error::BincodeS(RcEq::new(e)))?;
         let (sender, receiver) = channel::<MessageEvent>();
         let sender_closure = Closure::once(|msg| { let _ = sender.send(msg); });
         port.set_onmessage(Some(sender_closure.as_ref().unchecked_ref()));
@@ -197,7 +199,7 @@ impl ThumbnailWorker {
         };
         port.set_onmessage(None);
         let response = response.map_err(Error::Cancelled)?.data().dyn_into::<Uint8Array>().map_err(|_| Error::ProtocolError)?;
-        let response = bincode::deserialize::<ThumbnailWorkerResponseMessage>(&response.to_vec()).map_err(|e| Error::Bincode(RcEq::new(e)))?;
+        let response: ThumbnailWorkerResponseMessage = bincode::decode_from_slice(&response.to_vec(), BINCODE_CONFIG).map_err(|e| Error::BincodeD(RcEq::new(e)))?.0;
 
         // Compare versions
         let ThumbnailWorkerResponse::Version { version, git_hash, git_dirty } = response.response else {
@@ -319,8 +321,8 @@ impl InnerTW {
                 return;
             },
         };
-        let message = match bincode::deserialize::<ThumbnailWorkerResponseMessage>(&data.to_vec()).context("Failed to deserialize a message from ThumbnailWorker!") {
-            Ok(msg) => msg,
+        let message: ThumbnailWorkerResponseMessage = match bincode::decode_from_slice(&data.to_vec(), BINCODE_CONFIG).context("Failed to deserialize a message from ThumbnailWorker!") {
+            Ok((msg, ..)) => msg,
             Err(error) => {
                 self.protocol_mismatch.set(true);
                 error!(format!("{error}"));
@@ -334,15 +336,15 @@ impl InnerTW {
                 // the message ID on the response is wrong
                 // try to deserialize the returned message as a request, and extract the request ID
                 // from there
-                let request: ThumbnailWorkerRequestMessage = match bincode::deserialize(&received_data).context("Failed to deserialize the returned request message from ThumbnailWorker!") {
-                    Ok(m) => m,
+                let request: ThumbnailWorkerRequestMessage = match bincode::decode_from_slice(&received_data, BINCODE_CONFIG).context("Failed to deserialize the returned request message from ThumbnailWorker!") {
+                    Ok((m, ..)) => m,
                     Err(err) => {
                         // Nothing we can do, report failure and return.
                         error!(format!("{err}"));
                         return;
                     }
                 };
-                
+
                 // got the initial request back, return error
                 let Some(sender) = self.message_queue.borrow_mut().remove(&request.id) else { return };
                 let _ = sender.send(Err(Error::ProtocolError));
@@ -351,7 +353,7 @@ impl InnerTW {
         }
         let Some(sender) = self.message_queue.borrow_mut().remove(&message.id) else { 
             self.handle_undelivered_response(message.response);
-            return 
+            return;
         };
         if let Err(Ok(response)) = sender.send(Ok(message.response)) {
             self.handle_undelivered_response(response);
@@ -373,7 +375,7 @@ impl InnerTW {
 
     #[allow(clippy::needless_pass_by_value)] // message is not needed anymore
     fn send_message(&self, request: ThumbnailWorkerRequestMessage) -> Result<(), Error> {
-        let data = bincode::serialize(&request).map_err(|e| Error::Bincode(RcEq::new(e)))?;
+        let data = bincode::encode_to_vec(&request, BINCODE_CONFIG).map_err(|e| Error::BincodeS(RcEq::new(e)))?;
         let data: Uint8Array = (&*data).into();
         self.worker.port().post_message_with_transferable(&data, &Array::of1(&data.buffer())).map_err(Error::JS)?;
         Ok(())
@@ -389,7 +391,7 @@ impl InnerTW {
             }
         }
     }
-        
+
     /// Sends a request to the worker without expecting a response
     pub fn post_request(&self, request: ThumbnailWorkerRequest) -> Result<(), Error> {
         let id = self.next_id();

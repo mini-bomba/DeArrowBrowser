@@ -109,7 +109,7 @@ fn voting_callback(async_task_control: AsyncTaskControl, modal_control: ModalRen
                 if url.extend_segments(SBS_BRANDING_ENDPOINT).is_err() {
                     warn!("Failed to construct voting URL: SBServer base URL was not a vaild base!");
                     return;
-                };
+                }
                 url
             }
         };

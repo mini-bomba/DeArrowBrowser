@@ -40,7 +40,7 @@ fn parsed_url_last_segment(url: &Url) -> Option<String> {
     url.path_segments()
        .and_then(|it| 
             it.filter(|s| !s.is_empty())
-              .last()
+              .next_back()
        )
        .map(ToString::to_string)
 }

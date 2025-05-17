@@ -18,11 +18,13 @@
 
 use std::{error::Error, fmt::Display, rc::Rc};
 
-use serde::{Deserialize, Serialize};
+use bincode::{Decode, Encode};
 
 use super::common::{ThumbgenStats, ThumbnailKey};
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub const BINCODE_CONFIG: bincode::config::Configuration = bincode::config::standard();
+
+#[derive(Clone, Encode, Decode, Debug, PartialEq, Eq)]
 pub enum RemoteThumbnailGenerationError {
     JSError{
         name: Option<Rc<str>>,
@@ -52,7 +54,7 @@ impl Display for RemoteThumbnailGenerationError {
 
 impl Error for RemoteThumbnailGenerationError {}
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Encode, Decode, Debug)]
 pub enum ThumbnailWorkerRequest {
     Version {
         version: String,
@@ -74,7 +76,7 @@ pub enum ThumbnailWorkerRequest {
     Disconnecting,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Encode, Decode, Debug)]
 pub enum ThumbnailWorkerResponse {
     Version {
         version: String,
@@ -93,24 +95,24 @@ pub enum ThumbnailWorkerResponse {
     Ok,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Encode, Decode, Debug)]
 pub struct RawRemoteRef {
     pub url: Box<str>,
     pub ref_id: u16,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Encode, Decode, Debug)]
 pub enum WorkerSetting {
     ThumbgenBaseUrl(String),
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Encode, Decode, Debug)]
 pub(super) struct ThumbnailWorkerRequestMessage {
     pub id: u16,
     pub request: ThumbnailWorkerRequest,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Encode, Decode, Debug)]
 pub(super) struct ThumbnailWorkerResponseMessage {
     pub id: u16,
     pub response: ThumbnailWorkerResponse,

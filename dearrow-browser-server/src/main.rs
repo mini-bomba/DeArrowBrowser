@@ -200,7 +200,7 @@ async fn main() -> Result<(), ErrorContext> {
             .bind((ip_str, port))
             .with_context(|| format!("Failed to bind to tcp port {ip_str}:{port}"))?;
         info!("Listening on {ip_str}:{port}");
-    };
+    }
     if let Some(ref path) = config.listen.unix {
         let path_str = path.as_str();
         server = server
@@ -213,7 +213,7 @@ async fn main() -> Result<(), ErrorContext> {
             })?;
         }
         info!("Listening on {path_str}");
-    };
+    }
     server.run().await.context("Error while running the server")
 }
 

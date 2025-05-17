@@ -121,7 +121,7 @@ fn ChannelLink(props: &VideoPageProps) -> HtmlResult {
             };
             match url
                 .path_segments()
-                .and_then(|ps| ps.filter(|s| !s.is_empty()).last())
+                .and_then(|ps| ps.filter(|s| !s.is_empty()).next_back())
             {
                 Some(handle) => Ok(AttrValue::from(handle.to_owned())),
                 None => {

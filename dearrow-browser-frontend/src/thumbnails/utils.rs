@@ -85,7 +85,7 @@ impl Global {
         match self {
             Self::Window(window) => window.clear_interval_with_handle(handle),
             Self::Worker(worker) => worker.clear_interval_with_handle(handle),
-        };
+        }
     }
 }
 

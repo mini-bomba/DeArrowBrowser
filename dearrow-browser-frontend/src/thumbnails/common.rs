@@ -18,16 +18,16 @@
 
 use std::rc::Rc;
 
-use serde::{Deserialize, Serialize};
+use bincode::{Encode, Decode};
 
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Encode, Decode)]
 pub struct ThumbnailKey {
     pub video_id: Rc<str>,
     pub timestamp: Rc<str>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode)]
 pub struct CacheStats {
     pub total: usize,
     pub thumbs: usize,
@@ -36,13 +36,13 @@ pub struct CacheStats {
     pub pending: usize,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode)]
 pub struct WorkerStats {
     pub clients: usize,
     pub this_client_refs: usize,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode)]
 pub struct ThumbgenStats {
     pub cache_stats: CacheStats,
     pub worker_stats: Option<WorkerStats>,

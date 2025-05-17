@@ -77,7 +77,7 @@ impl Thumbgen {
         match self {
             Self::Remote(worker) => drop(worker.request(ThumbnailWorkerRequest::ClearErrors).await),
             Self::Local { gen, .. } => drop(gen.clear_errors()),
-        };
+        }
     }
 }
 
@@ -177,7 +177,7 @@ pub fn ThumbgenProvider(props: &ThumbnailGeneratorProviderProps) -> Html {
                 let errors_removed = r#gen.clear_errors();
                 log!(format!("Cleared {errors_removed} error entries after updating thumbgen API URL"));
             }
-        };
+        }
         refresh_state.trigger_refresh();
     });
 

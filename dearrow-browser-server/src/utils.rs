@@ -156,7 +156,7 @@ pub fn link_file<T: AsRawFd>(file: &T, new_path: &Path) -> std::io::Result<()> {
 
 pub fn random_b64<const N: usize>() -> String {
     let mut buffer = [MaybeUninit::<u8>::uninit(); N];
-    BASE64_URL_SAFE_NO_PAD.encode(getrandom::getrandom_uninit(&mut buffer).expect("Should be able to get random data"))
+    BASE64_URL_SAFE_NO_PAD.encode(getrandom::fill_uninit(&mut buffer).expect("Should be able to get random data"))
 }
 
 #[derive(Clone)]
@@ -188,7 +188,7 @@ impl TemporaryFile {
                 is_committed: false,
                 target_path,
             }),
-        };
+        }
 
         // unnamed file didn't work, fall back
         let tmp_file_path = fallback_tmpdir.join(random_b64::<64>());
@@ -220,7 +220,7 @@ impl TemporaryFile {
                     Err(err) if err.kind() == std::io::ErrorKind::NotFound => (), // fine
                     Err(err) => return Err(err.context(format!("Failed to remove existing file at {}", self.target_path.display()))),
                     Ok(()) => (),
-                };
+                }
                 link_file(&self.file, &self.target_path).with_context(|| format!("Failed to link in the new file at {}", self.target_path.display()))?;
             },
             TempFileType::FileInTmpDir { current_path } => {

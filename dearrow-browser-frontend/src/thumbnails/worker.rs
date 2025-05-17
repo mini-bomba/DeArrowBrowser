@@ -34,7 +34,7 @@ mod utils;
 pub mod worker_api;
 
 use local::{LocalBlobLink, LocalThumbGenerator};
-use worker_api::{RawRemoteRef, ThumbnailWorkerRequest, ThumbnailWorkerRequestMessage, ThumbnailWorkerResponse, ThumbnailWorkerResponseMessage};
+use worker_api::{RawRemoteRef, ThumbnailWorkerRequest, ThumbnailWorkerRequestMessage, ThumbnailWorkerResponse, ThumbnailWorkerResponseMessage, BINCODE_CONFIG};
 
 const PING_CHECK_INTERVAL: i32 = 30_000;
 const MAX_PING_FAILS: u8 = 3;
@@ -73,7 +73,7 @@ impl RemoteClient {
         assert!(held_refs.len() < u16::MAX.into(), "Out of ref IDs!");
         let ref_id = loop {
             let new_id = self.next_ref_id.replace(self.next_ref_id.get().wrapping_add(1));
-            
+
             if !held_refs.contains_key(&new_id) {
                 break new_id;
             }
@@ -94,7 +94,8 @@ impl Drop for RemoteClient {
         let remaining_refs = self.held_refs.get_mut().len();
         if remaining_refs > 0 {
             warn!(format!("RemoteClient dropped with {remaining_refs} held refs"));
-        }    }
+        }
+    }
 }
 
 impl WorkerContext {
@@ -155,7 +156,7 @@ impl WorkerContext {
             error!("Connect event did not contain a MessagePort!", event);
             return;
         };
-        
+
         port.set_onmessage(Some(self.get_message_event_closure().as_ref().unchecked_ref()));
         port.set_onmessageerror(Some(self.get_message_error_event_closure().as_ref().unchecked_ref()));
         self.register_client(port);
@@ -172,8 +173,8 @@ impl WorkerContext {
         let port: MessagePort = event.target().expect("target should be set").unchecked_into();
 
         let data = data.to_vec();
-        let message: ThumbnailWorkerRequestMessage = match bincode::deserialize(&data) {
-            Ok(msg) => msg,
+        let message: ThumbnailWorkerRequestMessage = match bincode::decode_from_slice(&data, BINCODE_CONFIG) {
+            Ok((msg, ..)) => msg,
             Err(err) => {
                 error!(format!("Failed to deserialize a message: {err:?}"));
                 // this will be missing data, but at least the caller should get notified of the error
@@ -250,8 +251,8 @@ impl WorkerContext {
             ThumbnailWorkerRequest::Version { version, git_hash, git_dirty } => {
                 if version != built_info::PKG_VERSION || git_hash.as_deref() != built_info::GIT_COMMIT_HASH || git_dirty != built_info::GIT_DIRTY {
                     warn!(format!("Version mismatch detected! Message (de)serialization errors may occur!\nNew client's version: {version}, git hash: {git_hash:?}, git dirty: {git_dirty:?}\nWorker version: {}, git hash: {:?}, git dirty: {:?}\nClose all DeArrow Browser windows to resolve this issue.", built_info::PKG_VERSION, built_info::GIT_COMMIT_HASH, built_info::GIT_DIRTY));
-                };
-                
+                }
+
                 ThumbnailWorkerResponse::Version { 
                     version: built_info::PKG_VERSION.to_owned(), 
                     git_hash: built_info::GIT_COMMIT_HASH.map(ToOwned::to_owned),
@@ -340,14 +341,14 @@ trait MessagePortExt {
 
 impl MessagePortExt for MessagePort {
     fn reply(&self, message: ThumbnailWorkerResponseMessage) {
-        let message = match bincode::serialize(&message) {
+        let message = match bincode::encode_to_vec(&message, BINCODE_CONFIG) {
             Ok(m) => m,
             Err(err) => {
                 error!(format!("Failed to serialize reply: {err:?}"));
                 return;
             }
         };
-        let message: Uint8Array = (&*message).into();
+        let message = Uint8Array::from(&*message);
         if let Err(err) = self.post_message_with_transferable(&message, &Array::of1(&message.buffer())) {
             error!("Failed to send reply:", err);
         }

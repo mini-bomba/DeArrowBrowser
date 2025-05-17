@@ -333,7 +333,7 @@ pub fn PageSelect(props: &PageSelectProps) -> Html {
                     state.detail_table_page = new_page.clamp(1, page_count) - 1;
                     state_handle.replace_state(state);
                 }
-            };
+            }
             input.set_value(&format!("{}", state.detail_table_page + 1));
         })
     };

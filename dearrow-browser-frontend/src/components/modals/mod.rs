@@ -43,7 +43,7 @@ impl Reducible for ModalState {
             ModalMessage::Open(h) => modals.push(h),
             ModalMessage::CloseTop => drop(modals.pop()),
             ModalMessage::CloseAll => modals.clear(),
-        };
+        }
         Self { modals }.into()
     }
 }

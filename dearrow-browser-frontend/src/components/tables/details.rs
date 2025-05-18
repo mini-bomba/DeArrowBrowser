@@ -508,10 +508,11 @@ pub fn BaseDetailTableRenderer(props: &BaseDetailTableRendererProps) -> Html {
         hide_username: props.hide_username,
         hide_videoid: props.hide_videoid,
     };
+    let header_classes = classes!("header", settings.sticky_headers.then_some("sticky"));
     match props.details {
         DetailSlice::Titles(ref list) => html! {
             <table class="detail-table titles" data-layout={AttrValue::Static(settings.title_table_layout.into())}>
-                <tr class="header">
+                <tr class={header_classes}>
                     <th>{"Submitted"}</th>
                     if !props.hide_videoid {
                         <th>{"Video ID"}</th>
@@ -535,7 +536,7 @@ pub fn BaseDetailTableRenderer(props: &BaseDetailTableRendererProps) -> Html {
         },
         DetailSlice::Thumbnails(ref list) => html! {
             <table class="detail-table thumbnails" data-layout={AttrValue::Static(settings.thumbnail_table_layout.into())}>
-                <tr class="header">
+                <tr class={header_classes}>
                     <th>{"Submitted"}</th>
                     if !props.hide_videoid {
                         <th>{"Video ID"}</th>

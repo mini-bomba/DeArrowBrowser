@@ -33,6 +33,7 @@ pub struct Settings {
     pub private_user_id: Option<Rc<str>>,
     pub sponsorblock_api_base_url: Rc<str>,
     pub enable_autosearch: bool,
+    pub sticky_headers: bool,
 }
 
 impl Default for Settings {
@@ -47,6 +48,7 @@ impl Default for Settings {
             private_user_id: None,
             sponsorblock_api_base_url: "https://sponsor.ajay.app/".into(),
             enable_autosearch: true,
+            sticky_headers: true,
         }
     }
 }

@@ -25,6 +25,7 @@ use web_sys::HtmlInputElement;
 use yew::prelude::*;
 use yew_router::prelude::*;
 
+use crate::contexts::SettingsContext;
 use crate::hooks::use_location_state;
 use crate::pages::LocationState;
 use crate::pages::MainRoute;
@@ -143,6 +144,7 @@ pub struct TableModeSwitchProps {
 
 pub struct TableModeSwitch {
     current_mode: TableMode,
+    sticky_headers: bool,
 
     set_titles_mode_cb: Callback<MouseEvent>,
     set_thumbs_mode_cb: Callback<MouseEvent>,
@@ -150,11 +152,13 @@ pub struct TableModeSwitch {
     set_warnings_issued_mode_cb: Callback<MouseEvent>,
 
     _location_handle: LocationHandle,
+    _settings_handle: ContextHandle<SettingsContext>,
 }
 
 pub enum TableModeSwitchMessage {
     UpdateMode(TableMode),
     LocationUpdated(Location),
+    SettingsUpdated(bool),
 }
 
 impl TableModeSwitch {
@@ -204,8 +208,13 @@ impl Component for TableModeSwitch {
             }
         };
 
+        let (settings, settings_handle) = scope.context::<SettingsContext>(
+            scope.callback(|s: SettingsContext| TableModeSwitchMessage::SettingsUpdated(s.settings().sticky_headers))
+        ).expect("TableModeSwitch should be used inside of a SettingsProvider");
+
         TableModeSwitch {
             current_mode: location_state.detail_table_mode,
+            sticky_headers: settings.settings().sticky_headers,
 
             set_titles_mode_cb: scope
                 .callback(|_| TableModeSwitchMessage::UpdateMode(TableMode::Titles)),
@@ -219,12 +228,14 @@ impl Component for TableModeSwitch {
             _location_handle: scope
                 .add_location_listener(scope.callback(TableModeSwitchMessage::LocationUpdated))
                 .unwrap(),
+            _settings_handle: settings_handle,
         }
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
+        let classes = classes!("table-mode-switch", self.sticky_headers.then_some("sticky"));
         html! {
-            <div class="table-mode-switch">
+            <div class={classes}>
                 if ctx.props().types.details() {
                     <span class="table-mode button" onclick={&self.set_titles_mode_cb} selected={self.current_mode == TableMode::Titles}>{"Titles"}</span>
                     <span class="table-mode button" onclick={&self.set_thumbs_mode_cb} selected={self.current_mode == TableMode::Thumbnails}>{"Thumbnails"}</span>
@@ -275,21 +286,24 @@ impl Component for TableModeSwitch {
             TableModeSwitchMessage::UpdateMode(new_mode) if new_mode != self.current_mode => {
                 self.current_mode = new_mode;
                 let scope = ctx.link();
-                let mut state = scope
-                    .location()
-                    .unwrap()
-                    .state::<LocationState>()
-                    .as_deref()
-                    .copied()
-                    .unwrap_or_default();
-                state.detail_table_mode = new_mode;
                 scope
                     .navigator()
                     .unwrap()
-                    .replace_with_state(&scope.route::<MainRoute>().unwrap(), state);
+                    .replace_with_state(
+                        &scope.route::<MainRoute>().unwrap(),
+                        LocationState {
+                            detail_table_mode: new_mode,
+                            detail_table_page: 0,
+                        },
+                    );
                 true
             }
             TableModeSwitchMessage::UpdateMode(..) => false,
+            TableModeSwitchMessage::SettingsUpdated(new_sticky) if new_sticky != self.sticky_headers => {
+                self.sticky_headers = new_sticky;
+                true
+            }
+            TableModeSwitchMessage::SettingsUpdated(..) => false,
         }
     }
 }

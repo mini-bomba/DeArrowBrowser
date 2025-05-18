@@ -70,6 +70,12 @@ body {
   display: flex;
   flex-direction: row;
   gap: 2rem;
+
+  &.sticky {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
   
   > a, > a > img {
     height: 100%;
@@ -227,6 +233,15 @@ body {
       &.header {
         border-bottom: 2px solid $gray;
         border-top: none;
+
+        &.sticky {
+          position: sticky;
+          top: calc(min(10vh, 3rem) + 4.5rem);
+          background: #111;
+          border: none;
+          outline: 1px solid $gray;
+          z-index: 1;
+        }
       }
     }
   }
@@ -497,6 +512,13 @@ body {
   display: flex;
   flex-direction: row;
   justify-content: flex-start;
+
+  &.sticky {
+    position: sticky;
+    top: calc(min(10vh, 3rem) + 2rem);
+    background: #111;
+    z-index: 1;
+  }
   
   > span {
     padding: 0.5rem;

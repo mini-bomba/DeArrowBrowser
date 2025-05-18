@@ -29,6 +29,7 @@ use crate::{contexts::SettingsContext, settings::TableLayout};
 
 const DISABLE_SW_TITLE: &str = "This is meant for debugging only - this disables sharing the thumbnail cache between all open tabs and makes the current tab handle all thumbnail fetching on it's own. Changes require a refresh to apply";
 const AUTOSEARCH_TITLE: &str = "If enabled, pasting valid query data or URLs into search fields will immediately trigger the search";
+const STICKY_HEADERS_TITLE: &str = "This makes all headers sticky (stick to the top of the page as you scroll) including the page header and the table header";
 
 /// Generator macro for a revert callback (Esc key pressed)
 ///
@@ -268,6 +269,7 @@ pub fn SettingsModal() -> Html {
     let title_table_layout_save           = use_callback(settings_context.clone(), save_callback!(title_table_layout, fromstr_verify));
     let thumbnail_table_layout_save       = use_callback(settings_context.clone(), save_callback!(thumbnail_table_layout, fromstr_verify));
     let render_thumbnails_in_tables_save  = use_callback(settings_context.clone(), save_callback!(render_thumbnails_in_tables, checkbox_verify));
+    let sticky_headers_save               = use_callback(settings_context.clone(), save_callback!(sticky_headers, checkbox_verify));
     let enable_autosearch_save            = use_callback(settings_context.clone(), save_callback!(enable_autosearch, checkbox_verify));
     let disable_sharedworker_save         = use_callback(settings_context.clone(), save_callback!(disable_sharedworker, checkbox_verify));
     let private_user_id_save              = use_callback(settings_context.clone(), save_callback!(private_user_id, priv_userid_verify));
@@ -278,6 +280,7 @@ pub fn SettingsModal() -> Html {
     let title_table_layout_undo           = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(title_table_layout));
     let thumbnail_table_layout_undo       = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(thumbnail_table_layout));
     let render_thumbnails_in_tables_undo  = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(render_thumbnails_in_tables));
+    let sticky_headers_undo               = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(sticky_headers));
     let enable_autosearch_undo            = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(enable_autosearch));
     let disable_sharedworker_undo         = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(disable_sharedworker));
     let private_user_id_undo              = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(private_user_id));
@@ -288,6 +291,7 @@ pub fn SettingsModal() -> Html {
     let title_table_layout_reset          = use_callback(settings_context.clone(), reset_callback!(title_table_layout));
     let thumbnail_table_layout_reset      = use_callback(settings_context.clone(), reset_callback!(thumbnail_table_layout));
     let render_thumbnails_in_tables_reset = use_callback(settings_context.clone(), reset_callback!(render_thumbnails_in_tables));
+    let sticky_headers_reset              = use_callback(settings_context.clone(), reset_callback!(sticky_headers));
     let enable_autosearch_reset           = use_callback(settings_context.clone(), reset_callback!(enable_autosearch));
     let disable_sharedworker_reset        = use_callback(settings_context.clone(), reset_callback!(disable_sharedworker));
     let private_user_id_reset             = use_callback(settings_context.clone(), reset_callback!(private_user_id));
@@ -397,6 +401,28 @@ pub fn SettingsModal() -> Html {
                         }
                     </div>
                 }
+                <label for="sticky_headers" title={STICKY_HEADERS_TITLE}>{"Sticky headers: "}</label>
+                <input 
+                    class={setting_class!(initial_settings, current_settings, sticky_headers)} 
+                    id="sticky_headers" 
+                    type="checkbox"
+                    onchange={sticky_headers_save} 
+                    ~checked={current_settings.sticky_headers} 
+                />
+                <div class="setting-actions">
+                    if should_show_undo!(sticky_headers, current_settings, initial_settings) {
+                        <span 
+                            class="clickable" title="Undo"
+                            onclick={sticky_headers_undo}
+                        >{"↩️"}</span>
+                    }
+                    if should_show_reset!(sticky_headers, current_settings, settings_context) {
+                        <span 
+                            class="clickable" title="Reset to default"
+                            onclick={sticky_headers_reset}
+                        >{"🔄"}</span>
+                    }
+                </div>
             </fieldset>
             <fieldset>
                 <legend>{"Site behaviour"}</legend>

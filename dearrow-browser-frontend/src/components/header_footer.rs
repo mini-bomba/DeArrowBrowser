@@ -33,6 +33,8 @@ use crate::utils::render_datetime_with_delta;
 pub fn Header() -> Html {
     let navigator = use_navigator().expect("Header should be placed in a Router");
     let modal_controls: ModalRendererControls = use_context().expect("Header should be placed inside a ModalRenderer");
+    let settings_context: SettingsContext = use_context().expect("Header should be placed inside a SettingsProvider");
+    let settings = settings_context.settings();
     let user_context: UserContext = use_context().expect("Header should be placed inside a SettingsProvider");
     let async_tasks_view: AsyncTaskList = use_context().expect("Header should be placed inside an AsyncTaskList");
     let open_settings_modal = use_callback(modal_controls.clone(), |_, modal_controls| {
@@ -77,8 +79,10 @@ pub fn Header() -> Html {
         VList::with_children(segments, None).into()
     });
 
+    let header_classes = classes!(settings.sticky_headers.then_some("sticky"));
+
     html! {
-        <div id="header">
+        <div id="header" class={header_classes}>
             <Link<MainRoute> to={MainRoute::Home}><img src="/icon/logo.svg" /></Link<MainRoute>>
             <div>
                 <h1 class="undecorated-link"><Link<MainRoute> to={MainRoute::Home}>{"DeArrow Browser"}</Link<MainRoute>></h1>

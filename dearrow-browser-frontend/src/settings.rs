@@ -48,7 +48,7 @@ impl Default for Settings {
             private_user_id: None,
             sponsorblock_api_base_url: "https://sponsor.ajay.app/".into(),
             enable_autosearch: true,
-            sticky_headers: true,
+            sticky_headers: false,
         }
     }
 }

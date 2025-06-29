@@ -62,7 +62,7 @@ fn ChannelDetails(props: &ChannelPageProps) -> HtmlResult {
     Ok(match *result {
         Ok(ref channel) => html! {
             <>
-                <div>{format!("Channel name: {}", channel.channel_name)}</div>
+                <div>{"Channel name: "}<a target="_blank" href={format!("https://youtube.com/channel/{}", channel.ucid)}>{channel.channel_name.clone()}</a></div>
                 <div>{format!("Videos: {} plain, {} VODs, {} shorts, {} releases; {} total", channel.num_videos, channel.num_vods, channel.num_shorts, channel.num_releases, channel.total_videos)}</div>
             </>
         },

@@ -289,6 +289,7 @@ impl From<&BrowseProgress> for api::BrowseProgress {
 
 #[derive(Debug)]
 pub struct ChannelData {
+    pub ucid: Arc<str>,
     pub channel_name: Box<str>,
     /// only contains video ids found in the `StringSet` at the time of creation
     pub video_ids: Box<[Arc<str>]>,
@@ -420,6 +421,7 @@ impl ChannelCache {
         let num_releases = releases_tab.iter().map(Vec::len).sum::<usize>()
             + releases_home.iter().map(Vec::len).sum::<usize>();
         Ok(Arc::new(ChannelData {
+            ucid: ucid.clone(),
             channel_name: videos.name.into(),
             num_videos: videos.video_ids.len(),
             num_vods: vods.video_ids.len(),
@@ -508,8 +510,6 @@ impl ChannelCache {
                 })
                 .clone()
         };
-
-        Ok::<usize, ErrorContext>(0)?;
 
         match channel_data_entry {
             ChannelDataCacheEntry::Resolved(res) => Ok(GetChannelOutput::Resolved(res)),

@@ -98,6 +98,7 @@ async fn get_channel_endpoint(path: web::Path<String>, db_lock: DBLock) -> JsonR
         },
         GetChannelOutput::Resolved(result) => {
             Ok(Either::Left(web::Json(InnertubeChannel {
+                ucid: result.ucid.clone(),
                 channel_name: result.channel_name.deref().into(),
                 num_videos: result.num_videos as u64,
                 num_vods: result.num_vods as u64,

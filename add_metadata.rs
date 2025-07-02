@@ -60,6 +60,11 @@ fn extra_git_info(file: &mut BufWriter<File>, manifest_loc: &Path) -> Result<(),
             format!("Some(\"{}\")", commit_datetime.to_rfc3339().escape_default())
         },
     };
-    writeln!(file, "#[doc=r#\"The commit time in RFC3339/ISO8601.\"#]\n#[allow(dead_code)]\npub const GIT_COMMIT_TIMESTAMP: Option<&str> = {commit_timestamp};").context("Failed to write data to file")?;
+    writeln!(file, "\
+        #[allow(clippy::needless_raw_string_hashes)]\n\
+        #[doc=r#\"The commit time in RFC3339/ISO8601.\"#]\n\
+        #[allow(dead_code)]\n\
+        pub const GIT_COMMIT_TIMESTAMP: Option<&str> = {commit_timestamp};"
+    ).context("Failed to write data to file")?;
     Ok(())
 }

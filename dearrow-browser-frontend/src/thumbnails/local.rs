@@ -28,6 +28,7 @@ use web_sys::{js_sys::{Error, Object, Reflect}, Blob};
 use super::common::{CacheStats, ThumbnailKey};
 use super::utils::*;
 use super::worker_api::RemoteThumbnailGenerationError;
+use crate::{constants::THUMBNAIL_URL, utils::ReqwestUrlExt};
 
 const SWEEP_INTERVAL: i32 = 30_000;
 const ASYNCGEN_ERROR_MSG: &str = "Thumbnail not generated yet";
@@ -134,22 +135,47 @@ struct InnerLTG {
     sweep_interval: OnceCell<Interval<dyn FnMut()>>,
 }
 
-async fn generate_thumb(mut url: Url, key: &ThumbnailKey) -> Result<LocalBlobLink, ThumbnailGenerationError> {
-    url.query_pairs_mut()
-        .append_pair("videoID", &key.video_id)
-        .append_pair("time", &key.timestamp);
-    let response = GLOBAL.with(Clone::clone).fetch(url.as_str()).await.map_err(ThumbnailGenerationError::JSError)?;
+async fn generate_thumb(mut api_url: Url, key: &ThumbnailKey) -> Result<LocalBlobLink, ThumbnailGenerationError> {
+    let response = if let Some(timestamp) = &key.timestamp {
+        api_url.query_pairs_mut()
+            .append_pair("videoID", &key.video_id)
+            .append_pair("time", timestamp);
+        let response = GLOBAL.with(Clone::clone).fetch(api_url.as_str()).await.map_err(ThumbnailGenerationError::JSError)?;
 
-    let status = response.status();
-    if status != 200 {
-        if status != 204 {
-            return Err(ThumbnailGenerationError::UnexpectedStatusCode(status as u16));
+        match response.status() {
+            200 => response,
+            204 => {
+                let failure_reason = response.headers().get("X-Failure-Reason").map_err(ThumbnailGenerationError::JSError)?
+                    .ok_or(ThumbnailGenerationError::SilentFailure)?;
+                return Err(ThumbnailGenerationError::ServerError(failure_reason.into()));
+            },
+            other => return Err(ThumbnailGenerationError::UnexpectedStatusCode(other)),
         }
+    } else {
+        // none = original
+        let mut url = THUMBNAIL_URL.clone();
+        // try maxres
+        url.extend_segments(&[&key.video_id, "maxresdefault.jpg"]).expect("youtube thumbnail url should be a valid base");
+        let response = GLOBAL.with(Clone::clone).fetch(url.as_str()).await.map_err(ThumbnailGenerationError::JSError)?;
 
-        let failure_reason = response.headers().get("X-Failure-Reason").map_err(ThumbnailGenerationError::JSError)?
-            .ok_or(ThumbnailGenerationError::SilentFailure)?;
-        return Err(ThumbnailGenerationError::ServerError(failure_reason.into()));
-    }
+        match response.status() {
+            200 => response,
+            404 => {
+                // retry with hqdefault
+                url.path_segments_mut()
+                    .unwrap()
+                    .pop()
+                    .push("hqdefault.jpg");
+                let response = GLOBAL.with(Clone::clone).fetch(url.as_str()).await.map_err(ThumbnailGenerationError::JSError)?;
+
+                match response.status() {
+                    200 => response,
+                    other => return Err(ThumbnailGenerationError::UnexpectedStatusCode(other)),
+                }
+            },
+            other => return Err(ThumbnailGenerationError::UnexpectedStatusCode(other)),
+        }
+    };
 
     let blob: JsFuture = response.blob().map_err(ThumbnailGenerationError::JSError)?.into();
     let blob: Blob = blob.await.map_err(ThumbnailGenerationError::JSError)?.unchecked_into();
@@ -165,6 +191,7 @@ async fn generate_thumb(mut url: Url, key: &ThumbnailKey) -> Result<LocalBlobLin
 
     let object_url = web_sys::Url::create_object_url_with_blob(&blob).map_err(ThumbnailGenerationError::JSError)?;
     let bloblink = LocalBlobLink { url: object_url.into() };
+    sleep(50).await; // let firefox register the bloblink
     Ok(bloblink)
 }
 
@@ -261,7 +288,10 @@ impl LocalThumbGenerator {
     /// Errors are cached indefinetly, thumbnails might be freed after some time with no
     /// references.
     pub async fn get_thumb(&self, key: &ThumbnailKey) -> Result<Rc<LocalBlobLink>, ThumbnailGenerationError> {
-        let future = match self.inner.thumbs.borrow_mut().entry(key.clone()).or_insert_with_key(|k| LocalThumbnailState::Pending(Self::generate_thumb(self.clone(), k.clone()).boxed_local().shared())) {
+        let future = match self.inner.thumbs.borrow_mut()
+            .entry(key.clone())
+            .or_insert_with_key(|k| LocalThumbnailState::Pending(Self::generate_thumb(self.clone(), k.clone()).boxed_local().shared()))
+        {
             LocalThumbnailState::Ready { thumbnail, ref mut eviction_timer, .. } => {
                 *eviction_timer = 0;
                 return Ok(thumbnail.clone())
@@ -270,7 +300,6 @@ impl LocalThumbGenerator {
             LocalThumbnailState::Pending(fut) => fut.clone(),
         };
         future.await?;
-        sleep(50).await; // let firefox register the bloblink
         // At this point the thumbnail should be in the Ready state
         match self.inner.thumbs.borrow_mut().get_mut(key).expect("thumbnail should be Ready here") {
             LocalThumbnailState::Ready { thumbnail, ref mut eviction_timer, .. } => {

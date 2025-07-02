@@ -25,7 +25,7 @@ use yew_hooks::{use_async_with_options, UseAsyncHandle, UseAsyncOptions};
 
 use crate::components::modals::{thumbnail::ThumbnailModal, ModalMessage};
 use crate::hooks::use_async_suspension;
-use crate::{innertube, ModalRendererControls, SettingsContext};
+use crate::{ModalRendererControls, SettingsContext};
 use crate::utils::RcEq;
 
 use super::common::{ThumbgenStats, ThumbnailKey};
@@ -219,27 +219,18 @@ pub struct UnwrappedThumbnailProps {
 
 #[function_component]
 pub fn UnwrappedThumbnail(props: &UnwrappedThumbnailProps) -> Html {
-    let timestamp: Rc<Rc<str>> = use_memo(props.clone(), |props| {
-        match props.timestamp {
-            None => innertube::original_thumbnail_url(&props.video_id).as_str().into(),
-            Some(t) => format!("{t}").into(),
-        }
+    let timestamp: Rc<Option<Rc<str>>> = use_memo(props.clone(), |props| {
+        props.timestamp.map(|t| t.to_string().into())
     });
-    if props.timestamp.is_none() {
-        html! {
-            <img class="thumbnail" src={(*timestamp).clone()} />
-        }
-    } else {
-        let fallback = html! {<span class="thumbnail-error">{"Generating thumbnail..."}</span>};
-        let thumb_key = ThumbnailKey {
-            video_id: props.video_id.clone(),
-            timestamp: (*timestamp).clone(),
-        };
-        html! {
-            <Suspense {fallback}>
-                <BaseThumbnail {thumb_key} />
-            </Suspense>
-        }
+    let fallback = html! {<span class="thumbnail-error">{"Generating thumbnail..."}</span>};
+    let thumb_key = ThumbnailKey {
+        video_id: props.video_id.clone(),
+        timestamp: (*timestamp).clone(),
+    };
+    html! {
+        <Suspense {fallback}>
+            <BaseThumbnail {thumb_key} />
+        </Suspense>
     }
 }
 

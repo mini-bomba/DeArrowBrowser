@@ -20,11 +20,11 @@ use std::rc::Rc;
 
 use bincode::{Encode, Decode};
 
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Encode, Decode)]
 pub struct ThumbnailKey {
     pub video_id: Rc<str>,
-    pub timestamp: Rc<str>,
+    // none = original thumb
+    pub timestamp: Option<Rc<str>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode)]

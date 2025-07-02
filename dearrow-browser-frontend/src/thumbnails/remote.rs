@@ -159,7 +159,7 @@ impl ThumbnailWorker {
     pub async fn new() -> Result<ThumbnailWorker, Error> {
         // Create the shared worker
         let worker = SharedWorker::new_with_worker_options(
-            "/thumbnails/worker_loader.mjs",
+            &format!("/thumbnails/worker_loader.mjs?v={}", *crate::constants::VERSION_STRING),
             &{
                 let opts = WorkerOptions::new();
                 opts.set_name("thumbnails_worker");

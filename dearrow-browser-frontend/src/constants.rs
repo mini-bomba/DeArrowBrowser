@@ -28,9 +28,10 @@ pub const ASYNC_TASK_AUTO_DISMISS_DELAY: Duration = Duration::from_secs(15);
 
 // Data based on build-time constants
 
-pub static USER_AGENT:  LazyLock<&'static str>                  = LazyLock::new(create_useragent_string);
-pub static BUILD_TIME:  LazyLock<Option<DateTime<FixedOffset>>> = LazyLock::new(|| DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC).ok());
-pub static COMMIT_TIME: LazyLock<Option<DateTime<FixedOffset>>> = LazyLock::new(|| built_info::GIT_COMMIT_TIMESTAMP.and_then(|t| DateTime::parse_from_rfc3339(t).ok()));
+pub static VERSION_STRING: LazyLock<&'static str>                  = LazyLock::new(create_version_string);
+pub static USER_AGENT:     LazyLock<&'static str>                  = LazyLock::new(create_useragent_string);
+pub static BUILD_TIME:     LazyLock<Option<DateTime<FixedOffset>>> = LazyLock::new(|| DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC).ok());
+pub static COMMIT_TIME:    LazyLock<Option<DateTime<FixedOffset>>> = LazyLock::new(|| built_info::GIT_COMMIT_TIMESTAMP.and_then(|t| DateTime::parse_from_rfc3339(t).ok()));
 
 // URLs
 
@@ -49,10 +50,14 @@ pub static UCID_REGEX:     LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^UC(?
 pub static HANDLE_REGEX:   LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^@[\w.-]{3,30}$").expect("HANDLE_REGEX should be valid"));
 pub static VIDEO_ID_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[\w\d_-]{11}$").expect("VIDEO_ID_REGEX should be valid"));
 
-fn create_useragent_string() -> &'static str {
+fn create_version_string() -> &'static str {
     match (crate::built_info::GIT_COMMIT_HASH_SHORT, crate::built_info::GIT_DIRTY) {
-        (Some(hash), Some(true)) => format!("DeArrowBrowser/{}+g{hash}-dirty", crate::built_info::PKG_VERSION),
-        (Some(hash), _) => format!("DeArrowBrowser/{}+g{hash}", crate::built_info::PKG_VERSION),
-        _ => format!("DeArrowBrowser/{}", crate::built_info::PKG_VERSION),
-    }.leak()
+        (Some(hash), Some(true)) => format!("{}+g{hash}-dirty", crate::built_info::PKG_VERSION).leak(),
+        (Some(hash), _) => format!("{}+g{hash}", crate::built_info::PKG_VERSION).leak(),
+        _ => crate::built_info::PKG_VERSION,
+    }
+}
+
+fn create_useragent_string() -> &'static str {
+    format!("DeArrowBrowser/{}", *VERSION_STRING).leak()
 }

@@ -18,7 +18,7 @@
 
 pub mod local;
 pub mod remote;
-pub mod worker_api;
+mod worker_api;
 pub mod components;
 mod utils;
 pub mod common;

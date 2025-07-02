@@ -36,6 +36,7 @@ pub mod innertube;
 pub mod settings;
 pub mod utils;
 pub mod pages;
+#[path = "thumbnails/mod_main.rs"]
 pub mod thumbnails;
 pub mod sbserver;
 use contexts::*;

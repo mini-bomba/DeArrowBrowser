@@ -19,7 +19,6 @@
 
 use std::{cell::{Cell, OnceCell, RefCell}, collections::HashMap, rc::Rc};
 
-use common::{ThumbgenStats, WorkerStats};
 use gloo_console::{error, log, warn};
 use reqwest::Url;
 use slab::Slab;
@@ -27,14 +26,21 @@ use wasm_bindgen::{closure::Closure, JsCast};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{js_sys::{self, Array, Reflect, Uint8Array}, MessageEvent, MessagePort, SharedWorkerGlobalScope};
 
-pub mod local;
-mod common;
+// imports from the root crate
 #[allow(dead_code)]
+#[path = "../constants.rs"]
+mod constants;
+#[allow(dead_code)]
+#[path = "../utils.rs"]
 mod utils;
-pub mod worker_api;
 
-use local::{LocalBlobLink, LocalThumbGenerator};
-use worker_api::{RawRemoteRef, ThumbnailWorkerRequest, ThumbnailWorkerRequestMessage, ThumbnailWorkerResponse, ThumbnailWorkerResponseMessage, BINCODE_CONFIG};
+// this module, imported as if we were in the root src dir
+#[path = "mod_worker.rs"]
+pub mod thumbnails;
+
+use thumbnails::common::{ThumbgenStats, WorkerStats};
+use thumbnails::local::{LocalBlobLink, LocalThumbGenerator};
+use thumbnails::worker_api::{self, RawRemoteRef, ThumbnailWorkerRequest, ThumbnailWorkerRequestMessage, ThumbnailWorkerResponse, ThumbnailWorkerResponseMessage, BINCODE_CONFIG};
 
 const PING_CHECK_INTERVAL: i32 = 30_000;
 const MAX_PING_FAILS: u8 = 3;

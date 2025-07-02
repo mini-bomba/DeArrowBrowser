@@ -107,13 +107,13 @@ pub enum WorkerSetting {
 }
 
 #[derive(Encode, Decode, Debug)]
-pub(super) struct ThumbnailWorkerRequestMessage {
+pub struct ThumbnailWorkerRequestMessage {
     pub id: u16,
     pub request: ThumbnailWorkerRequest,
 }
 
 #[derive(Encode, Decode, Debug)]
-pub(super) struct ThumbnailWorkerResponseMessage {
+pub struct ThumbnailWorkerResponseMessage {
     pub id: u16,
     pub response: ThumbnailWorkerResponse,
 }

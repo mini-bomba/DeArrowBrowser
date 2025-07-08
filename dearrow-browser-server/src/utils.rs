@@ -277,9 +277,9 @@ impl ReqwestResponseExt for reqwest::Response {
 
         if (decoded.is_err() && std::env::var_os("DAB_IT_DUMP_ERRORS").is_some()) || std::env::var_os("DAB_IT_DUMP_ALL").is_some() {
             let mut path = PathBuf::from("./debug");
-            path.push(format!("{}-{name}.json", unix_timestamp()));
             let dump_result: std::io::Result<()> = async {
                 tokio::fs::create_dir_all(&path).await?;
+                path.push(format!("{}-{name}.json", unix_timestamp()));
                 tokio::fs::write(&path, &body).await?;
                 Ok(())
             }.await;

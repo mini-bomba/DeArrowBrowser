@@ -61,7 +61,7 @@ pub fn HomePage() -> Html {
     };
 
     let detail_count = status_context.and_then(|status_context| {
-        url_and_mode.as_ref().as_ref().map(|(_, dtm)| match dtm {
+        url_and_mode.as_ref().as_ref().and_then(|(_, dtm)| match dtm {
             DetailType::Thumbnail => status_context.thumbnails,
             DetailType::Title => status_context.titles,
         })

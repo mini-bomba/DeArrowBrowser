@@ -65,6 +65,16 @@ pub static SERVER_VERSION:  LazyLock<Arc<str>> = LazyLock::new(|| built_info::PK
 pub static SERVER_GIT_HASH: LazyLock<Option<Arc<str>>> = LazyLock::new(|| built_info::GIT_COMMIT_HASH.map(std::convert::Into::into));
 pub static BUILD_TIMESTAMP: LazyLock<Option<i64>> = LazyLock::new(|| DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC).ok().map(|t| t.timestamp()));
 
+// Constants for the status endpoint
+pub static SERVER_BRAND: LazyLock<Arc<str>> = LazyLock::new(|| Arc::from("DeArrow Browser"));
+pub static SERVER_URL:   LazyLock<Arc<str>> = LazyLock::new(||
+    if let Some(hash) = built_info::GIT_COMMIT_HASH {
+        Arc::from(format!("https://github.com/mini-bomba/DeArrowBrowser/tree/{hash}"))
+    } else {
+        Arc::from("https://github.com/mini-bomba/DeArrowBrowser")
+    }
+);
+
 // Custom response status codes
 /// 333 Not ready yet - Indicates that the server is still querying requested data.
 /// The response may contain progress information. The client should request the same URL again.

@@ -158,6 +158,14 @@ body {
   justify-content: space-between;
   font-size: 1rem;
 
+  > * {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    min-width: 25vw;
+  }
+
   >:last-child {
     text-align: right;
   }

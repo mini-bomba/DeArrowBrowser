@@ -20,27 +20,34 @@
 //       module.
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
+#[serde(default)]
 pub struct StatusResponse {
-    pub last_updated: i64,
-    pub last_modified: i64,
-    pub updating_now: bool,
-    pub titles: usize,
-    pub thumbnails: usize,
-    pub vip_users: usize,
-    pub usernames: usize,
-    pub warnings: usize,
-    pub errors: usize,
+    // database stats
+    pub titles: Option<usize>,
+    pub thumbnails: Option<usize>,
+    pub vip_users: Option<usize>,
+    pub usernames: Option<usize>,
+    pub warnings: Option<usize>,
+    // dab internal stats
+    pub errors: Option<usize>,
     pub string_count: Option<usize>,
-    pub video_infos: usize,
-    pub uncut_segments: usize,
-    pub cached_channels: usize,
-    pub fscached_channels: usize,
-    pub server_version: RcStr,
+    pub video_infos: Option<usize>,
+    pub uncut_segments: Option<usize>,
+    pub cached_channels: Option<usize>,
+    pub fscached_channels: Option<usize>,
+    // general server build data
+    pub server_version: Option<RcStr>,
     pub server_git_hash: Option<RcStr>,
     pub server_git_dirty: Option<bool>,
     pub server_build_timestamp: Option<i64>,
-    pub server_startup_timestamp: i64,
+    pub server_startup_timestamp: Option<i64>,
+    pub server_brand: Option<RcStr>,
+    pub server_url: Option<RcStr>,
+    // stats for snapshot-based impls
+    pub last_updated: Option<i64>,
+    pub last_modified: Option<i64>,
+    pub updating_now: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]

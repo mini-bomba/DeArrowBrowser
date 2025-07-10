@@ -128,7 +128,7 @@ impl Component for UserContextProvider {
     fn create(ctx: &Context<Self>) -> Self {
         let scope = ctx.link();
         let (settings, settings_handle) = scope.context(scope.callback(|s: SettingsContext| UserContextProviderMessage::UserIdUpdate(s.settings().private_user_id.clone()))).unwrap();
-        let (status, status_handle) = scope.context(scope.callback(|s: StatusContext| UserContextProviderMessage::StatusUpdate(s.map(|s| s.last_updated)))).unwrap();
+        let (status, status_handle) = scope.context(scope.callback(|s: StatusContext| UserContextProviderMessage::StatusUpdate(s.and_then(|s| s.last_updated)))).unwrap();
         let window_context = scope.context(Callback::noop()).unwrap().0; // we don't care about updates
         let private_user_id = settings.settings().private_user_id.clone();
         UserContextProvider {
@@ -141,7 +141,7 @@ impl Component for UserContextProvider {
                 }
             }),
             private_user_id,
-            last_update: status.map(|s| s.last_updated),
+            last_update: status.and_then(|s| s.last_updated),
             _settings_context_handle: settings_handle,
             _status_context_handle: status_handle,
         }

@@ -133,25 +133,31 @@ async fn get_status(
     );
     let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     Ok(web::Json(StatusResponse {
-        last_updated: db.last_updated,
-        last_modified: db.last_modified,
-        updating_now: db.updating_now,
-        titles: db.db.titles.len(),
-        thumbnails: db.db.thumbnails.len(),
-        vip_users: db.db.vip_users.len(),
-        usernames: db.db.usernames.len(),
-        warnings: db.db.warnings.len(),
-        errors: db.errors.len(),
+        // database stats
+        titles: Some(db.db.titles.len()),
+        thumbnails: Some(db.db.thumbnails.len()),
+        vip_users: Some(db.db.vip_users.len()),
+        usernames: Some(db.db.usernames.len()),
+        warnings: Some(db.db.warnings.len()),
+        // dab internal stats
+        errors: Some(db.errors.len()),
         string_count: strings,
-        video_infos: db.video_info_count,
-        uncut_segments: db.uncut_segment_count,
-        cached_channels,
-        fscached_channels,
-        server_version: SERVER_VERSION.clone(),
+        video_infos: Some(db.video_info_count),
+        uncut_segments: Some(db.uncut_segment_count),
+        cached_channels: Some(cached_channels),
+        fscached_channels: Some(fscached_channels),
+        // general server build data
+        server_version: Some(SERVER_VERSION.clone()),
         server_git_hash: SERVER_GIT_HASH.clone(),
         server_git_dirty: built_info::GIT_DIRTY,
         server_build_timestamp: *BUILD_TIMESTAMP,
-        server_startup_timestamp: config.startup_timestamp.timestamp(),
+        server_startup_timestamp: Some(config.startup_timestamp.timestamp()),
+        server_brand: Some(SERVER_BRAND.clone()),
+        server_url: Some(SERVER_URL.clone()),
+        // stats for snapshot-based impls
+        last_updated: Some(db.last_updated),
+        last_modified: Some(db.last_modified),
+        updating_now: db.updating_now,
     }))
 }
 

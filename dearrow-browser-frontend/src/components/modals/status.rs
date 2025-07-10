@@ -62,6 +62,30 @@ pub fn StatusModal() -> Html {
             .into()
     });
 
+    let server_version: Rc<Option<AttrValue>> = use_memo(status.clone(), |status| {
+        let status = status.as_ref()?;
+
+        if let Some(git_hash) = &status.server_git_hash {
+            let short_hash = &git_hash[..8];
+            match (&status.server_version, &status.server_git_dirty) {
+                (Some(version), Some(true)) => Some(AttrValue::from(format!("{version} / {short_hash} + changes"))),
+                (Some(version), _)          => Some(AttrValue::from(format!("{version} / {short_hash}"))),
+                (None,          Some(true)) => Some(AttrValue::from(format!("{git_hash} + changes"))),
+                (None,          _)          => Some(AttrValue::Rc(git_hash.clone())),
+            }
+        } else {
+            status.server_version.clone().map(AttrValue::Rc)
+        }
+    });
+
+    let server_version = html! {
+        if let Some(version) = &*server_version {
+            {version}
+        } else {
+            <em>{"Unknown"}</em>
+        }
+    };
+
     let thumbgen_impl = match &thumbgen {
         None => None,
         Some(Thumbgen::Remote(..)) => Some("SharedWorker"),
@@ -204,20 +228,23 @@ pub fn StatusModal() -> Html {
                     <h4>{"Build info"}</h4>
                     <table>
                         <tr>
-                            <th>{"Version"}</th>
-                            <td>{status.server_version.clone()}</td>
+                            <th>{"Brand"}</th>
+                            <td>
+                            if let Some(brand) = &status.server_brand {
+                                {brand}
+                            } else {
+                                <em>{"Unknown"}</em>
+                            }
+                            </td>
                         </tr>
                         <tr>
-                            <th>{"Git hash"}</th>
+                            <th>{"Version"}</th>
                             <td>
-                                if let Some(ref hash) = status.server_git_hash {
-                                    <a href={format!("https://github.com/mini-bomba/DeArrowBrowser/commit/{hash}")} target="_blank">{&hash[..8]}</a>
-                                    if status.server_git_dirty == Some(true) {
-                                        {" "}<b>{"+ uncommitted changes"}</b>
-                                    }
-                                } else {
-                                    <em>{"Unknown"}</em>
-                                }
+                            if let Some(url) = &status.server_url {
+                                <a href={url.clone()}>{server_version}</a>
+                            } else {
+                                {server_version}
+                            }
                             </td>
                         </tr>
                         <tr>
@@ -233,93 +260,115 @@ pub fn StatusModal() -> Html {
                     </table>
                     <h4>{"Server status"}</h4>
                     <table>
-                        <tr>
-                            <th>{"Server started at"}</th>
-                            <td>
-                                if let Some(dt) = DateTime::from_timestamp(status.server_startup_timestamp, 0) {
-                                    {render_datetime(dt)}
-                                } else {
-                                    <em>{"Failed to parse"}</em>
-                                }
-                            </td>
-                        </tr>
-                        <tr>
-                            <th>{"Last update"}</th>
-                            <td>
-                                if let Some(dt) = DateTime::from_timestamp_millis(status.last_updated) {
-                                    {render_datetime(dt)}
-                                    if status.updating_now {
-                                        <b>{", update in progress"}</b>
+                        if let Some(ts) = status.server_startup_timestamp {
+                            <tr>
+                                <th>{"Server started at"}</th>
+                                <td>
+                                    if let Some(dt) = DateTime::from_timestamp(ts, 0) {
+                                        {render_datetime(dt)}
+                                    } else {
+                                        <em>{"Failed to parse"}</em>
                                     }
-                                } else {
-                                    <em>{"Failed to parse"}</em>
-                                }
-                            </td>
-                        </tr>
-                        <tr>
-                            <th>{"DB snapshot taken at"}</th>
-                            <td>
-                                if let Some(dt) = DateTime::from_timestamp_millis(status.last_modified) {
-                                    {render_datetime(dt)}
-                                } else {
-                                    <em>{"Failed to parse"}</em>
-                                }
-                            </td>
-                        </tr>
-                        <tr class="hoverswitch-trigger">
-                            <th>{"Title count"}</th>
-                            {number_hoverswitch!(td, status.titles)}
-                        </tr>
-                        <tr class="hoverswitch-trigger">
-                            <th>{"Thumbnail count"}</th>
-                            {number_hoverswitch!(td, status.thumbnails)}
-                        </tr>
-                        <tr class="hoverswitch-trigger">
-                            <th>{"Username count"}</th>
-                            {number_hoverswitch!(td, status.usernames)}
-                        </tr>
-                        <tr class="hoverswitch-trigger">
-                            <th>{"VIPs"}</th>
-                            {number_hoverswitch!(td, status.vip_users)}
-                        </tr>
-                        <tr class="hoverswitch-trigger">
-                            <th>{"Warnings"}</th>
-                            {number_hoverswitch!(td, status.warnings)}
-                        </tr>
-                        <tr class="hoverswitch-trigger">
-                            <th>{"Unique strings"}</th>
-                            if let Some(count) = status.string_count {
-                                {number_hoverswitch!(td, count)}
-                            } else {
-                                <td><em>{"Unknown"}</em></td>
-                            }
-                        </tr>
-                        <tr class="hoverswitch-trigger">
-                            <th>{"Videos with durations"}</th>
-                            {number_hoverswitch!(td, status.video_infos)}
-                        </tr>
-                        <tr class="hoverswitch-trigger">
-                            <th>{"Unmarked video segments"}</th>
-                            {number_hoverswitch!(td, status.uncut_segments)}
-                        </tr>
-                        <tr class="hoverswitch-trigger">
-                            <th>{"Cached channels"}</th>
-                            if status.cached_channels >= 1000 || status.fscached_channels >= 1000 {
-                                <td class="hoverswitch">
-                                    <span>{status.cached_channels.abbreviate_int()}{" / "}{status.fscached_channels.abbreviate_int()}</span>
-                                    <span>{status.cached_channels.render_int()}{" / "}{status.fscached_channels.render_int()}</span>
                                 </td>
-                            } else {
-                                <td>{status.cached_channels}{" / "}{status.fscached_channels}</td>
-                            }
-                        </tr>
-                        <tr class="hoverswitch-trigger">
-                            <th>{"Parse errors"}</th>
-                            <td>
-                                {number_hoverswitch!(span, status.errors)}{" "}
-                                <a href={(*errors_url).clone()} target="_blank">{"(view)"}</a>
-                            </td>
-                        </tr>
+                            </tr>
+                        }
+                        if let Some(ts) = status.last_updated {
+                            <tr>
+                                <th>{"Last update"}</th>
+                                <td>
+                                    if let Some(dt) = DateTime::from_timestamp_millis(ts) {
+                                        {render_datetime(dt)}
+                                        if status.updating_now {
+                                            <b>{", update in progress"}</b>
+                                        }
+                                    } else {
+                                        <em>{"Failed to parse"}</em>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        if let Some(ts) = status.last_modified {
+                            <tr>
+                                <th>{"DB snapshot taken at"}</th>
+                                <td>
+                                    if let Some(dt) = DateTime::from_timestamp_millis(ts) {
+                                        {render_datetime(dt)}
+                                    } else {
+                                        <em>{"Failed to parse"}</em>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        if let Some(count) = status.titles {
+                            <tr class="hoverswitch-trigger">
+                                <th>{"Title count"}</th>
+                                {number_hoverswitch!(td, count)}
+                            </tr>
+                        }
+                        if let Some(count) = status.thumbnails {
+                            <tr class="hoverswitch-trigger">
+                                <th>{"Thumbnail count"}</th>
+                                {number_hoverswitch!(td, count)}
+                            </tr>
+                        }
+                        if let Some(count) = status.usernames {
+                            <tr class="hoverswitch-trigger">
+                                <th>{"Username count"}</th>
+                                {number_hoverswitch!(td, count)}
+                            </tr>
+                        }
+                        if let Some(count) = status.vip_users {
+                            <tr class="hoverswitch-trigger">
+                                <th>{"VIPs"}</th>
+                                {number_hoverswitch!(td, count)}
+                            </tr>
+                        }
+                        if let Some(count) = status.warnings {
+                            <tr class="hoverswitch-trigger">
+                                <th>{"Warnings"}</th>
+                                {number_hoverswitch!(td, count)}
+                            </tr>
+                        }
+                        if let Some(count) = status.string_count {
+                            <tr class="hoverswitch-trigger">
+                                <th>{"Unique strings"}</th>
+                                {number_hoverswitch!(td, count)}
+                            </tr>
+                        }
+                        if let Some(count) = status.video_infos {
+                            <tr class="hoverswitch-trigger">
+                                <th>{"Videos with durations"}</th>
+                                {number_hoverswitch!(td, count)}
+                            </tr>
+                        }
+                        if let Some(count) = status.uncut_segments {
+                            <tr class="hoverswitch-trigger">
+                                <th>{"Unmarked video segments"}</th>
+                                {number_hoverswitch!(td, count)}
+                            </tr>
+                        }
+                        if let (Some(mem), Some(fs)) = (status.cached_channels, status.fscached_channels) {
+                            <tr class="hoverswitch-trigger">
+                                <th>{"Cached channels"}</th>
+                                if mem >= 1000 || fs >= 1000 {
+                                    <td class="hoverswitch">
+                                        <span>{mem.abbreviate_int()}{" / "}{fs.abbreviate_int()}</span>
+                                        <span>{mem.render_int()}{" / "}{fs.render_int()}</span>
+                                    </td>
+                                } else {
+                                    <td>{mem}{" / "}{fs}</td>
+                                }
+                            </tr>
+                        }
+                        if let Some(count) = status.errors {
+                            <tr class="hoverswitch-trigger">
+                                <th>{"Parse errors"}</th>
+                                <td>
+                                    {number_hoverswitch!(span, count)}{" "}
+                                    <a href={(*errors_url).clone()} target="_blank">{"(view)"}</a>
+                                </td>
+                            </tr>
+                        }
                     </table>
                 } else {
                     <em>{"Loading..."}</em>

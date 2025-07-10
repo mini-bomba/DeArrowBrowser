@@ -136,27 +136,65 @@ pub fn Footer() -> Html {
         AttrValue::from(format!(" © mini_bomba 2023-{year}, licensed under "))
     });
 
-    let last_updated = match status.as_ref().and_then(|status| DateTime::from_timestamp_millis(status.last_updated)) {
-        None => AttrValue::from("..."),
-        Some(time) => AttrValue::from(render_datetime_with_delta(time)),
-    };
-    let last_modified = match status.as_ref().and_then(|status| DateTime::from_timestamp_millis(status.last_modified)) {
-        None => AttrValue::from("..."),
-        Some(time) => AttrValue::from(render_datetime_with_delta(time)),
+    let left_part = match status.as_ref() {
+        None => html! {
+            {"Loading..."}
+        },
+        Some(status) => {
+            if status.last_modified.is_none() && status.last_updated.is_none() {
+                let server_line = match (&status.server_brand, &status.server_version) {
+                    (None, None) => html! {
+                        <em>{"Unknown"}</em>
+                    },
+                    (None, Some(ver)) => html! {<>
+                        <em>{"Unknown brand "}</em>{ver.clone()}
+                    </>},
+                    (Some(brand), None) => html! {
+                        {brand.clone()}
+                    },
+                    (Some(brand), Some(ver)) => html! {<>
+                        {brand.clone()}{" "}{ver.clone()}
+                    </>},
+                };
+                // server doesn't provide snapshot timestamps
+                // assume we have live data
+                html! {
+                    <table>
+                        <tr><td>{"Backend server: "}{server_line}</td></tr>
+                        <tr><td>{"Probably serving live data"}</td></tr>
+                    </table>
+                }
+            } else {
+                let last_updated = match status.last_updated.and_then(DateTime::from_timestamp_millis) {
+                    None => AttrValue::from("Unknown"),
+                    Some(time) => AttrValue::from(render_datetime_with_delta(time)),
+                };
+                let last_modified = match status.last_modified.and_then(DateTime::from_timestamp_millis) {
+                    None => AttrValue::from("Unknown"),
+                    Some(time) => AttrValue::from(render_datetime_with_delta(time)),
+                };
+
+                html! {
+                    <table>
+                        <tr>
+                            <td>{"Last update:"}</td>
+                            <td>{last_updated} if status.updating_now { <b>{", update in progress"}</b> }</td>
+                        </tr>
+                        <tr>
+                            <td>{"Database snapshot taken at:"}</td>
+                            <td>{last_modified}</td>
+                        </tr>
+                    </table>
+                }
+            }
+        }
     };
 
     html! {
         <div id="footer">
-            <table class="clickable" onclick={open_version_modal}>
-                <tr>
-                    <td>{"Last update:"}</td>
-                    <td>{last_updated} if status.is_some_and(|s| s.updating_now) { <b>{", update in progress"}</b> }</td>
-                </tr>
-                <tr>
-                    <td>{"Database snapshot taken at:"}</td>
-                    <td>{last_modified}</td>
-                </tr>
-            </table>
+            <div class="clickable" onclick={open_version_modal}>
+                {left_part}
+            </div>
             <span>
                 <table>
                     <tr><td>

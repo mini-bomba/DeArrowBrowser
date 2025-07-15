@@ -37,6 +37,7 @@ use std::{
 };
 
 mod constants;
+mod errors;
 mod innertube;
 mod middleware;
 mod routes;

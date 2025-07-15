@@ -34,10 +34,12 @@ use std::{collections::HashSet, sync::Arc};
 
 use crate::built_info;
 use crate::constants::*;
+use crate::errors::extensions;
 use crate::middleware::etag::{ETagCache, ETagCacheControl};
 use crate::sbserver_emulation::get_random_time_for_video;
 use crate::state::*;
 use crate::utils::{self, ExtendResponder, ResponderExt};
+use crate::errors::{self, Error::EmptyStatus};
 
 pub fn configure(app_config: web::Data<AppConfig>) -> impl FnOnce(&mut web::ServiceConfig) {
     move |cfg| {
@@ -77,8 +79,8 @@ pub fn configure(app_config: web::Data<AppConfig>) -> impl FnOnce(&mut web::Serv
     }
 }
 
-type JsonResult<T> = utils::Result<web::Json<T>>;
-type JsonResultOrFetchProgress<T> = utils::Result<
+type JsonResult<T> = errors::Result<web::Json<T>>;
+type JsonResultOrFetchProgress<T> = errors::Result<
     Either<
         web::Json<T>,
         (
@@ -218,22 +220,29 @@ async fn request_reload(
     string_set_lock: StringSetLock,
     config: web::Data<AppConfig>,
     auth: web::Query<Auth>,
-) -> HttpResponse {
+) -> errors::Result<&'static str> {
     let provided_hash = match auth.auth.as_deref() {
         None => {
-            return HttpResponse::NotFound().finish();
+            return Err(EmptyStatus(StatusCode::NOT_FOUND));
         }
         Some(s) => Sha256::digest(s),
     };
     let actual_hash = Sha256::digest(config.auth_secret.as_str());
 
     if provided_hash != actual_hash {
-        return HttpResponse::Forbidden().finish();
+        return Err(
+            anyhow!("forbidden")
+                .with_extension(extensions::status::FORBIDDEN.clone())
+                .with_extension(extensions::empty_body::INSTANCE.clone())
+                .with_extension(extensions::no_timings::INSTANCE.clone())
+                .into()
+        );
     }
-    match spawn_blocking(move || do_reload(db_lock, string_set_lock, config)).await {
-        Ok(..) => HttpResponse::Ok().body("Reload complete"),
-        Err(e) => HttpResponse::InternalServerError().body(format!("{e:?}")),
-    }
+    spawn_blocking(move || do_reload(db_lock, string_set_lock, config))
+        .await
+        .context("Reload task panicked")?
+        .context("Failed to reload")?;
+    Ok("Reload complete")
 }
 
 #[get("/errors")]
@@ -253,11 +262,11 @@ async fn get_titles(
     query: web::Query<MainEndpointURLParams>,
 ) -> JsonResult<Vec<ApiTitle>> {
     if query.count > 1024 {
-        return Err(utils::Error::from(anyhow!(
-            "Too many requested titles. You requested {} titles, but the configured max is 1024.",
-            query.count
-        ))
-        .set_status(StatusCode::BAD_REQUEST));
+        return Err(
+            anyhow!("Too many requested titles. You requested {} titles, but the configured max is 1024.", query.count)
+                .with_extension(extensions::status::BAD_REQUEST.clone())
+                .into()
+        );
     }
     let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     Ok(web::Json(
@@ -319,7 +328,7 @@ async fn get_title_by_uuid(
         .get(path.into_inner().as_str())
         .cloned()
     else {
-        return Err(utils::Error::EmptyStatus(StatusCode::NOT_FOUND));
+        return Err(EmptyStatus(StatusCode::NOT_FOUND));
     };
     let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     Ok(web::Json(
@@ -328,7 +337,7 @@ async fn get_title_by_uuid(
             .iter()
             .find(|t| Arc::ptr_eq(&t.uuid, &uuid))
             .map(|t| t.into_with_db(&db.db))
-            .ok_or(utils::Error::EmptyStatus(StatusCode::NOT_FOUND))?,
+            .ok_or(EmptyStatus(StatusCode::NOT_FOUND))?,
     ))
 }
 
@@ -431,8 +440,9 @@ async fn get_thumbnails(
 ) -> JsonResult<Vec<ApiThumbnail>> {
     if query.count > 1024 {
         return Err(
-            utils::Error::from(anyhow!("Too many requested thumbnails. You requested {} thumbnails, but the configured max is 1024.", query.count))
-                .set_status(StatusCode::BAD_REQUEST)
+            anyhow!("Too many requested thumbnails. You requested {} thumbnails, but the configured max is 1024.", query.count)
+                .with_extension(extensions::status::BAD_REQUEST.clone())
+                .into()
         );
     }
     let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
@@ -478,7 +488,7 @@ async fn get_thumbnail_by_uuid(
         .get(path.into_inner().as_str())
         .cloned()
     else {
-        return Err(utils::Error::EmptyStatus(StatusCode::NOT_FOUND));
+        return Err(EmptyStatus(StatusCode::NOT_FOUND));
     };
     let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
     Ok(web::Json(
@@ -487,7 +497,7 @@ async fn get_thumbnail_by_uuid(
             .iter()
             .find(|t| Arc::ptr_eq(&t.uuid, &uuid))
             .map(|t| t.into_with_db(&db.db))
-            .ok_or(utils::Error::EmptyStatus(StatusCode::NOT_FOUND))?,
+            .ok_or(EmptyStatus(StatusCode::NOT_FOUND))?,
     ))
 }
 

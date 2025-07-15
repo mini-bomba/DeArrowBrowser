@@ -27,11 +27,11 @@ use cloneable_errors::anyhow;
 use dearrow_parser::{Extension, Thumbnail, ThumbnailFlags, Title, TitleFlags, VideoInfo};
 use serde::{Deserialize, Serialize};
 
-use crate::{middleware::etag::ETagCache, state::{DBLock, StringSetLock}, utils};
+use crate::{errors::{self, extensions}, middleware::etag::ETagCache, state::{DBLock, StringSetLock}};
 use crate::constants::*;
 
-type JsonResult<T> = utils::Result<web::Json<T>>;
-type CustomizedJsonResult<T> = utils::Result<CustomizeResponder<web::Json<T>>>;
+type JsonResult<T> = errors::Result<web::Json<T>>;
+type CustomizedJsonResult<T> = errors::Result<CustomizeResponder<web::Json<T>>>;
 
 pub fn configure_disabled(cfg: &mut web::ServiceConfig) {
     cfg.default_service(web::to(disabled_route));
@@ -254,9 +254,19 @@ async fn get_chunk_branding(db_lock: DBLock, query: web::Query<ChunkBrandingPara
     }
     // validate & parse hashprefix
     if path.hash_prefix.len() != 4 {
-        return Err(utils::Error::from(anyhow!("Unsupported hashprefix! Only 4-character prefixes are supported by DeArrow Browser's SponsorBlockServer emulation, but your was {} chars long!", path.hash_prefix.len())).set_status(StatusCode::BAD_REQUEST));
+        return Err(
+            anyhow!(
+                "Unsupported hashprefix! Only 4-character prefixes are supported by DeArrow Browser's SponsorBlockServer emulation, but your was {} chars long!", 
+                path.hash_prefix.len()
+            )
+                .with_extension(extensions::status::BAD_REQUEST.clone())
+                .into()
+        );
     }
-    let hash_prefix = u16::from_str_radix(&path.hash_prefix, 16).map_err(|_| utils::Error::from(anyhow!("Invalid hashprefix!")).set_status(StatusCode::BAD_REQUEST))?;
+    let hash_prefix = u16::from_str_radix(&path.hash_prefix, 16)
+        .map_err(|_| 
+            anyhow!("Invalid hashprefix!").with_extension(extensions::status::BAD_REQUEST.clone())
+        )?;
 
     // Find and group details
     let mut videos: HashMap<Arc<str>, Option<&VideoInfo>> = db.db.video_infos[hash_prefix as usize].iter().map(|v| (v.video_id.clone(), Some(v))).collect();

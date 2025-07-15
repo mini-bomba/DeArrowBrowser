@@ -29,10 +29,11 @@ use tokio_stream::{wrappers::LinesStream, StreamExt};
 use crate::{constants::*, utils::{ReqwestResponseExt, TemporaryFile}};
 use crate::middleware::etag::{ETagCache, ETagCacheControl};
 use crate::state::{self, AppConfig, DBLock, GetChannelOutput};
-use crate::utils::{self, ExtendResponder, ResponderExt};
+use crate::utils::{ExtendResponder, ResponderExt};
+use crate::errors;
 
-type JsonResult<T> = utils::Result<web::Json<T>>;
-type JsonResultOrFetchProgress<T> = utils::Result<Either<web::Json<T>, (ExtendResponder<web::Json<api::ChannelFetchProgress>>, StatusCode)>>;
+type JsonResult<T> = errors::Result<web::Json<T>>;
+type JsonResultOrFetchProgress<T> = errors::Result<Either<web::Json<T>, (ExtendResponder<web::Json<api::ChannelFetchProgress>>, StatusCode)>>;
 
 pub fn configure_disabled(cfg: &mut web::ServiceConfig) {
     cfg.default_service(web::to(disabled_route));

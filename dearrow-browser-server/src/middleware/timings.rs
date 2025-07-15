@@ -24,6 +24,10 @@ use log::error;
 
 use crate::{utils::HeaderMapExt, AppConfig};
 
+/// This response extension disables the [`Timings`] middleware
+#[derive(Clone, Copy)]
+pub struct NoTimings;
+
 pub struct Timings;
 
 
@@ -67,10 +71,13 @@ where
         }
         let start = Instant::now();
         let srv = self.service.call(req);
-        
+
         async move {
             let mut resp = srv.await?;
             let elapsed = Instant::elapsed(&start);
+            if resp.response().extensions().contains::<NoTimings>() {
+                return Ok(resp);
+            }
             let headers = resp.headers_mut();
             if let Err(e) = headers.append_header(("X-Time-Spent", format!("{} ns", render_duration(&elapsed)))) {
                 error!("Failed to append the X-Time-Spent header: {}", HttpError::from(e));

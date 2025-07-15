@@ -15,77 +15,13 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use std::{ffi::CString, fmt::{Debug, Display}, fs, mem::MaybeUninit, ops::{Deref, DerefMut}, os::{fd::AsRawFd, unix::ffi::OsStrExt}, path::{Path, PathBuf}, sync::Arc, time::{SystemTime, UNIX_EPOCH}};
+use std::{ffi::CString, fs, mem::MaybeUninit, ops::{Deref, DerefMut}, os::{fd::AsRawFd, unix::ffi::OsStrExt}, path::{Path, PathBuf}, sync::Arc, time::{SystemTime, UNIX_EPOCH}};
 
-use actix_web::{dev::Extensions, http::{header::{HeaderMap, TryIntoHeaderPair}, StatusCode}, HttpResponse, Responder, ResponseError};
+use actix_web::{dev::Extensions, http::header::{HeaderMap, TryIntoHeaderPair}, HttpResponse, Responder};
 use base64::prelude::{BASE64_URL_SAFE_NO_PAD, Engine};
-use cloneable_errors::{ErrContext, ErrorContext, IntoErrorIterator, ResContext};
+use cloneable_errors::{ErrContext, ErrorContext, ResContext};
 use serde::de::DeserializeOwned;
 use tokio::fs::File;
-
-/// This extension will be present on a response if the response contains
-/// a [`cloneable_errors::SerializableError`] encoded as json
-pub struct SerializableErrorResponseMarker;
-
-pub enum Error {
-    #[allow(clippy::enum_variant_names)]
-    ErrorContext(ErrorContext, StatusCode),
-    EmptyStatus(StatusCode),
-}
-
-impl Debug for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::ErrorContext(ref err, _) => Debug::fmt(err, f),
-            Error::EmptyStatus(status) => f.debug_tuple("Error::EmptyStatus").field(status).finish(),
-        }
-    }
-}
-impl Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::ErrorContext(ref err, _) => Display::fmt(err, f),
-            Error::EmptyStatus(status) => write!(f, "{status}"),
-        }
-    }
-}
-impl From<ErrorContext> for Error {
-    fn from(value: ErrorContext) -> Self {
-        Error::ErrorContext(value, StatusCode::INTERNAL_SERVER_ERROR)
-    }
-}
-impl std::error::Error for Error {}
-impl ResponseError for Error {
-    fn status_code(&self) -> StatusCode {
-        let (Error::ErrorContext(_, status) | Error::EmptyStatus(status)) = self;
-        *status
-    }
-
-    fn error_response(&self) -> HttpResponse {
-        let mut builder = HttpResponse::build(self.status_code());
-        match self {
-            Error::ErrorContext(err, _) => {
-                {
-                    let mut exts = builder.extensions_mut();
-                    exts.insert(SerializableErrorResponseMarker);
-                }
-                builder.json(err.serializable_copy())
-            },
-            Error::EmptyStatus(..) => builder.finish(),
-        }
-    }
-}
-
-impl Error {
-    pub fn set_status(self, status: StatusCode) -> Self {
-        match self {
-            Error::ErrorContext(err, _) => Error::ErrorContext(err, status),
-            Error::EmptyStatus(..) => Error::EmptyStatus(status),
-        }
-    }
-}
-
-pub type Result<T> = std::result::Result<T, Error>;
 
 pub fn get_mtime(p: &Path) -> i64 {
     fs::metadata(p).ok()

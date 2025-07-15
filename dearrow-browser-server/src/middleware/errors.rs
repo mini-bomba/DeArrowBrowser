@@ -26,7 +26,8 @@ use cloneable_errors::SerializableError;
 use futures::{future::LocalBoxFuture, FutureExt};
 use log::warn;
 
-use crate::utils::{HeaderMapExt, SerializableErrorResponseMarker};
+use crate::utils::HeaderMapExt;
+use crate::errors::SerializableErrorResponseMarker;
 
 
 pub struct ErrorRepresentation;

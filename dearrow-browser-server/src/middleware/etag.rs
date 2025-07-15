@@ -28,7 +28,7 @@ use futures::{future::LocalBoxFuture, FutureExt};
 
 use crate::{constants::*, utils::HeaderMapExt};
 use crate::state::DBLock;
-use crate::utils;
+use crate::errors;
 
 /// This response extension controls the behaviour of the [`ETagCache`] middleware
 #[derive(Clone, Copy)]
@@ -78,7 +78,7 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let db = req.app_data::<DBLock>().unwrap().clone();
         let Ok(etag) = db.read().map(|db| db.get_etag()) else {
-            return ready(Err(utils::Error::from(DB_READ_ERR.clone()).into())).boxed_local();
+            return ready(Err(errors::Error::from(DB_READ_ERR.clone()).into())).boxed_local();
         };
 
         let inm = match IfNoneMatch::parse(&req) {

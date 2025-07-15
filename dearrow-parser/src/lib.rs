@@ -232,6 +232,8 @@ pub struct DearrowDB {
     /// Use `.get_video_info()` to get a specific `VideoInfo` object
     pub video_infos: Box<[Box<[VideoInfo]>]>,
     pub warnings: Vec<Warning>,
+    /// number of usernames which were discarded at the deserialization stage
+    pub usernames_skipped: u64,
 }
 
 pub struct DBPaths {
@@ -262,7 +264,7 @@ impl DearrowDB {
             .find(|v| Arc::ptr_eq(&v.video_id, video_id))
     }
 
-    pub fn load_dir(dir: &Path, string_set: &mut StringSet) -> Result<LoadResult> {
+    pub fn load_dir(dir: &Path, string_set: &mut StringSet, load_all_usernames: bool) -> Result<LoadResult> {
         DearrowDB::load(
             &DBPaths {
                 thumbnails: dir.join("thumbnails.csv"),
@@ -276,10 +278,11 @@ impl DearrowDB {
                 warnings: dir.join("warnings.csv"),
             },
             string_set,
+            load_all_usernames,
         )
     }
 
-    pub fn load(paths: &DBPaths, string_set: &mut StringSet) -> Result<LoadResult> {
+    pub fn load(paths: &DBPaths, string_set: &mut StringSet, load_all_usernames: bool) -> Result<LoadResult> {
         // Briefly open each file in read-only to check if they exist before continuing to parse
         File::open(&paths.thumbnails).context("Could not open the thumbnails file")?;
         File::open(&paths.thumbnail_timestamps)
@@ -302,9 +305,6 @@ impl DearrowDB {
         info!("Loading titles...");
         let titles = Self::load_titles(paths, string_set, &mut errors)?;
 
-        info!("Loading usernames...");
-        let usernames = Self::load_usernames(paths, string_set, &mut errors)?;
-
         info!("Loading VIPs...");
         let vip_users = Self::load_vips(paths, string_set, &mut errors)?;
 
@@ -313,6 +313,9 @@ impl DearrowDB {
 
         info!("Loading warnings...");
         let warnings = Self::load_warnings(paths, string_set, &mut errors)?;
+
+        info!("Loading usernames...");
+        let (usernames, usernames_skipped) = Self::load_usernames(paths, string_set, &mut errors, load_all_usernames)?;
 
         info!("DearrowDB loaded!");
         Ok((
@@ -323,6 +326,7 @@ impl DearrowDB {
                 vip_users,
                 video_infos,
                 warnings,
+                usernames_skipped,
             },
             errors,
         ))
@@ -465,13 +469,19 @@ impl DearrowDB {
         paths: &DBPaths,
         string_set: &mut StringSet,
         errors: &mut Vec<ErrorContext>,
-    ) -> Result<HashMap<Arc<str>, Username>> {
-        Ok(csv::Reader::from_path(&paths.usernames)
+        load_all: bool,
+    ) -> Result<(HashMap<Arc<str>, Username>, u64)> {
+        let mut skip_count: u64 = 0;
+        Ok((csv::Reader::from_path(&paths.usernames)
             .context("could not initialize csv reader for usernames")?
             .into_deserialize::<csv_data::Username>()
             .filter_map(
                 |result| match result.context("Error while deserializing usernames") {
                     Ok(mut username) => {
+                        if !load_all && !string_set.set.contains(&username.user_id) {
+                            skip_count = skip_count.saturating_add(1);
+                            return None;
+                        }
                         username.dedupe(string_set);
                         TryInto::<Username>::try_into(username)
                             .map_err(|e| {
@@ -486,7 +496,9 @@ impl DearrowDB {
                 },
             )
             .map(|username| (username.user_id.clone(), username))
-            .collect())
+            .collect(),
+            skip_count
+        ))
     }
 
     fn load_vips(
@@ -528,9 +540,8 @@ impl DearrowDB {
             .into_deserialize::<csv_data::SponsorTime>()
             .for_each(|result| {
                 match result.context("Error while deserializing SponsorBlock segments") {
-                    Ok(mut segment) => {
-                        segment.dedupe(string_set);
-                        if let Some((hash_prefix, duration, segment)) = segment.filter_and_split() {
+                    Ok(segment) => {
+                        if let Some((hash_prefix, duration, segment)) = segment.filter_and_split(string_set) {
                             video_durations[hash_prefix as usize]
                                 .entry(duration.video_id.clone())
                                 .and_modify(|d| {
@@ -820,6 +831,8 @@ mod csv_data {
         pub hashed_video_id: String,
         #[serde(rename = "timeSubmitted")]
         pub time_submitted: i64,
+        #[serde(rename = "userID")]
+        pub user_id: Arc<str>,
     }
 
     #[derive(Deserialize)]
@@ -1073,17 +1086,21 @@ mod csv_data {
     }
 
     impl SponsorTime {
-        pub fn filter_and_split(self) -> Option<(u16, VideoDuration, TrimmedSponsorTime)> {
+        pub fn filter_and_split(mut self, string_set: &mut StringSet) -> Option<(u16, VideoDuration, TrimmedSponsorTime)> {
             let hash_prefix = match u16::from_str_radix(&self.hashed_video_id[..4], 16) {
                 Ok(n) => n,
                 Err(_) => compute_hashprefix(&self.video_id),
             };
+            // insert all userids, to register them as "seen" so that the usernames of these users
+            // are kept, even if we don't actually use these userids
+            string_set.dedupe_arc(&mut self.user_id);
             // https://github.com/ajayyy/SponsorBlockServer/blob/af31f511a53a7e30ad27123656a911393200672b/src/routes/getBranding.ts#L112
             if self.votes > -2
                 && self.shadow_hidden == 0
                 && self.hidden == 0
                 && self.action_type == "skip"
             {
+                self.dedupe(string_set);
                 Some((
                     hash_prefix,
                     VideoDuration {

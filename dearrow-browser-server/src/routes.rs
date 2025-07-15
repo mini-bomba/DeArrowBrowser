@@ -27,7 +27,7 @@ use cloneable_errors::{
     anyhow, bail, ErrorContext, IntoErrorIterator, ResContext, SerializableError,
 };
 use futures::join;
-use log::warn;
+use log::{info, warn};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::{collections::HashSet, sync::Arc};
@@ -186,7 +186,8 @@ fn do_reload(
         .map_err(|_| SS_READ_ERR.clone())?
         .clone();
     let (mut new_db, errors) =
-        DearrowDB::load_dir(config.mirror_path.as_path(), &mut string_set_clone)?;
+        DearrowDB::load_dir(config.mirror_path.as_path(), &mut string_set_clone, false)?;
+    info!("Skipped loading {} usernames", new_db.usernames_skipped);
     new_db.sort();
     let last_updated = Utc::now().timestamp_millis();
     let last_modified = utils::get_mtime(&config.mirror_path.join("titles.csv"));

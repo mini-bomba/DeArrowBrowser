@@ -113,7 +113,7 @@ async fn main() -> Result<(), ErrorContext> {
         let mut string_set = string_set_lock
             .write()
             .map_err(|_| constants::SS_WRITE_ERR.clone())?;
-        let (db, errors) = DearrowDB::load_dir(&config.mirror_path, &mut string_set)
+        let (db, errors) = DearrowDB::load_dir(&config.mirror_path, &mut string_set, false)
             .context("Initial DearrowDB load failed")?;
         string_set.clean();
 
@@ -138,6 +138,7 @@ async fn main() -> Result<(), ErrorContext> {
         db_state.etag = Some(db_state.generate_etag());
         web::Data::new(RwLock::new(db_state))
     };
+    info!("Skipped loading {} usernames", db.read().unwrap().db.usernames_skipped);
     info!("Database ready!");
 
     let mut server = {

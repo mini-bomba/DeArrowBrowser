@@ -61,8 +61,8 @@ pub mod sync {
         impl IntoWithDatabase<ApiTitle> for &parser_types::Title {
             fn into_with_db(self, db: &DearrowDB) -> ApiTitle {
                 let mut res: ApiTitle = self.into();
-                res.username = db.usernames.get(&res.user_id).map(|u| u.username.clone());
-                res.vip = db.vip_users.contains(&res.user_id);
+                res.username = db.get_username(&res.user_id).map(|u| u.username.clone());
+                res.vip = db.is_vip(&res.user_id);
                 res
             }
         }
@@ -93,8 +93,8 @@ pub mod sync {
         impl IntoWithDatabase<ApiThumbnail> for &parser_types::Thumbnail {
             fn into_with_db(self, db: &DearrowDB) -> ApiThumbnail {
                 let mut res: ApiThumbnail = self.into();
-                res.username = db.usernames.get(&res.user_id).map(|u| u.username.clone());
-                res.vip = db.vip_users.contains(&res.user_id);
+                res.username = db.get_username(&res.user_id).map(|u| u.username.clone());
+                res.vip = db.is_vip(&res.user_id);
                 res
             }
         }
@@ -102,12 +102,10 @@ pub mod sync {
         impl IntoWithDatabase<ApiWarning> for &parser_types::Warning {
             fn into_with_db(self, db: &DearrowDB) -> ApiWarning {
                 let warned_username = db
-                    .usernames
-                    .get(&self.warned_user_id)
+                    .get_username(&self.warned_user_id)
                     .map(|u| u.username.clone());
                 let issuer_username = db
-                    .usernames
-                    .get(&self.issuer_user_id)
+                    .get_username(&self.issuer_user_id)
                     .map(|u| u.username.clone());
                 ApiWarning {
                     warned_user_id: self.warned_user_id.clone(),

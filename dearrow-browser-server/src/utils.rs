@@ -50,7 +50,7 @@ impl HeaderMapExt for HeaderMap {
 }
 
 pub fn arc_addr<T: ?Sized>(arc: &Arc<T>) -> usize {
-    Arc::as_ptr(arc).cast::<()>() as usize
+    Arc::as_ptr(arc).addr()
 }
 
 pub struct ExtendResponder<T: Responder> {

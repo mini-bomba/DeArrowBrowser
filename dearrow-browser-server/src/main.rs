@@ -132,7 +132,6 @@ async fn main() -> Result<(), ErrorContext> {
             uncut_segment_count: 0,
             video_info_count: 0,
         };
-        db_state.db.sort();
         db_state.uncut_segment_count = db_state.calculate_uncut_segment_count();
         db_state.video_info_count = db_state.calculate_video_info_count();
         db_state.etag = Some(db_state.generate_etag());

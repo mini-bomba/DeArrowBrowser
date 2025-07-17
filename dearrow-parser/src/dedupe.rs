@@ -16,7 +16,7 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::HashSet, hash::{Hasher, Hash}, ops::Deref, sync::Arc};
 
 
 #[derive(Default, Clone)]
@@ -50,4 +50,47 @@ impl StringSet {
 
 pub trait Dedupe {
     fn dedupe(&mut self, set: &mut StringSet);
+}
+
+pub fn arc_addr<T: ?Sized>(arc: &Arc<T>) -> usize {
+    Arc::as_ptr(arc).addr()
+}
+
+/// A wrapper around Arc<T> that redefines the equality comparisons to be simple pointer equality
+/// checks.
+#[derive(Clone, Debug)]
+pub struct AddrArc<T: ?Sized>(Arc<T>);
+
+impl<T: ?Sized> AddrArc<T> {
+    /// Returns the internal Arc<T> instance
+    #[must_use]
+    pub fn unwrap(self) -> Arc<T> {
+        self.0
+    }
+}
+
+impl<T: ?Sized> PartialEq for AddrArc<T> {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+impl<T: ?Sized> Eq for AddrArc<T> {}
+impl<T: ?Sized> Hash for AddrArc<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Arc::as_ptr(&self.0).addr().hash(state);
+    }
+}
+
+impl<T: ?Sized> Deref for AddrArc<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T: ?Sized> From<Arc<T>> for AddrArc<T> {
+    fn from(value: Arc<T>) -> Self {
+        Self(value)
+    }
 }

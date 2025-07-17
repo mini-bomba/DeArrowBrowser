@@ -17,10 +17,7 @@
 */
 
 use std::{
-    collections::{HashMap, HashSet},
-    fs::File,
-    path::{Path, PathBuf},
-    sync::Arc,
+    collections::HashMap, fs::File, path::{Path, PathBuf}, sync::Arc
 };
 
 use cloneable_errors::{ErrContext, ErrorContext, ResContext};
@@ -28,7 +25,7 @@ use log::info;
 
 use crate::{
     csv::{parsing::WithWarnings, types as csv_types},
-    dedupe::{Dedupe, StringSet},
+    dedupe::{arc_addr, AddrArc, Dedupe, StringSet},
     types::*,
 };
 
@@ -37,8 +34,8 @@ type Result<T> = std::result::Result<T, ErrorContext>;
 pub struct DearrowDB {
     pub titles: Vec<Title>,
     pub thumbnails: Vec<Thumbnail>,
-    pub usernames: HashMap<Arc<str>, Username>,
-    pub vip_users: HashSet<Arc<str>>,
+    pub usernames: Vec<Username>,
+    pub vip_users: Vec<Arc<str>>,
     /// `VideoInfos` are grouped by hashprefix (a u16 value)
     /// Use `.get_video_info()` to get a specific `VideoInfo` object
     pub video_infos: Box<[Box<[VideoInfo]>]>,
@@ -62,17 +59,30 @@ pub struct DBPaths {
 pub type LoadResult = (DearrowDB, Vec<ErrorContext>);
 
 impl DearrowDB {
-    pub fn sort(&mut self) {
-        self.titles
-            .sort_unstable_by(|a, b| a.time_submitted.cmp(&b.time_submitted));
-        self.thumbnails
-            .sort_unstable_by(|a, b| a.time_submitted.cmp(&b.time_submitted));
+    fn sort(&mut self) {
+        self.titles.sort_unstable_by_key(|v| v.time_submitted);
+        self.thumbnails.sort_unstable_by_key(|v| v.time_submitted);
+        self.usernames.sort_unstable_by_key(|v| arc_addr(&v.user_id));
+        self.vip_users.sort_unstable_by_key(arc_addr);
     }
 
     pub fn get_video_info(&self, video_id: &Arc<str>) -> Option<&VideoInfo> {
         self.video_infos[compute_hashprefix(video_id) as usize]
             .iter()
             .find(|v| Arc::ptr_eq(&v.video_id, video_id))
+    }
+
+    pub fn get_username(&self, user_id: &Arc<str>) -> Option<&Username> {
+        self.usernames
+            .binary_search_by_key(&arc_addr(user_id), |u| arc_addr(&u.user_id))
+            .ok()
+            .map(|i| &self.usernames[i])
+    }
+
+    pub fn is_vip(&self, user_id: &Arc<str>) -> bool {
+        self.vip_users
+            .binary_search_by_key(&arc_addr(user_id), arc_addr)
+            .is_ok()
     }
 
     pub fn load_dir(dir: &Path, string_set: &mut StringSet, load_all_usernames: bool) -> Result<LoadResult> {
@@ -128,19 +138,20 @@ impl DearrowDB {
         info!("Loading usernames...");
         let (usernames, usernames_skipped) = Self::load_usernames(paths, string_set, &mut errors, load_all_usernames)?;
 
+        info!("Sorting the database...");
+        let mut data = DearrowDB {
+            titles,
+            thumbnails,
+            usernames,
+            vip_users,
+            video_infos,
+            warnings,
+            usernames_skipped,
+        };
+        data.sort();
+
         info!("DearrowDB loaded!");
-        Ok((
-            DearrowDB {
-                titles,
-                thumbnails,
-                usernames,
-                vip_users,
-                video_infos,
-                warnings,
-                usernames_skipped,
-            },
-            errors,
-        ))
+        Ok((data, errors))
     }
 
     fn load_thumbnails(
@@ -150,7 +161,7 @@ impl DearrowDB {
     ) -> Result<Vec<Thumbnail>> {
         // Load the entirety of thumbnailTimestamps and thumbnailVotes into HashMaps, while
         // deduplicating strings
-        let thumbnail_timestamps: HashMap<Arc<str>, csv_types::ThumbnailTimestamps> =
+        let thumbnail_timestamps: HashMap<AddrArc<str>, csv_types::ThumbnailTimestamps> =
             csv::Reader::from_path(&paths.thumbnail_timestamps)
                 .context("Could not initialize csv reader for thumbnail timestamps")?
                 .into_deserialize::<csv_types::ThumbnailTimestamps>()
@@ -166,9 +177,9 @@ impl DearrowDB {
                         }
                     }
                 })
-                .map(|timestamp| (timestamp.uuid.clone(), timestamp))
+                .map(|timestamp| (timestamp.uuid.clone().into(), timestamp))
                 .collect();
-        let thumbnail_votes: HashMap<Arc<str>, csv_types::ThumbnailVotes> =
+        let thumbnail_votes: HashMap<AddrArc<str>, csv_types::ThumbnailVotes> =
             csv::Reader::from_path(&paths.thumbnail_votes)
                 .context("Could not initialize csv reader for thumbnail votes")?
                 .into_deserialize::<csv_types::ThumbnailVotes>()
@@ -184,7 +195,7 @@ impl DearrowDB {
                         }
                     }
                 })
-                .map(|thumb| (thumb.uuid.clone(), thumb))
+                .map(|thumb| (thumb.uuid.clone().into(), thumb))
                 .collect();
 
         // Load the Thumbnail objects while deduplicating strings and merging them with other Thumbnail* objects
@@ -195,8 +206,9 @@ impl DearrowDB {
                 |result| match result.context("Error while deserializing thumbnails") {
                     Ok(mut thumb) => {
                         thumb.dedupe(string_set);
-                        let timestamp = thumbnail_timestamps.get(&thumb.uuid);
-                        let votes = thumbnail_votes.get(&thumb.uuid);
+                        let uuid = thumb.uuid.clone().into();
+                        let timestamp = thumbnail_timestamps.get(&uuid);
+                        let votes = thumbnail_votes.get(&uuid);
                         match thumb.try_merge(timestamp, votes) {
                             Ok(WithWarnings { obj, warnings }) => {
                                 errors.extend(
@@ -226,7 +238,7 @@ impl DearrowDB {
         string_set: &mut StringSet,
         errors: &mut Vec<ErrorContext>,
     ) -> Result<Vec<Title>> {
-        let title_votes: HashMap<Arc<str>, csv_types::TitleVotes> =
+        let title_votes: HashMap<AddrArc<str>, csv_types::TitleVotes> =
             csv::Reader::from_path(&paths.title_votes)
                 .context("Could not initialize csv reader for title votes")?
                 .into_deserialize::<csv_types::TitleVotes>()
@@ -242,7 +254,7 @@ impl DearrowDB {
                         }
                     }
                 })
-                .map(|title| (title.uuid.clone(), title))
+                .map(|title| (title.uuid.clone().into(), title))
                 .collect();
         Ok(csv::Reader::from_path(&paths.titles)
             .context("Could not initialize csv reader for titles")?
@@ -251,7 +263,7 @@ impl DearrowDB {
                 |result| match result.context("Error while deserializing titles") {
                     Ok(mut title) => {
                         title.dedupe(string_set);
-                        let votes = title_votes.get(&title.uuid);
+                        let votes = title_votes.get(&title.uuid.clone().into());
                         match title.try_merge(votes) {
                             Ok(WithWarnings { obj, warnings }) => {
                                 errors.extend(
@@ -281,7 +293,7 @@ impl DearrowDB {
         string_set: &mut StringSet,
         errors: &mut Vec<ErrorContext>,
         load_all: bool,
-    ) -> Result<(HashMap<Arc<str>, Username>, u64)> {
+    ) -> Result<(Vec<Username>, u64)> {
         let mut skip_count: u64 = 0;
         Ok((csv::Reader::from_path(&paths.usernames)
             .context("could not initialize csv reader for usernames")?
@@ -306,7 +318,6 @@ impl DearrowDB {
                     }
                 },
             )
-            .map(|username| (username.user_id.clone(), username))
             .collect(),
             skip_count
         ))
@@ -316,7 +327,7 @@ impl DearrowDB {
         paths: &DBPaths,
         string_set: &mut StringSet,
         errors: &mut Vec<ErrorContext>,
-    ) -> Result<HashSet<Arc<str>>> {
+    ) -> Result<Vec<Arc<str>>> {
         Ok(csv::Reader::from_path(&paths.vip_users)
             .context("could not initialize csv reader for VIP users")?
             .into_deserialize::<csv_types::VIPUser>()
@@ -342,9 +353,9 @@ impl DearrowDB {
         errors: &mut Vec<ErrorContext>,
     ) -> Result<Box<[Box<[VideoInfo]>]>> {
         const HASHBLOCK_RANGE: std::ops::RangeInclusive<usize> = 0..=u16::MAX as usize;
-        let mut segments: Box<[HashMap<Arc<str>, Vec<csv_types::TrimmedSponsorTime>>]> =
+        let mut segments: Box<[HashMap<AddrArc<str>, Vec<csv_types::TrimmedSponsorTime>>]> =
             HASHBLOCK_RANGE.map(|_| HashMap::new()).collect();
-        let mut video_durations: Box<[HashMap<Arc<str>, csv_types::VideoDuration>]> =
+        let mut video_durations: Box<[HashMap<AddrArc<str>, csv_types::VideoDuration>]> =
             HASHBLOCK_RANGE.map(|_| HashMap::new()).collect();
         csv::Reader::from_path(&paths.sponsor_times)
             .context("could not initialize csv reader for SponsorBlock segments")?
@@ -354,7 +365,7 @@ impl DearrowDB {
                     Ok(segment) => {
                         if let Some((hash_prefix, duration, segment)) = segment.filter_and_split(string_set) {
                             video_durations[hash_prefix as usize]
-                                .entry(duration.video_id.clone())
+                                .entry(duration.video_id.clone().into())
                                 .and_modify(|d| {
                                     if duration.video_duration != 0.
                                         && (d.time_submitted > duration.time_submitted
@@ -369,7 +380,7 @@ impl DearrowDB {
                                 })
                                 .or_insert(duration);
                             segments[hash_prefix as usize]
-                                .entry(segment.video_id.clone())
+                                .entry(segment.video_id.clone().into())
                                 .or_default()
                                 .push(segment);
                         }
@@ -382,11 +393,12 @@ impl DearrowDB {
                 video_durations[hash_prefix]
                     .values()
                     .filter_map(|duration| {
+                        let vid = duration.video_id.clone().into();
                         let video_duration = if duration.video_duration > 0. {
                             duration.video_duration
                         } else {
                             match segments[hash_prefix]
-                                .get(&duration.video_id)
+                                .get(&vid)
                                 .and_then(|l| l.iter().map(|s| s.end_time).max_by(f64::total_cmp))
                             {
                                 None => return None, // no duration, no segments - no data
@@ -396,7 +408,7 @@ impl DearrowDB {
                         Some(VideoInfo {
                             video_id: duration.video_id.clone(),
                             video_duration: duration.video_duration,
-                            uncut_segments: match segments[hash_prefix].get_mut(&duration.video_id)
+                            uncut_segments: match segments[hash_prefix].get_mut(&vid)
                             {
                                 None => Box::new([UncutSegment {
                                     offset: 0.,

@@ -185,10 +185,9 @@ fn do_reload(
         .read()
         .map_err(|_| SS_READ_ERR.clone())?
         .clone();
-    let (mut new_db, errors) =
+    let (new_db, errors) =
         DearrowDB::load_dir(config.mirror_path.as_path(), &mut string_set_clone, false)?;
     info!("Skipped loading {} usernames", new_db.usernames_skipped);
-    new_db.sort();
     let last_updated = Utc::now().timestamp_millis();
     let last_modified = utils::get_mtime(&config.mirror_path.join("titles.csv"));
     {
@@ -619,7 +618,7 @@ async fn get_user_by_userid(
             active_warning_count: 0,
         },
         Some(user_id) => {
-            let username = db.db.usernames.get(&user_id);
+            let username = db.db.get_username(&user_id);
             let (warning_count, active_warnings) = db.db.warnings.iter().fold((0, 0), |acc, w| {
                 if w.warned_user_id != user_id {
                     acc

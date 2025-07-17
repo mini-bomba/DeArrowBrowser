@@ -360,7 +360,7 @@ async fn get_user_info(db_lock: DBLock, string_set: StringSetLock, query: web::Q
         Some(user_id) => {
             let active_warnings: Vec<_> = db.db.warnings.iter().rev().filter(|w| w.active && Arc::ptr_eq(&w.warned_user_id, &user_id)).collect();
             UserInfo {
-                userName: db.db.usernames.get(&user_id).map_or_else(|| user_id.clone(), |u| u.username.clone()),
+                userName: db.db.get_username(&user_id).map_or_else(|| user_id.clone(), |u| u.username.clone()),
                 titleSubmissionCount: db.db.titles.iter().filter(|t| Arc::ptr_eq(&t.user_id, &user_id) && t.votes >= 0).count(),
                 thumbnailSubmissionCount: db.db.thumbnails.iter().filter(|t| Arc::ptr_eq(&t.user_id, &user_id) && t.votes >= 0).count(),
                 vip: db.db.vip_users.contains(&user_id),

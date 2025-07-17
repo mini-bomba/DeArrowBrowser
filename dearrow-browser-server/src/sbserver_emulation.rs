@@ -24,7 +24,7 @@ use std::{sync::Arc, collections::HashMap};
 use actix_web::{get, http::StatusCode, post, web, CustomizeResponder, HttpResponse, Responder};
 use alea_js::Alea;
 use cloneable_errors::anyhow;
-use dearrow_parser::{Extension, Thumbnail, ThumbnailFlags, Title, TitleFlags, VideoInfo};
+use dearrow_parser::types::{Extension, Thumbnail, ThumbnailFlags, Title, TitleFlags, VideoInfo};
 use serde::{Deserialize, Serialize};
 
 use crate::{errors::{self, extensions}, middleware::etag::ETagCache, state::{DBLock, StringSetLock}};

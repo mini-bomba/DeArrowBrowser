@@ -23,7 +23,7 @@ use actix_web::{
 };
 use chrono::Utc;
 use constants::CONFIG_PATH;
-use dearrow_parser::{DearrowDB, StringSet};
+use dearrow_parser::{db::DearrowDB, dedupe::StringSet};
 use env_logger::Env;
 use cloneable_errors::{bail, ErrorContext, ResContext};
 use log::info;

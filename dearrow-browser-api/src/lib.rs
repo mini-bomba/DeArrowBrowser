@@ -27,14 +27,16 @@ pub mod sync {
     #[cfg(feature = "dearrow-parser")]
     mod dearrow_parser_traits {
         use super::*;
+        use dearrow_parser::db::DearrowDB;
+        use dearrow_parser::types as parser_types;
 
         pub trait IntoWithDatabase<T> {
-            fn into_with_db(self, db: &dearrow_parser::DearrowDB) -> T;
+            fn into_with_db(self, db: &DearrowDB) -> T;
         }
 
-        impl From<&dearrow_parser::Title> for ApiTitle {
-            fn from(value: &dearrow_parser::Title) -> Self {
-                use dearrow_parser::TitleFlags;
+        impl From<&parser_types::Title> for ApiTitle {
+            fn from(value: &parser_types::Title) -> Self {
+                use parser_types::TitleFlags;
                 let unverified = value.flags.contains(TitleFlags::Unverified);
                 Self {
                     uuid: value.uuid.clone(),
@@ -56,8 +58,8 @@ pub mod sync {
                 }
             }
         }
-        impl IntoWithDatabase<ApiTitle> for &dearrow_parser::Title {
-            fn into_with_db(self, db: &dearrow_parser::DearrowDB) -> ApiTitle {
+        impl IntoWithDatabase<ApiTitle> for &parser_types::Title {
+            fn into_with_db(self, db: &DearrowDB) -> ApiTitle {
                 let mut res: ApiTitle = self.into();
                 res.username = db.usernames.get(&res.user_id).map(|u| u.username.clone());
                 res.vip = db.vip_users.contains(&res.user_id);
@@ -65,9 +67,9 @@ pub mod sync {
             }
         }
 
-        impl From<&dearrow_parser::Thumbnail> for ApiThumbnail {
-            fn from(value: &dearrow_parser::Thumbnail) -> Self {
-                use dearrow_parser::ThumbnailFlags;
+        impl From<&parser_types::Thumbnail> for ApiThumbnail {
+            fn from(value: &parser_types::Thumbnail) -> Self {
+                use parser_types::ThumbnailFlags;
                 Self {
                     uuid: value.uuid.clone(),
                     video_id: value.video_id.clone(),
@@ -88,8 +90,8 @@ pub mod sync {
                 }
             }
         }
-        impl IntoWithDatabase<ApiThumbnail> for &dearrow_parser::Thumbnail {
-            fn into_with_db(self, db: &dearrow_parser::DearrowDB) -> ApiThumbnail {
+        impl IntoWithDatabase<ApiThumbnail> for &parser_types::Thumbnail {
+            fn into_with_db(self, db: &DearrowDB) -> ApiThumbnail {
                 let mut res: ApiThumbnail = self.into();
                 res.username = db.usernames.get(&res.user_id).map(|u| u.username.clone());
                 res.vip = db.vip_users.contains(&res.user_id);
@@ -97,8 +99,8 @@ pub mod sync {
             }
         }
 
-        impl IntoWithDatabase<ApiWarning> for &dearrow_parser::Warning {
-            fn into_with_db(self, db: &dearrow_parser::DearrowDB) -> ApiWarning {
+        impl IntoWithDatabase<ApiWarning> for &parser_types::Warning {
+            fn into_with_db(self, db: &DearrowDB) -> ApiWarning {
                 let warned_username = db
                     .usernames
                     .get(&self.warned_user_id)
@@ -116,8 +118,8 @@ pub mod sync {
                     message: self.message.clone(),
                     active: self.active,
                     extension: match self.extension {
-                        dearrow_parser::Extension::SponsorBlock => Extension::SponsorBlock,
-                        dearrow_parser::Extension::DeArrow => Extension::DeArrow,
+                        parser_types::Extension::SponsorBlock => Extension::SponsorBlock,
+                        parser_types::Extension::DeArrow => Extension::DeArrow,
                     },
                 }
             }

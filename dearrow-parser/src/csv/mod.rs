@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2025 mini_bomba
+*  Copyright (C) 2023-2025 mini_bomba
 *
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -16,8 +16,5 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub(crate) mod csv;
-pub mod db;
-pub mod dedupe;
-pub mod errors;
-pub mod types;
+pub(crate) mod types;
+pub(crate) mod parsing;

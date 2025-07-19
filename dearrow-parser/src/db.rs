@@ -17,16 +17,14 @@
 */
 
 use std::{
-    collections::HashMap, fs::File, path::{Path, PathBuf}, sync::Arc
+    collections::{hash_map::Entry, HashMap}, fs::File, path::{Path, PathBuf}, sync::Arc
 };
 
 use cloneable_errors::{ErrContext, ErrorContext, ResContext};
 use log::info;
 
 use crate::{
-    csv::{parsing::WithWarnings, types as csv_types},
-    dedupe::{arc_addr, AddrArc, Dedupe, StringSet},
-    types::*,
+    csv::{parsing::WithWarnings, types as csv_types}, dedupe::{arc_addr, AddrArc, Dedupe, StringSet}, errors::{ObjectKind, ParseError, ParseErrorKind}, types::*
 };
 
 type Result<T> = std::result::Result<T, ErrorContext>;
@@ -40,6 +38,7 @@ pub struct DearrowDB {
     /// Use `.get_video_info()` to get a specific `VideoInfo` object
     pub video_infos: Box<[Box<[VideoInfo]>]>,
     pub warnings: Vec<Warning>,
+    pub casual_titles: Vec<CasualTitle>,
     /// number of usernames which were discarded at the deserialization stage
     pub usernames_skipped: u64,
 }
@@ -54,6 +53,8 @@ pub struct DBPaths {
     pub vip_users: PathBuf,
     pub sponsor_times: PathBuf,
     pub warnings: PathBuf,
+    pub casual_votes: PathBuf,
+    pub casual_vote_titles: PathBuf,
 }
 
 pub type LoadResult = (DearrowDB, Vec<ErrorContext>);
@@ -64,6 +65,7 @@ impl DearrowDB {
         self.thumbnails.sort_unstable_by_key(|v| v.time_submitted);
         self.usernames.sort_unstable_by_key(|v| arc_addr(&v.user_id));
         self.vip_users.sort_unstable_by_key(arc_addr);
+        self.casual_titles.sort_unstable_by_key(|v| v.first_submitted);
     }
 
     pub fn get_video_info(&self, video_id: &Arc<str>) -> Option<&VideoInfo> {
@@ -88,15 +90,17 @@ impl DearrowDB {
     pub fn load_dir(dir: &Path, string_set: &mut StringSet, load_all_usernames: bool) -> Result<LoadResult> {
         DearrowDB::load(
             &DBPaths {
-                thumbnails: dir.join("thumbnails.csv"),
+                thumbnails:           dir.join("thumbnails.csv"),
                 thumbnail_timestamps: dir.join("thumbnailTimestamps.csv"),
-                thumbnail_votes: dir.join("thumbnailVotes.csv"),
-                titles: dir.join("titles.csv"),
-                title_votes: dir.join("titleVotes.csv"),
-                usernames: dir.join("userNames.csv"),
-                vip_users: dir.join("vipUsers.csv"),
-                sponsor_times: dir.join("sponsorTimes.csv"),
-                warnings: dir.join("warnings.csv"),
+                thumbnail_votes:      dir.join("thumbnailVotes.csv"),
+                titles:               dir.join("titles.csv"),
+                title_votes:          dir.join("titleVotes.csv"),
+                usernames:            dir.join("userNames.csv"),
+                vip_users:            dir.join("vipUsers.csv"),
+                sponsor_times:        dir.join("sponsorTimes.csv"),
+                warnings:             dir.join("warnings.csv"),
+                casual_votes:         dir.join("casualVotes.csv"),
+                casual_vote_titles:   dir.join("casualVoteTitles.csv"),
             },
             string_set,
             load_all_usernames,
@@ -126,6 +130,9 @@ impl DearrowDB {
         info!("Loading titles...");
         let titles = Self::load_titles(paths, string_set, &mut errors)?;
 
+        info!("Loading casual titles...");
+        let casual_titles = Self::load_casual_titles(paths, string_set, &mut errors)?;
+
         info!("Loading VIPs...");
         let vip_users = Self::load_vips(paths, string_set, &mut errors)?;
 
@@ -146,6 +153,7 @@ impl DearrowDB {
             vip_users,
             video_infos,
             warnings,
+            casual_titles,
             usernames_skipped,
         };
         data.sort();
@@ -286,6 +294,62 @@ impl DearrowDB {
                 },
             )
             .collect())
+    }
+
+    fn load_casual_titles(
+        paths: &DBPaths,
+        string_set: &mut StringSet,
+        errors: &mut Vec<ErrorContext>,
+    ) -> Result<Vec<CasualTitle>> {
+        let mut titles: HashMap<(usize, i8), CasualTitle> = 
+            csv::Reader::from_path(&paths.casual_vote_titles)
+                .context("Could not initialize csv reader for casual vote titles")?
+                .into_deserialize::<csv_types::CasualTitle>()
+                .filter_map(|result| 
+                    match result.context("Error while deserializing casual vote titles") {
+                        Ok(mut title) => {
+                            title.dedupe(string_set);
+                            Some(((arc_addr(&title.video_id), title.id), title.into()))
+                        }
+                        Err(error) => {
+                            errors.push(error);
+                            None
+                        }
+                    }
+                )
+                .collect();
+        csv::Reader::from_path(&paths.casual_votes)
+            .context("Could not initialize csv reader for casual votes")?
+            .into_deserialize::<csv_types::CasualVote>()
+            .for_each(|result| {
+                let mut vote = match result.context("Error while deserializing casual votes") {
+                    Ok(vote) => vote,
+                    Err(error) => return errors.push(error),
+                };
+                vote.dedupe(string_set);
+                match titles.entry((arc_addr(&vote.video_id), vote.title_id)) {
+                    Entry::Vacant(entry) => drop(entry.insert(vote.into())),
+                    Entry::Occupied(entry) => entry.into_mut().add_vote(vote).context("Error while merging casual votes").unwrap_or_else(|err| errors.push(err)),
+                }
+            });
+        Ok(
+            titles.into_values()
+                .filter(|title| {
+                    if title.votes.values().all(Option::is_none) {
+                        errors.push(ParseError(
+                            ObjectKind::CasualTitle,
+                            ParseErrorKind::CasualTitleWithoutVotes {
+                                video_id: title.video_id.clone(),
+                                title: title.title.clone(),
+                            }
+                        ).context("Error while finalizing casual vote merge"));
+                        false
+                    } else {
+                        true
+                    }
+                })
+                .collect()
+        )
     }
 
     fn load_usernames(

@@ -21,6 +21,7 @@ use std::sync::{Arc, LazyLock};
 use serde::Deserialize;
 
 use crate::dedupe::{Dedupe, StringSet};
+use crate::types::CasualCategory;
 
 #[derive(Deserialize)]
 pub struct Thumbnail {
@@ -170,6 +171,30 @@ pub struct VideoDuration {
     pub has_outro: bool,
 }
 
+#[derive(Deserialize)]
+pub struct CasualTitle {
+    #[serde(rename = "videoID")]
+    pub video_id: Arc<str>,
+    pub id: i8,
+    #[serde(rename = "hashedVideoID")]
+    pub hashed_video_id: String,
+    pub title: Arc<str>,
+}
+
+#[derive(Deserialize)]
+pub struct CasualVote {
+    #[serde(rename = "videoID")]
+    pub video_id: Arc<str>,
+    #[serde(rename = "hashedVideoID")]
+    pub hashed_video_id: String,
+    pub category: CasualCategory,
+    pub upvotes: i16,
+    #[serde(rename = "timeSubmitted")]
+    pub time_submitted: i64,
+    #[serde(rename = "titleID")]
+    pub title_id: i8,
+}
+
 impl Dedupe for Thumbnail {
     fn dedupe(&mut self, set: &mut StringSet) {
         set.dedupe_arc(&mut self.uuid);
@@ -235,5 +260,18 @@ impl Dedupe for Warning {
         set.dedupe_arc(&mut self.user_id);
         set.dedupe_arc(&mut self.issuer_user_id);
         set.dedupe_arc(&mut self.reason);
+    }
+}
+
+impl Dedupe for CasualTitle {
+    fn dedupe(&mut self, set: &mut StringSet) {
+        set.dedupe_arc(&mut self.video_id);
+        set.dedupe_arc(&mut self.title);
+    }
+}
+
+impl Dedupe for CasualVote {
+    fn dedupe(&mut self, set: &mut StringSet) {
+        set.dedupe_arc(&mut self.video_id);
     }
 }

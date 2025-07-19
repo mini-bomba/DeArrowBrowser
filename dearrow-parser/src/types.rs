@@ -18,8 +18,11 @@
 
 use std::sync::Arc;
 
+use enum_map::{Enum, EnumMap};
 use enumflags2::{bitflags, BitFlags};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use strum::VariantNames;
 
 use crate::dedupe::{Dedupe, StringSet};
 
@@ -112,6 +115,27 @@ pub struct Warning {
     pub active: bool,
 }
 
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Copy, Debug, Enum, VariantNames)]
+#[serde(rename_all = "lowercase")]
+#[strum(serialize_all = "lowercase")]
+pub enum CasualCategory {
+    Funny,
+    Creative,
+    Clever,
+    Descriptive,
+    Other,
+    Downvote,
+}
+
+#[derive(Clone, Debug)]
+pub struct CasualTitle {
+    pub video_id: Arc<str>,
+    pub hash_prefix: u16,
+    pub title: Option<Arc<str>>,
+    pub first_submitted: i64,
+    pub votes: EnumMap<CasualCategory, Option<i16>>,
+}
+
 impl Dedupe for Thumbnail {
     fn dedupe(&mut self, set: &mut StringSet) {
         set.dedupe_arc(&mut self.uuid);
@@ -139,6 +163,15 @@ impl Dedupe for Warning {
         set.dedupe_arc(&mut self.warned_user_id);
         set.dedupe_arc(&mut self.issuer_user_id);
         set.dedupe_arc(&mut self.message);
+    }
+}
+
+impl Dedupe for CasualTitle {
+    fn dedupe(&mut self, set: &mut StringSet) {
+        set.dedupe_arc(&mut self.video_id);
+        if let Some(ref mut title) = self.title {
+            set.dedupe_arc(title);
+        }
     }
 }
 

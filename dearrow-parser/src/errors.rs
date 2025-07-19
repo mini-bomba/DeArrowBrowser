@@ -18,6 +18,10 @@
 
 use std::{fmt::Display, sync::Arc};
 
+use strum::VariantNames;
+
+use crate::types::CasualCategory;
+
 #[derive(Debug, Clone)]
 pub enum ParseErrorKind {
     InvalidValue {
@@ -34,6 +38,15 @@ pub enum ParseErrorKind {
         struct_name: &'static str,
         uuid: Arc<str>,
     },
+    DuplicateVote {
+        video_id: Arc<str>,
+        title_id: i8,
+        category: CasualCategory,
+    },
+    CasualTitleWithoutVotes {
+        video_id: Arc<str>,
+        title: Option<Arc<str>>,
+    }
 }
 
 #[derive(Debug, Clone, Copy, strum::Display)]
@@ -42,6 +55,7 @@ pub enum ObjectKind {
     Thumbnail,
     Username,
     Warning,
+    CasualTitle,
 }
 
 #[derive(Debug, Clone)]
@@ -54,7 +68,10 @@ impl Display for ParseError {
         match self.1 {
             ParseErrorKind::InvalidValue { ref uuid, field, value } => write!(f, "Parsing error: Field {field} in {object_kind} {uuid} contained an invalid value: {value}"),
             ParseErrorKind::MismatchedUUIDs { struct_name, ref uuid_main, ref uuid_struct } => write!(f, "Merge error: Component {struct_name} of {object_kind} {uuid_main} had a different UUID: {uuid_struct}"),
-            ParseErrorKind::MissingSubobject { struct_name, ref uuid } => write!(f, "Parsing error: {object_kind} {uuid} was missing an associated {struct_name} object")
+            ParseErrorKind::MissingSubobject { struct_name, ref uuid } => write!(f, "Parsing error: {object_kind} {uuid} was missing an associated {struct_name} object"),
+            ParseErrorKind::DuplicateVote { ref video_id, title_id, category } => write!(f, "Merge error: Casual title #{title_id} on video {video_id} has multiple vote entries for category {}", CasualCategory::VARIANTS[category as usize]),
+            ParseErrorKind::CasualTitleWithoutVotes { ref video_id, title: Some(ref title) } => write!(f, "Merge error: Casual title \"{title}\" on video {video_id} had no associated CasualVote entries"),
+            ParseErrorKind::CasualTitleWithoutVotes { ref video_id, title: None } => write!(f, "Merge error: Casual null title on video {video_id} had no associated CasualVote entries"),
         }
     }
 }

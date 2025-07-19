@@ -16,6 +16,7 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use enum_map::EnumMap;
 use enumflags2::BitFlag;
 
 use crate::{
@@ -333,5 +334,59 @@ impl TryFrom<Warning> for types::Warning {
             active,
             extension,
         })
+    }
+}
+
+impl From<CasualTitle> for types::CasualTitle {
+    fn from(value: CasualTitle) -> Self {
+        Self {
+            hash_prefix: match u16::from_str_radix(&value.hashed_video_id[..4], 16) {
+                Ok(n) => n,
+                Err(_) => compute_hashprefix(&value.video_id),
+            },
+            video_id: value.video_id,
+            title: Some(value.title),
+            first_submitted: i64::MAX,
+            votes: EnumMap::default(),
+        }
+    }
+}
+
+impl From<CasualVote> for types::CasualTitle {
+    fn from(value: CasualVote) -> Self {
+        Self {
+            hash_prefix: match u16::from_str_radix(&value.hashed_video_id[..4], 16) {
+                Ok(n) => n,
+                Err(_) => compute_hashprefix(&value.video_id),
+            },
+            video_id: value.video_id.clone(),
+            title: None,
+            first_submitted: value.time_submitted,
+            votes: {
+                let mut votes = EnumMap::default();
+                votes[value.category] = Some(value.upvotes);
+                votes
+            },
+        }
+    }
+}
+
+impl types::CasualTitle {
+    pub(crate) fn add_vote(&mut self, vote: CasualVote) -> Result<()> {
+        if self.votes[vote.category].is_some() {
+            return Err(ParseError(
+                ObjectKind::CasualTitle,
+                ParseErrorKind::DuplicateVote {
+                    video_id: vote.video_id,
+                    title_id: vote.title_id,
+                    category: vote.category,
+                }
+            ))
+        }
+
+        self.first_submitted = self.first_submitted.min(vote.time_submitted);
+        self.votes[vote.category] = Some(vote.upvotes);
+
+        Ok(())
     }
 }

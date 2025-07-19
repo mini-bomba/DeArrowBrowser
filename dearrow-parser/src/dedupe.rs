@@ -16,7 +16,7 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::{collections::HashSet, hash::{Hasher, Hash}, ops::Deref, sync::Arc};
+use std::{collections::HashSet, hash::{Hash, Hasher}, ops::Deref, sync::Arc};
 
 
 #[derive(Default, Clone)]
@@ -56,7 +56,7 @@ pub fn arc_addr<T: ?Sized>(arc: &Arc<T>) -> usize {
     Arc::as_ptr(arc).addr()
 }
 
-/// A wrapper around Arc<T> that redefines the equality comparisons to be simple pointer equality
+/// A wrapper around [`Arc<T>`] that redefines the equality comparisons to be simple pointer equality
 /// checks.
 #[derive(Clone, Debug)]
 pub struct AddrArc<T: ?Sized>(Arc<T>);

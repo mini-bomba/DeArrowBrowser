@@ -19,16 +19,22 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 #![allow(clippy::needless_pass_by_value)]
-use std::{sync::Arc, collections::HashMap};
+use std::{collections::HashMap, sync::Arc};
 
 use actix_web::{get, http::StatusCode, post, web, CustomizeResponder, HttpResponse, Responder};
 use alea_js::Alea;
 use cloneable_errors::anyhow;
-use dearrow_parser::types::{Extension, Thumbnail, ThumbnailFlags, Title, TitleFlags, VideoInfo};
+use dearrow_parser::types::{
+    CasualCategory, CasualTitle, Extension, Thumbnail, ThumbnailFlags, Title, TitleFlags, VideoInfo,
+};
 use serde::{Deserialize, Serialize};
 
-use crate::{errors::{self, extensions}, middleware::etag::ETagCache, state::{DBLock, StringSetLock}};
 use crate::constants::*;
+use crate::{
+    errors::{self, extensions},
+    middleware::etag::ETagCache,
+    state::{DBLock, StringSetLock},
+};
 
 type JsonResult<T> = errors::Result<web::Json<T>>;
 type CustomizedJsonResult<T> = errors::Result<CustomizeResponder<web::Json<T>>>;
@@ -117,11 +123,35 @@ impl SBApiThumbnail {
     }
 }
 
+#[derive(Serialize, Debug, Clone)]
+struct SBApiCasualVote {
+    id: CasualCategory,
+    count: i16,
+    title: Option<Arc<str>>,
+}
+
+impl SBApiCasualVote {
+    fn from_db(title: &CasualTitle) -> impl Iterator<Item = SBApiCasualVote> + use<'_> {
+        let downvotes = title.votes[CasualCategory::Downvote].unwrap_or_default();
+        title.votes.iter()
+            .filter(move |(category, votes)|
+                *category != CasualCategory::Downvote
+                && votes.is_some_and(|votes| votes > downvotes)
+            )
+            .map(move |(category, votes)| SBApiCasualVote {
+                id: category,
+                count: votes.unwrap() - downvotes,
+                title: title.title.clone(),
+            })
+    }
+}
+
 #[allow(non_snake_case)]
 #[derive(Serialize, Debug, Clone)]
 struct SBApiVideo {
     titles: Vec<SBApiTitle>,
     thumbnails: Vec<SBApiThumbnail>,
+    casualVotes: Vec<SBApiCasualVote>,
     randomTime: f64,
     videoDuration: Option<f64>,
 }
@@ -161,6 +191,7 @@ fn unknown_video(video_id: &str) -> SBApiVideo {
     SBApiVideo {
         titles: vec![],
         thumbnails: vec![],
+        casualVotes: vec![],
         randomTime: get_random_time_for_video(video_id, None),
         videoDuration: None,
     }
@@ -221,6 +252,10 @@ async fn get_video_branding(db_lock: DBLock, string_set: StringSetLock, query: w
                     thumbs.sort_unstable_by(|a, b| a.locked.cmp(&b.locked).then(a.votes.cmp(&b.votes).then(a.original.cmp(&b.original).reverse())).reverse());
                     thumbs
                 },
+                casualVotes: db.db.casual_titles.iter()
+                    .filter(|title| Arc::ptr_eq(&title.video_id, &video_id))
+                    .flat_map(SBApiCasualVote::from_db)
+                    .collect(),
                 randomTime: get_random_time_for_video(&video_id, video_info),
                 videoDuration: video_info.map(|v| v.video_duration),
             }).customize())
@@ -269,8 +304,16 @@ async fn get_chunk_branding(db_lock: DBLock, query: web::Query<ChunkBrandingPara
         )?;
 
     // Find and group details
-    let mut videos: HashMap<Arc<str>, Option<&VideoInfo>> = db.db.video_infos[hash_prefix as usize].iter().map(|v| (v.video_id.clone(), Some(v))).collect();
-    let mut titles: HashMap<Arc<str>, Vec<SBApiTitle>> = HashMap::new();
+    let mut result: HashMap<Arc<str>, SBApiVideo> = db.db.video_infos[hash_prefix as usize].iter()
+        .map(|v| (v.video_id.clone(), SBApiVideo {
+            titles: Vec::new(),
+            thumbnails: Vec::new(),
+            casualVotes: Vec::new(),
+            randomTime: get_random_time_for_video(&v.video_id, Some(v)),
+            videoDuration: Some(v.video_duration),
+        }))
+        .collect();
+
     db.db.titles.iter()
         .filter(|t|
             t.hash_prefix == hash_prefix
@@ -283,14 +326,12 @@ async fn get_chunk_branding(db_lock: DBLock, query: web::Query<ChunkBrandingPara
                 || t.votes.saturating_sub(t.downvotes) >= t.flags.contains(TitleFlags::Unverified).into()
             )
         )
-        .for_each(|t| match titles.get_mut(&t.video_id) {
-            Some(v) => v.push(SBApiTitle::from_db(t, query.0.returnUserID)),
-            None => {
-                titles.insert(t.video_id.clone(), vec![SBApiTitle::from_db(t, query.0.returnUserID)]);
-                videos.entry(t.video_id.clone()).or_default();
-            },
-        });
-    let mut thumbnails: HashMap<Arc<str>, Vec<SBApiThumbnail>> = HashMap::new();
+        .for_each(|t|
+            result.entry(t.video_id.clone())
+                .or_insert_with_key(|v| unknown_video(v))
+                .titles
+                .push(SBApiTitle::from_db(t, query.0.returnUserID))
+        );
     db.db.thumbnails.iter()
         .filter(|t|
             t.hash_prefix == hash_prefix
@@ -302,21 +343,23 @@ async fn get_chunk_branding(db_lock: DBLock, query: web::Query<ChunkBrandingPara
                 || t.votes.saturating_sub(t.downvotes) >= t.flags.contains(ThumbnailFlags::Original).into()
             )
         )
-        .for_each(|t| match thumbnails.get_mut(&t.video_id) {
-            Some(v) => v.push(SBApiThumbnail::from_db(t, query.0.returnUserID)),
-            None => {
-                thumbnails.insert(t.video_id.clone(), vec![SBApiThumbnail::from_db(t, query.0.returnUserID)]);
-                videos.entry(t.video_id.clone()).or_default();
-            },
-        });
+        .for_each(|t|
+            result.entry(t.video_id.clone())
+                .or_insert_with_key(|v| unknown_video(v))
+                .thumbnails
+                .push(SBApiThumbnail::from_db(t, query.0.returnUserID))
+        );
+    db.db.casual_titles.iter()
+        .filter(|t| t.hash_prefix == hash_prefix)
+        .for_each(|t|
+            result.entry(t.video_id.clone())
+                .or_insert_with_key(|v| unknown_video(v))
+                .casualVotes
+                .extend(SBApiCasualVote::from_db(t))
+        );
 
     // Construct response
-    Ok(web::Json(videos.into_iter().map(|(v, info)| (v.clone(), SBApiVideo {
-        titles: titles.get(&v).cloned().unwrap_or_default(),
-        thumbnails: thumbnails.get(&v).cloned().unwrap_or_default(),
-        randomTime: get_random_time_for_video(&v, info),
-        videoDuration: info.map(|info| info.video_duration),
-    })).collect::<HashMap<Arc<str>, SBApiVideo>>()).customize())
+    Ok(web::Json(result).customize())
 }
 
 #[allow(non_snake_case)]

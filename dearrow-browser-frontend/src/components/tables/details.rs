@@ -224,6 +224,9 @@ fn title_flags(title: &ApiTitle) -> Html {
             if title.vip {
                 <Icon r#type={IconType::VIP} tooltip="This title was submitted by a VIP" />
             }
+            if title.casual_mode {
+                <Icon r#type={IconType::Casual} tooltip="This title was submitted by a casual mode user" />
+            }
         </>
     }
 }
@@ -258,6 +261,9 @@ fn thumbnail_flags(thumb: &ApiThumbnail) -> Html {
             }
             if thumb.vip {
                 <Icon r#type={IconType::VIP} tooltip="This thumbnail was submitted by a VIP" />
+            }
+            if thumb.casual_mode {
+                <Icon r#type={IconType::Casual} tooltip="This thumbnail was submitted by a casual mode user" />
             }
         </>
     }

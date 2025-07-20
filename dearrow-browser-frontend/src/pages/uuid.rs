@@ -121,6 +121,9 @@ fn UUIDTitle(props: &UUIDPageProps) -> HtmlResult {
                         if title.vip {
                             <br /><Icon r#type={IconType::VIP} />{" - Submitted by a VIP"}
                         }
+                        if title.casual_mode {
+                            <br /><Icon r#type={IconType::Casual} />{" - Submitted by a casual mode user"}
+                        }
                         </>})}
                     </div>
                     <div>
@@ -143,6 +146,14 @@ fn UUIDTitle(props: &UUIDPageProps) -> HtmlResult {
                     </div>
                     <div>{"Submitted at: "}{DateTime::from_timestamp_millis(title.time_submitted).map_or(title.time_submitted.to_string(), render_datetime)}</div>
                     <div>{"User ID: "}{title.user_id.clone()}{" "}{userid_link(title.user_id.clone().into())}</div>
+                    <div>
+                        {"User agent: "}
+                        if title.user_agent.is_empty() {
+                            <em>{"Unknown"}</em>
+                        } else {
+                            {title.user_agent.clone()}
+                        }
+                    </div>
                     <div>
                         {"Username: "}
                         if let Some(ref username) = title.username {
@@ -233,6 +244,9 @@ fn UUIDThumbnail(props: &UUIDPageProps) -> HtmlResult {
                         if thumbnail.vip {
                             <br /><Icon r#type={IconType::VIP} />{" - Submitted by a VIP"}
                         }
+                        if thumbnail.casual_mode {
+                            <br /><Icon r#type={IconType::Casual} />{" - Submitted by a casual mode user"}
+                        }
                         </>})}
                     </div>
                     <div>
@@ -255,6 +269,14 @@ fn UUIDThumbnail(props: &UUIDPageProps) -> HtmlResult {
                     </div>
                     <div>{"Submitted at: "}{DateTime::from_timestamp_millis(thumbnail.time_submitted).map_or(thumbnail.time_submitted.to_string(), render_datetime)}</div>
                     <div>{"User ID: "}{thumbnail.user_id.clone()}{" "}{userid_link(thumbnail.user_id.clone().into())}</div>
+                    <div>
+                        {"User agent: "}
+                        if thumbnail.user_agent.is_empty() {
+                            <em>{"Unknown"}</em>
+                        } else {
+                            {thumbnail.user_agent.clone()}
+                        }
+                    </div>
                     <div>
                         {"Username: "}
                         if let Some(ref username) = thumbnail.username {

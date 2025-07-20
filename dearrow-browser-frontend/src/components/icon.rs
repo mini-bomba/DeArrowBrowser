@@ -41,6 +41,7 @@ pub enum IconType {
     Close,
     Warning,
     WarningInactive,
+    Casual,
 }
 
 #[derive(Properties, PartialEq)]
@@ -80,6 +81,7 @@ pub fn Icon(props: &IconProps) -> Html {
         IconType::Close             => classes!("icon", "icon-removed", "grayscale"),
         IconType::Warning           => classes!("icon", "icon-warning"),
         IconType::WarningInactive   => classes!("icon", "icon-warning", "grayscale"),
+        IconType::Casual            => classes!("icon", "icon-casual"),
     };
 
     if props.onclick.is_some() {

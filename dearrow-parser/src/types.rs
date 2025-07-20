@@ -36,6 +36,7 @@ pub enum ThumbnailFlags {
     Removed,
     MissingVotes,
     MissingTimestamp,
+    CasualMode,
 }
 
 #[bitflags]
@@ -48,6 +49,7 @@ pub enum TitleFlags {
     Unverified,
     Removed,
     MissingVotes,
+    CasualMode,
 }
 
 #[derive(Clone, Debug)]
@@ -55,6 +57,7 @@ pub struct Thumbnail {
     pub uuid: Arc<str>,
     pub video_id: Arc<str>,
     pub user_id: Arc<str>,
+    pub user_agent: Arc<str>,
     pub time_submitted: i64,
     pub timestamp: Option<f64>,
     pub votes: i8,
@@ -69,6 +72,7 @@ pub struct Title {
     pub video_id: Arc<str>,
     pub title: Arc<str>,
     pub user_id: Arc<str>,
+    pub user_agent: Arc<str>,
     pub time_submitted: i64,
     pub votes: i8,
     pub downvotes: i8,

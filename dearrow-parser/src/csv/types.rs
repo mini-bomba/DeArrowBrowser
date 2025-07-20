@@ -36,6 +36,10 @@ pub struct Thumbnail {
     pub uuid: Arc<str>,
     #[serde(rename = "hashedVideoID")]
     pub hashed_video_id: String,
+    #[serde(rename = "casualMode")]
+    pub casual_mode: i8,
+    #[serde(rename = "userAgent")]
+    pub user_agent: Arc<str>,
 }
 
 #[derive(Deserialize)]
@@ -80,6 +84,10 @@ pub struct Title {
     pub uuid: Arc<str>,
     #[serde(rename = "hashedVideoID")]
     pub hashed_video_id: String,
+    #[serde(rename = "casualMode")]
+    pub casual_mode: i8,
+    #[serde(rename = "userAgent")]
+    pub user_agent: Arc<str>,
 }
 
 #[derive(Deserialize, Default)]
@@ -200,6 +208,7 @@ impl Dedupe for Thumbnail {
         set.dedupe_arc(&mut self.uuid);
         set.dedupe_arc(&mut self.video_id);
         set.dedupe_arc(&mut self.user_id);
+        set.dedupe_arc(&mut self.user_agent);
     }
 }
 impl Dedupe for Title {
@@ -208,6 +217,7 @@ impl Dedupe for Title {
         set.dedupe_arc(&mut self.title);
         set.dedupe_arc(&mut self.video_id);
         set.dedupe_arc(&mut self.user_id);
+        set.dedupe_arc(&mut self.user_agent);
     }
 }
 impl Dedupe for ThumbnailVotes {

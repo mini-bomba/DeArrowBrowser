@@ -169,6 +169,7 @@ impl Thumbnail {
             intbool!(thumb votes, shadow_hidden, 0, 1, forgiving),
         );
         flags.set(ThumbnailFlags::Removed, intbool!(thumb votes, removed));
+        flags.set(ThumbnailFlags::CasualMode, intbool!(thumb self, casual_mode));
         if !flags.contains(ThumbnailFlags::Original) && timestamps.is_none() {
             warnings.push(ParseError(
                 ObjectKind::Thumbnail,
@@ -183,6 +184,7 @@ impl Thumbnail {
             obj: types::Thumbnail {
                 uuid: self.uuid,
                 user_id: self.user_id,
+                user_agent: self.user_agent,
                 time_submitted: self.time_submitted,
                 timestamp: timestamps.map(|t| t.timestamp),
                 votes: votes.votes,
@@ -238,11 +240,13 @@ impl Title {
             intbool!(title votes, verification, 0, -1, strict),
         );
         flags.set(TitleFlags::Removed, intbool!(title votes, removed));
+        flags.set(TitleFlags::CasualMode, intbool!(title self, casual_mode));
         Ok(WithWarnings {
             obj: types::Title {
                 uuid: self.uuid,
                 title: self.title,
                 user_id: self.user_id,
+                user_agent: self.user_agent,
                 time_submitted: self.time_submitted,
                 votes: votes.votes,
                 downvotes: votes.downvotes,

@@ -735,6 +735,20 @@ fieldset {
   }
 }
 
+.useragent-row {
+  display: flex;
+  flex-direction: row;
+  align-content: center;
+
+  .icon {
+    align-item: stretch;
+    aspect-ratio: 1/1;
+    width: unset;
+    height: unset;
+    margin-left: 0.5em;
+  }
+}
+
 
 // Icons & stuff
 .icon {
@@ -751,59 +765,77 @@ fieldset {
 }
 
 .icon-dablogo {
-  background-image: url("/icon/logo.svg");
+  background-image: url("/icon/twemoji/logo.svg");
 }
 .icon-downvote {
-  background-image: url("/icon/downvote.svg");
+  background-image: url("/icon/twemoji/downvote.svg");
 }
 .icon-locked {
-  background-image: url("/icon/locked.svg");
+  background-image: url("/icon/twemoji/locked.svg");
 }
 .icon-original {
-  background-image: url("/icon/original.svg");
+  background-image: url("/icon/twemoji/original.svg");
 }
 .icon-removed {
-  background-image: url("/icon/removed.svg");
+  background-image: url("/icon/twemoji/removed.svg");
 }
 .icon-replaced {
-  background-image: url("/icon/replaced.svg");
+  background-image: url("/icon/twemoji/replaced.svg");
 }
 .icon-settings {
-  background-image: url("/icon/settings.svg");
+  background-image: url("/icon/twemoji/settings.svg");
 }
 .icon-shadowhidden {
-  background-image: url("/icon/shadowhidden.svg");
+  background-image: url("/icon/twemoji/shadowhidden.svg");
 }
 .icon-timestamp-missing {
-  background-image: url("/icon/timestamp_missing.svg");
+  background-image: url("/icon/twemoji/timestamp_missing.svg");
 }
 .icon-unverified {
-  background-image: url("/icon/unverified.svg");
+  background-image: url("/icon/twemoji/unverified.svg");
 }
 .icon-upvote {
-  background-image: url("/icon/upvote.svg");
+  background-image: url("/icon/twemoji/upvote.svg");
 }
 .icon-vip {
-  background-image: url("/icon/vip.svg");
+  background-image: url("/icon/twemoji/vip.svg");
 }
 .icon-votes-missing {
-  background-image: url("/icon/votes_missing.svg");
+  background-image: url("/icon/twemoji/votes_missing.svg");
 }
 .icon-upvote-and-lock {
-  background-image: url("/icon/upvote_and_lock.svg");
+  background-image: url("/icon/twemoji/upvote_and_lock.svg");
 }
 .icon-downvote-and-remove {
-  background-image: url("/icon/downvote_and_remove.svg");
+  background-image: url("/icon/twemoji/downvote_and_remove.svg");
 }
 .icon-wait {
-  background-image: url("/icon/wait.svg");
+  background-image: url("/icon/twemoji/wait.svg");
 }
 .icon-done {
-  background-image: url("/icon/done.svg");
+  background-image: url("/icon/twemoji/done.svg");
 }
 .icon-warning {
-  background-image: url("/icon/warning.svg");
+  background-image: url("/icon/twemoji/warning.svg");
 }
 .icon-casual {
-  background-image: url("/icon/casual.svg");
+  background-image: url("/icon/twemoji/casual.svg");
+}
+.icon-dearrow-cli {
+  background-image: url("/icon/twemoji/da_cli.svg");
+}
+.icon-firefox {
+  background-image: url("/icon/user-agents/firefox.svg");
+}
+.icon-firefox-dev {
+  background-image: url("/icon/user-agents/firefox_dev.svg");
+}
+.icon-chromium {
+  background-image: url("/icon/user-agents/chromium.svg");
+}
+.icon-safari {
+  background-image: url("/icon/user-agents/safari.svg");
+}
+.icon-libretube {
+  background-image: url("/icon/user-agents/libretube.png");
 }

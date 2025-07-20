@@ -65,6 +65,24 @@ fn flags_entry(html: Html) -> Html {
     }
 }
 
+fn user_agent_icon(user_agent: &str) -> Html {
+    let Some((first_part, ..)) = user_agent.split_once('/') else {
+        return html! {
+            <Icon r#type={IconType::Unknown} tooltip="Unknown user agent" />
+        }
+    };
+    match first_part {
+        "deArrow@ajay.app" => html! {<Icon r#type={IconType::Firefox} tooltip="Firefox addon (stable version)" />},
+        "deArrowBETA@ajay.app" => html! {<Icon r#type={IconType::FirefoxDev} tooltip="Firefox addon (beta version)" />},
+        "enamippconapkdmgfgjchkhakpfinmaj" => html! {<Icon r#type={IconType::Chromium} tooltip="Chromium extension (from the Chrome Web Store)" />},
+        "dearrow-cli" => html! {<Icon r#type={IconType::DeArrowCLI} tooltip="DeArrow CLI" />},
+        "app.ajay.dearrow.extension (2PCQH7P6MB)" => html! {<Icon r#type={IconType::Safari} tooltip="Safari extension (from the appstore)" />},
+        "app.ajay.dearrow.DeArrow-for-YouTube.Extension (UNSIGNED)" => html! {<Icon r#type={IconType::Safari} tooltip="Safari extension (self-compiled)" />},
+        "com.github.libretube" => html! {<Icon r#type={IconType::LibreTube} tooltip="LibreTube" />},
+        _ => html! {<Icon r#type={IconType::Unknown} tooltip="Unknown user agent" />},
+    }
+}
+
 #[function_component]
 fn UUIDTitle(props: &UUIDPageProps) -> HtmlResult {
     let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
@@ -146,12 +164,12 @@ fn UUIDTitle(props: &UUIDPageProps) -> HtmlResult {
                     </div>
                     <div>{"Submitted at: "}{DateTime::from_timestamp_millis(title.time_submitted).map_or(title.time_submitted.to_string(), render_datetime)}</div>
                     <div>{"User ID: "}{title.user_id.clone()}{" "}{userid_link(title.user_id.clone().into())}</div>
-                    <div>
+                    <div class="useragent-row">
                         {"User agent: "}
                         if title.user_agent.is_empty() {
                             <em>{"Unknown"}</em>
                         } else {
-                            {title.user_agent.clone()}
+                            {title.user_agent.clone()}{user_agent_icon(&title.user_agent)}
                         }
                     </div>
                     <div>
@@ -269,12 +287,12 @@ fn UUIDThumbnail(props: &UUIDPageProps) -> HtmlResult {
                     </div>
                     <div>{"Submitted at: "}{DateTime::from_timestamp_millis(thumbnail.time_submitted).map_or(thumbnail.time_submitted.to_string(), render_datetime)}</div>
                     <div>{"User ID: "}{thumbnail.user_id.clone()}{" "}{userid_link(thumbnail.user_id.clone().into())}</div>
-                    <div>
+                    <div class="useragent-row">
                         {"User agent: "}
                         if thumbnail.user_agent.is_empty() {
                             <em>{"Unknown"}</em>
                         } else {
-                            {thumbnail.user_agent.clone()}
+                            {thumbnail.user_agent.clone()}{user_agent_icon(&thumbnail.user_agent)}
                         }
                     </div>
                     <div>

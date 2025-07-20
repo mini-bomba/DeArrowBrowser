@@ -83,7 +83,7 @@ pub fn Header() -> Html {
 
     html! {
         <div id="header" class={header_classes}>
-            <Link<MainRoute> to={MainRoute::Home}><img src="/icon/logo.svg" /></Link<MainRoute>>
+            <Link<MainRoute> to={MainRoute::Home}><img src="/icon/twemoji/logo.svg" /></Link<MainRoute>>
             <div>
                 <h1 class="undecorated-link"><Link<MainRoute> to={MainRoute::Home}>{"DeArrow Browser"}</Link<MainRoute>></h1>
                 if !async_tasks_view.tasks.is_empty() {

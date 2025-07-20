@@ -42,6 +42,13 @@ pub enum IconType {
     Warning,
     WarningInactive,
     Casual,
+    Firefox,
+    FirefoxDev,
+    Chromium,
+    Safari,
+    LibreTube,
+    DeArrowCLI,
+    Unknown,
 }
 
 #[derive(Properties, PartialEq)]
@@ -82,12 +89,19 @@ pub fn Icon(props: &IconProps) -> Html {
         IconType::Warning           => classes!("icon", "icon-warning"),
         IconType::WarningInactive   => classes!("icon", "icon-warning", "grayscale"),
         IconType::Casual            => classes!("icon", "icon-casual"),
+        IconType::Firefox           => classes!("icon", "icon-firefox"),
+        IconType::FirefoxDev        => classes!("icon", "icon-firefox-dev"),
+        IconType::Chromium          => classes!("icon", "icon-chromium"),
+        IconType::Safari            => classes!("icon", "icon-safari"),
+        IconType::LibreTube         => classes!("icon", "icon-libretube"),
+        IconType::DeArrowCLI        => classes!("icon", "icon-dearrow-cli"),
+        IconType::Unknown           => classes!("icon", "icon-unverified", "grayscale"),
     };
 
     if props.onclick.is_some() {
         class.push("clickable");
     }
-    class.push(props.class.clone());
+    class.extend(&props.class);
 
     html! {
         <span id={props.id.clone()} {class} title={props.tooltip.clone()} onclick={props.onclick.clone()}></span>

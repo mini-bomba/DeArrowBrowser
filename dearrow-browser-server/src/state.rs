@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2023-2024 mini_bomba
+*  Copyright (C) 2023-2025 mini_bomba
 *
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -66,6 +66,7 @@ pub struct AppConfig {
     pub enable_timings_header: bool,
     pub cache_path: PathBuf,
     pub enable_fakeapi: bool,
+    pub skip_unused_usernames: bool,
 }
 
 impl Default for AppConfig {
@@ -82,6 +83,7 @@ impl Default for AppConfig {
             enable_timings_header: false,
             cache_path: PathBuf::from("./cache"),
             enable_fakeapi: false,
+            skip_unused_usernames: false,
         }
     }
 }

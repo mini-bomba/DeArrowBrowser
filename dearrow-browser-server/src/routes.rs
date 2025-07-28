@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2023-2024 mini_bomba
+*  Copyright (C) 2023-2025 mini_bomba
 *
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -15,6 +15,7 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
+
 #![allow(clippy::needless_pass_by_value)]
 use actix_web::Either;
 use actix_web::{
@@ -186,8 +187,10 @@ fn do_reload(
         .map_err(|_| SS_READ_ERR.clone())?
         .clone();
     let (new_db, errors) =
-        DearrowDB::load_dir(config.mirror_path.as_path(), &mut string_set_clone, false)?;
-    info!("Skipped loading {} usernames", new_db.usernames_skipped);
+        DearrowDB::load_dir(config.mirror_path.as_path(), &mut string_set_clone, !config.skip_unused_usernames)?;
+    if new_db.usernames_skipped != 0 {
+        info!("Skipped loading {} usernames", new_db.usernames_skipped);
+    }
     let last_updated = Utc::now().timestamp_millis();
     let last_modified = utils::get_mtime(&config.mirror_path.join("titles.csv"));
     {

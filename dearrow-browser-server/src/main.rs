@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2023-2024 mini_bomba
+*  Copyright (C) 2023-2025 mini_bomba
 *
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -15,6 +15,7 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
+
 use actix_files::{Files, NamedFile};
 use actix_web::{
     dev::{fn_service, ServiceRequest, ServiceResponse},
@@ -109,13 +110,15 @@ async fn main() -> Result<(), ErrorContext> {
             .build()
             .expect("Should be able to create a reqwest Client"),
     );
+    let usernames_skipped;
     let db: web::Data<RwLock<DatabaseState>> = {
         let mut string_set = string_set_lock
             .write()
             .map_err(|_| constants::SS_WRITE_ERR.clone())?;
-        let (db, errors) = DearrowDB::load_dir(&config.mirror_path, &mut string_set, false)
+        let (db, errors) = DearrowDB::load_dir(&config.mirror_path, &mut string_set, !config.skip_unused_usernames)
             .context("Initial DearrowDB load failed")?;
         string_set.clean();
+        usernames_skipped = db.usernames_skipped;
 
         let mut db_state = DatabaseState {
             db,
@@ -137,7 +140,9 @@ async fn main() -> Result<(), ErrorContext> {
         db_state.etag = Some(db_state.generate_etag());
         web::Data::new(RwLock::new(db_state))
     };
-    info!("Skipped loading {} usernames", db.read().unwrap().db.usernames_skipped);
+    if usernames_skipped != 0 {
+        info!("Skipped loading {usernames_skipped} usernames");
+    }
     info!("Database ready!");
 
     let mut server = {

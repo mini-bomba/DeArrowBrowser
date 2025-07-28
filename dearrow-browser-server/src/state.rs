@@ -46,7 +46,7 @@ use std::{
 };
 use tokio::fs::read_dir;
 
-use crate::{constants::*, innertube, utils::random_b64};
+use crate::{constants::*, errors::extensions, innertube, utils::random_b64};
 
 pub type DBLock = web::Data<RwLock<DatabaseState>>;
 pub type StringSetLock = web::Data<RwLock<StringSet>>;
@@ -470,7 +470,7 @@ impl ChannelCache {
             } else {
                 let maybe_handle = format!("@{handle}");
                 if !HANDLE_REGEX.is_match(&maybe_handle) {
-                    bail!("Invalid handle/UCID!")
+                    bail!("Invalid handle/UCID!", extend: extensions::status::BAD_REQUEST.clone());
                 }
                 maybe_handle.into()
             };

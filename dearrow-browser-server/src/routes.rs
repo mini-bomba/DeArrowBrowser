@@ -238,11 +238,11 @@ async fn request_reload(
 
     if provided_hash != actual_hash {
         return Err(
-            anyhow!("forbidden")
-                .with_extension(extensions::status::FORBIDDEN.clone())
-                .with_extension(extensions::empty_body::INSTANCE.clone())
-                .with_extension(extensions::no_timings::INSTANCE.clone())
-                .into()
+            anyhow!("forbidden", extend:
+                extensions::status::FORBIDDEN.clone(),
+                extensions::empty_body::INSTANCE.clone(),
+                extensions::no_timings::INSTANCE.clone()
+            ).into()
         );
     }
     spawn_blocking(move || do_reload(db_lock, string_set_lock, config))
@@ -270,9 +270,10 @@ async fn get_titles(
 ) -> JsonResult<Vec<ApiTitle>> {
     if query.count > 1024 {
         return Err(
-            anyhow!("Too many requested titles. You requested {} titles, but the configured max is 1024.", query.count)
-                .with_extension(extensions::status::BAD_REQUEST.clone())
-                .into()
+            anyhow!(
+                ("Too many requested titles. You requested {} titles, but the configured max is 1024.", query.count),
+                extend: extensions::status::BAD_REQUEST.clone()
+            ).into()
         );
     }
     let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
@@ -447,9 +448,10 @@ async fn get_thumbnails(
 ) -> JsonResult<Vec<ApiThumbnail>> {
     if query.count > 1024 {
         return Err(
-            anyhow!("Too many requested thumbnails. You requested {} thumbnails, but the configured max is 1024.", query.count)
-                .with_extension(extensions::status::BAD_REQUEST.clone())
-                .into()
+            anyhow!(
+                ("Too many requested thumbnails. You requested {} titles, but the configured max is 1024.", query.count),
+                extend: extensions::status::BAD_REQUEST.clone()
+            ).into()
         );
     }
     let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
@@ -759,9 +761,10 @@ async fn get_casual_titles(
 ) -> JsonResult<Vec<ApiCasualTitle>> {
     if query.count > 1024 {
         return Err(
-            anyhow!("Too many requested thumbnails. You requested {} casual titles, but the configured max is 1024.", query.count)
-                .with_extension(extensions::status::BAD_REQUEST.clone())
-                .into()
+            anyhow!(
+                ("Too many requested casual titles. You requested {} titles, but the configured max is 1024.", query.count),
+                extend: extensions::status::BAD_REQUEST.clone()
+            ).into()
         );
     }
     let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;

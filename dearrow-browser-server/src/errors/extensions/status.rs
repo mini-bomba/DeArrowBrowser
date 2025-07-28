@@ -34,4 +34,4 @@ macro_rules! lazy_ext {
     };
 }
 
-lazy_ext!(BAD_REQUEST, FORBIDDEN);
+lazy_ext!(BAD_REQUEST, FORBIDDEN, NOT_FOUND);

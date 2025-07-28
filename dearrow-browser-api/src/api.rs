@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2023-2024 mini_bomba
+*  Copyright (C) 2023-2025 mini_bomba
 *
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -18,6 +18,9 @@
 // NOTE: This file is used as a template for dearrow-browser-api::sync and ::unsync modules.
 //       The RcStr type will be defined externally with the correct smart pointer variant for the
 //       module.
+
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
@@ -66,6 +69,7 @@ pub struct ApiTitle {
     pub unverified: bool,
     pub removed: bool,
     pub casual_mode: bool,
+    #[serde(default)]
     pub votes_missing: bool,
     pub score: i8,
     pub username: Option<RcStr>,
@@ -87,7 +91,9 @@ pub struct ApiThumbnail {
     pub shadow_hidden: bool,
     pub removed: bool,
     pub casual_mode: bool,
+    #[serde(default)]
     pub votes_missing: bool,
+    #[serde(default)]
     pub timestamp_missing: bool,
     pub score: i8,
     pub username: Option<RcStr>,
@@ -162,4 +168,12 @@ pub struct ApiWarning {
     pub extension: Extension,
     pub message: RcStr,
     pub active: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct ApiCasualTitle {
+    pub video_id: RcStr,
+    pub title: Option<RcStr>,
+    pub first_submitted: i64,
+    pub votes: HashMap<RcStr, i16>,
 }

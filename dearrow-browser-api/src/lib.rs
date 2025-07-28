@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2023-2024 mini_bomba
+*  Copyright (C) 2023-2025 mini_bomba
 *
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -15,6 +15,7 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
+
 #[cfg(feature = "sync")]
 pub mod sync {
     type RcStr = std::sync::Arc<str>;
@@ -26,9 +27,20 @@ pub mod sync {
 
     #[cfg(feature = "dearrow-parser")]
     mod dearrow_parser_traits {
+        use std::sync::{Arc, LazyLock};
+
         use super::*;
         use dearrow_parser::db::DearrowDB;
         use dearrow_parser::types as parser_types;
+        use strum::VariantNames;
+
+        static CASUAL_CATEGORY_ARCS: LazyLock<&'static [Arc<str>]> = LazyLock::new(||
+            Box::leak(
+                parser_types::CasualCategory::VARIANTS.iter()
+                    .map(|v| Arc::from(*v))
+                    .collect()
+            )
+        );
 
         pub trait IntoWithDatabase<T> {
             fn into_with_db(self, db: &DearrowDB) -> T;
@@ -123,6 +135,20 @@ pub mod sync {
                         parser_types::Extension::SponsorBlock => Extension::SponsorBlock,
                         parser_types::Extension::DeArrow => Extension::DeArrow,
                     },
+                }
+            }
+        }
+
+        impl From<&parser_types::CasualTitle> for ApiCasualTitle {
+            fn from(value: &parser_types::CasualTitle) -> Self {
+                Self {
+                    title: value.title.clone(),
+                    video_id: value.video_id.clone(),
+                    first_submitted: value.first_submitted,
+                    votes: value.votes.into_iter()
+                        .filter_map(|(c, v)| Some(c).zip(v))
+                        .map(|(category, count)| (CASUAL_CATEGORY_ARCS[category as usize].clone(), count))
+                        .collect(),
                 }
             }
         }

@@ -19,9 +19,12 @@ unsync = []
 boxed = []
 # String implementation
 string = []
+# from dearrow-parser types traits
+dearrow-parser = ["dep:dearrow-parser", "dep:strum"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 dearrow-parser = { path = "../dearrow-parser", optional = true }
+strum = { workspace = true, optional = true }
 serde.workspace = true

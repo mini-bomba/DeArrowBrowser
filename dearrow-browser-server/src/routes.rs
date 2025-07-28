@@ -56,6 +56,9 @@ pub fn configure(app_config: web::Data<AppConfig>) -> impl FnOnce(&mut web::Serv
             .service(get_thumbnail_by_uuid)
             .service(get_thumbnails_by_video_id)
             .service(get_thumbnails_by_user_id)
+            .service(get_casual_titles)
+            .service(get_thumbnail_by_uuid)
+            .service(get_casual_titles_by_video_id)
             .service(get_user_by_userid)
             .service(get_user_warnings)
             .service(get_issued_warnings)
@@ -66,7 +69,8 @@ pub fn configure(app_config: web::Data<AppConfig>) -> impl FnOnce(&mut web::Serv
 
         if app_config.innertube.enable {
             cfg.service(get_titles_by_channel)
-                .service(get_thumbnails_by_channel);
+                .service(get_thumbnails_by_channel)
+                .service(get_casual_titles_by_channel);
         } else {
             cfg.route(
                 "/titles/channel/{channel}",
@@ -746,4 +750,94 @@ async fn get_video(
             }
         }
     }))
+}
+
+#[get("/casual_titles", wrap = "ETagCache")]
+async fn get_casual_titles(
+    db_lock: DBLock,
+    query: web::Query<MainEndpointURLParams>,
+) -> JsonResult<Vec<ApiCasualTitle>> {
+    if query.count > 1024 {
+        return Err(
+            anyhow!("Too many requested thumbnails. You requested {} casual titles, but the configured max is 1024.", query.count)
+                .with_extension(extensions::status::BAD_REQUEST.clone())
+                .into()
+        );
+    }
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
+    Ok(web::Json(
+        db.db
+            .casual_titles
+            .iter()
+            .rev()
+            .skip(query.offset)
+            .take(query.count)
+            .map(From::from)
+            .collect::<Vec<_>>(),
+    ))
+}
+
+#[get("/casual_titles/video_id/{video_id}", wrap = "ETagCache")]
+async fn get_casual_titles_by_video_id(
+    db_lock: DBLock,
+    string_set: StringSetLock,
+    path: web::Path<String>,
+) -> JsonResult<Vec<ApiCasualTitle>> {
+    let video_id = string_set
+        .read()
+        .map_err(|_| SS_READ_ERR.clone())?
+        .set
+        .get(path.into_inner().as_str())
+        .cloned();
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
+    let titles = match video_id {
+        None => vec![],
+        Some(id) => db
+            .db
+            .casual_titles
+            .iter()
+            .rev()
+            .filter(|t| Arc::ptr_eq(&t.video_id, &id))
+            .map(From::from)
+            .collect(),
+    };
+    Ok(web::Json(titles))
+}
+
+#[get("/casual_titles/channel/{channel}", wrap = "ETagCache")]
+async fn get_casual_titles_by_channel(
+    db_lock: DBLock,
+    path: web::Path<String>,
+) -> JsonResultOrFetchProgress<Vec<ApiCasualTitle>> {
+    let channel_cache = {
+        let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
+        db.channel_cache.clone()
+    };
+    let channel_data = channel_cache
+        .get_channel(path.into_inner().as_str())
+        .await
+        .context("Failed to get channel info")?;
+
+    match channel_data {
+        GetChannelOutput::Pending(progress) => {
+            let mut resp = web::Json(api::ChannelFetchProgress::from(&progress)).extend();
+            resp.extensions.insert(ETagCacheControl::DoNotCache);
+            Ok(Either::Right((resp, *NOT_READY_YET)))
+        }
+        GetChannelOutput::Resolved(result) => {
+            // we only really need the string pointer's address to figure out if they're equal, thanks to
+            // the `StringSet`
+            let vid_set: HashSet<usize> = result.video_ids.iter().map(utils::arc_addr).collect();
+            let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
+            let thumbs = db
+                .db
+                .casual_titles
+                .iter()
+                .rev()
+                .filter(|t| vid_set.contains(&utils::arc_addr(&t.video_id)))
+                .map(From::from)
+                .collect();
+            Ok(Either::Left(web::Json(thumbs)))
+        }
+    }
 }

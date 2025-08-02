@@ -143,6 +143,7 @@ async fn get_status(
         // database stats
         titles: Some(db.db.titles.len()),
         thumbnails: Some(db.db.thumbnails.len()),
+        casual_titles: Some(db.db.casual_titles.len()),
         vip_users: Some(db.db.vip_users.len()),
         usernames: Some(db.db.usernames.len()),
         warnings: Some(db.db.warnings.len()),

@@ -19,7 +19,7 @@
 //       The RcStr type will be defined externally with the correct smart pointer variant for the
 //       module.
 
-use std::collections::HashMap;
+use indexmap::map::IndexMap;
 
 use serde::{Deserialize, Serialize};
 
@@ -29,6 +29,7 @@ pub struct StatusResponse {
     // database stats
     pub titles: Option<usize>,
     pub thumbnails: Option<usize>,
+    pub casual_titles: Option<usize>,
     pub vip_users: Option<usize>,
     pub usernames: Option<usize>,
     pub warnings: Option<usize>,
@@ -175,5 +176,5 @@ pub struct ApiCasualTitle {
     pub video_id: RcStr,
     pub title: Option<RcStr>,
     pub first_submitted: i64,
-    pub votes: HashMap<RcStr, i16>,
+    pub votes: IndexMap<RcStr, i16>,
 }

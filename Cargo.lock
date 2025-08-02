@@ -662,6 +662,7 @@ name = "dearrow-browser-api"
 version = "1.15.2"
 dependencies = [
  "dearrow-parser",
+ "indexmap 2.10.0",
  "serde",
  "strum",
 ]

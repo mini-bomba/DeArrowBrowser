@@ -19,13 +19,14 @@
 use std::rc::Rc;
 
 use cloneable_errors::{ErrorContext, ResContext};
-use dearrow_browser_api::unsync::{ApiThumbnail, ApiTitle, InnertubeVideo, Video};
+use dearrow_browser_api::unsync::{ApiCasualTitle, ApiThumbnail, ApiTitle, InnertubeVideo, Video};
 use gloo_console::error;
 use reqwest::Url;
 use strum::{IntoStaticStr, VariantArray};
 use yew::prelude::*;
 use yew_router::prelude::{Location, LocationHandle, RouterScopeExt};
 
+use crate::components::tables::casual::CasualTableSettings;
 use crate::components::tables::remote::{Endpoint, RemotePaginatedTable};
 use crate::components::tables::switch::TableModeSwitch;
 use crate::components::tables::thumbs::ThumbTableSettings;
@@ -59,7 +60,7 @@ fn VideoDetailsTable(props: &VideoDetailsTableProps) -> Html {
                 {"Channel: "}
                 <ChannelLink videoid={props.videoid.clone()} />
             </div>
-            <div hidden={props.tab != VideoPageTab::Titles}>
+            <div hidden={props.tab == VideoPageTab::Thumbnails}>
                 {"Original title: "}
                 <OriginalTitle videoid={props.videoid.clone()} />
             </div>
@@ -108,6 +109,8 @@ enum VideoPageTab {
     #[default]
     Titles,
     Thumbnails,
+    #[strum(serialize="Casual titles")]
+    CasualTitles,
 }
 
 #[derive(PartialEq, Eq, Clone)]
@@ -116,6 +119,10 @@ struct VideoPageTitles {
 }
 #[derive(PartialEq, Eq, Clone)]
 struct VideoPageThumbnails {
+    videoid: AttrValue,
+}
+#[derive(PartialEq, Eq, Clone)]
+struct VideoPageCasualTitles {
     videoid: AttrValue,
 }
 
@@ -136,6 +143,16 @@ impl Endpoint for VideoPageThumbnails {
     fn create_url(&self, base_url: &Url) -> Url {
         base_url
             .join_segments(&["api", "thumbnails", "video_id", &self.videoid])
+            .expect("base_url should be a valid base")
+    }
+}
+impl Endpoint for VideoPageCasualTitles {
+    type Item = ApiCasualTitle;
+    type LoadProgress = ();
+
+    fn create_url(&self, base_url: &Url) -> Url {
+        base_url
+            .join_segments(&["api", "casual_titles", "video_id", &self.videoid])
             .expect("base_url should be a valid base")
     }
 }
@@ -281,6 +298,9 @@ impl Component for VideoPage {
             hide_userid: false,
             hide_username: false,
         };
+        const CASUAL_SETTINGS: CasualTableSettings = CasualTableSettings {
+            hide_videoid: true,
+        };
 
         let props = ctx.props();
         html! {<>
@@ -322,6 +342,15 @@ impl Component for VideoPage {
                         }}
                         item_count_update={self.entry_count_callback.clone()}
                         settings={THUMB_SETTINGS}
+                    />
+                },
+                VideoPageTab::CasualTitles => html! {
+                    <RemotePaginatedTable<VideoPageCasualTitles, VideoPageTab>
+                        endpoint={VideoPageCasualTitles {
+                            videoid: props.videoid.clone()
+                        }}
+                        item_count_update={self.entry_count_callback.clone()}
+                        settings={CASUAL_SETTINGS}
                     />
                 },
             }}

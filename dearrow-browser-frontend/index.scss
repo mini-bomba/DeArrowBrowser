@@ -216,6 +216,16 @@ body {
         &.compressed {
           max-width: calc(100vw - 70rem);
         }
+
+        &.casual {
+          width: calc(100vw - 30rem);
+          max-width: unset;
+
+          .null-title {
+            color: #bbb;
+            margin-left: 0.5em;
+          }
+        }
       }
       
       &.score-col {
@@ -231,6 +241,16 @@ body {
           max-width: inherit;
           text-wrap: auto
         }
+      }
+
+      &.casual-votes-col {
+        display: grid;
+        grid-template-columns: auto auto;
+        gap: 0 0.5em;
+        justify-content: space-between;
+        align-content: center;
+        text-align: left;
+        max-width: 10rem;
       }
     }
 

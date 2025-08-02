@@ -311,6 +311,12 @@ pub fn StatusModal() -> Html {
                                 {number_hoverswitch!(td, count)}
                             </tr>
                         }
+                        if let Some(count) = status.casual_titles {
+                            <tr class="hoverswitch-trigger">
+                                <th>{"Casual title count"}</th>
+                                {number_hoverswitch!(td, count)}
+                            </tr>
+                        }
                         if let Some(count) = status.usernames {
                             <tr class="hoverswitch-trigger">
                                 <th>{"Username count"}</th>

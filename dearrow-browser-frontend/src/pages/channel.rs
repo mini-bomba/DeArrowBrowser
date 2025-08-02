@@ -17,7 +17,7 @@
 */
 use std::rc::Rc;
 
-use dearrow_browser_api::unsync::{ApiThumbnail, ApiTitle, ChannelFetchProgress, InnertubeChannel};
+use dearrow_browser_api::unsync::{ApiCasualTitle, ApiThumbnail, ApiTitle, ChannelFetchProgress, InnertubeChannel};
 use cloneable_errors::ResContext;
 use gloo_console::error;
 use reqwest::Url;
@@ -187,6 +187,8 @@ enum ChannelPageTab {
     #[default]
     Titles,
     Thumbnails,
+    #[strum(serialize="Casual titles")]
+    CasualTitles,
 }
 
 #[derive(PartialEq, Eq, Clone)]
@@ -195,6 +197,10 @@ struct ChannelTitles {
 }
 #[derive(PartialEq, Eq, Clone)]
 struct ChannelThumbs {
+    channel: AttrValue,
+}
+#[derive(PartialEq, Eq, Clone)]
+struct ChannelCasualTitles {
     channel: AttrValue,
 }
 
@@ -233,6 +239,17 @@ impl Endpoint for ChannelThumbs {
         render_channel_progress(progress)
     }
 }
+impl Endpoint for ChannelCasualTitles {
+    type Item = ApiCasualTitle;
+    type LoadProgress = ChannelFetchProgress;
+
+    fn create_url(&self, base_url: &Url) -> Url {
+        base_url.join_segments(&["api", "casual_titles", "channel", &self.channel]).expect("base should be a valid base")
+    }
+    fn render_load_progress(&self, progress: &Self::LoadProgress) -> Html {
+        render_channel_progress(progress)
+    }
+}
 
 #[function_component]
 pub fn ChannelPage(props: &ChannelPageProps) -> Html {
@@ -261,6 +278,12 @@ pub fn ChannelPage(props: &ChannelPageProps) -> Html {
                 ChannelPageTab::Thumbnails => html! {
                     <RemotePaginatedTable<ChannelThumbs, ChannelPageTab>
                         endpoint={ChannelThumbs { channel: props.channel.clone() }}
+                        item_count_update={callback}
+                    />
+                },
+                ChannelPageTab::CasualTitles => html! {
+                    <RemotePaginatedTable<ChannelCasualTitles, ChannelPageTab>
+                        endpoint={ChannelCasualTitles { channel: props.channel.clone() }}
                         item_count_update={callback}
                     />
                 },

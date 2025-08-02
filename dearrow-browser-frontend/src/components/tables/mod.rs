@@ -16,6 +16,7 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+pub mod casual;
 pub mod macros;
 pub mod remote;
 pub mod renderer;

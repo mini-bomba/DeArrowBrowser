@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2023-2024 mini_bomba
+*  Copyright (C) 2023-2025 mini_bomba
 *
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -16,188 +16,53 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::ops::BitOr;
 use std::str::FromStr;
 
-use enumflags2::{bitflags, BitFlags};
-use html::IntoPropValue;
+use strum::VariantArray;
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
 use yew_router::prelude::*;
 
 use crate::contexts::SettingsContext;
 use crate::hooks::use_location_state;
-use crate::pages::LocationState;
 use crate::pages::MainRoute;
+use crate::pages::LocationState;
 
-use super::details::DetailType;
-
-#[derive(Default, PartialEq, Eq, Clone, Copy)]
-pub enum TableMode {
-    #[default]
-    Titles,
-    Thumbnails,
-    WarningsReceived,
-    WarningsIssued,
-}
-
-impl TryFrom<TableMode> for DetailType {
-    type Error = ();
-
-    fn try_from(value: TableMode) -> Result<Self, Self::Error> {
-        match value {
-            TableMode::Titles => Ok(DetailType::Title),
-            TableMode::Thumbnails => Ok(DetailType::Thumbnail),
-            _ => Err(()),
-        }
-    }
-}
-
-#[derive(PartialEq, Eq, Clone, Copy)]
-pub enum ModeSubtype {
-    Details,
-    Warnings,
-}
-
-#[bitflags]
-#[repr(u8)]
-#[derive(PartialEq, Eq, Clone, Copy)]
-enum InternalModeSubtype {
-    Details,
-    Warnings,
-}
-
-#[derive(PartialEq, Eq, Clone, Copy)]
-pub struct EnabledSubtypes {
-    inner: BitFlags<InternalModeSubtype>,
-}
-
-impl EnabledSubtypes {
-    fn details(self) -> bool {
-        self.inner.contains(InternalModeSubtype::Details)
-    }
-    fn warnings(self) -> bool {
-        self.inner.contains(InternalModeSubtype::Warnings)
-    }
-}
-
-impl From<ModeSubtype> for EnabledSubtypes {
-    fn from(value: ModeSubtype) -> Self {
-        match value {
-            ModeSubtype::Details => Self {
-                inner: InternalModeSubtype::Details.into(),
-            },
-            ModeSubtype::Warnings => Self {
-                inner: InternalModeSubtype::Warnings.into(),
-            },
-        }
-    }
-}
-
-impl IntoPropValue<EnabledSubtypes> for ModeSubtype {
-    fn into_prop_value(self) -> EnabledSubtypes {
-        self.into()
-    }
-}
-
-impl BitOr for EnabledSubtypes {
-    type Output = EnabledSubtypes;
-
-    fn bitor(self, rhs: Self) -> Self::Output {
-        Self {
-            inner: self.inner | rhs.inner,
-        }
-    }
-}
-
-impl BitOr<ModeSubtype> for EnabledSubtypes {
-    type Output = EnabledSubtypes;
-
-    fn bitor(self, rhs: ModeSubtype) -> Self::Output {
-        self | EnabledSubtypes::from(rhs)
-    }
-}
-
-impl BitOr for ModeSubtype {
-    type Output = EnabledSubtypes;
-
-    fn bitor(self, rhs: Self) -> Self::Output {
-        EnabledSubtypes::from(self) | EnabledSubtypes::from(rhs)
-    }
-}
-
-impl BitOr<EnabledSubtypes> for ModeSubtype {
-    type Output = EnabledSubtypes;
-
-    fn bitor(self, rhs: EnabledSubtypes) -> Self::Output {
-        rhs | self
-    }
-}
+pub trait Tabs: VariantArray + Into<&'static str> + Copy + Sized + Default + Eq {}
+impl<T> Tabs for T
+where T: VariantArray + Into<&'static str> + Copy + Sized + Default + Eq {}
 
 #[derive(Properties, PartialEq)]
 pub struct TableModeSwitchProps {
     #[prop_or_default]
     pub entry_count: Option<usize>,
-
-    pub types: EnabledSubtypes,
 }
 
-pub struct TableModeSwitch {
-    current_mode: TableMode,
+pub struct TableModeSwitch<T: Tabs> {
+    current_mode: T,
     sticky_headers: bool,
 
-    set_titles_mode_cb: Callback<MouseEvent>,
-    set_thumbs_mode_cb: Callback<MouseEvent>,
-    set_warnings_received_mode_cb: Callback<MouseEvent>,
-    set_warnings_issued_mode_cb: Callback<MouseEvent>,
+    callbacks: Box<[Callback<MouseEvent>]>,
 
     _location_handle: LocationHandle,
     _settings_handle: ContextHandle<SettingsContext>,
 }
 
-pub enum TableModeSwitchMessage {
-    UpdateMode(TableMode),
+pub enum TableModeSwitchMessage<T: Tabs> {
+    UpdateMode(T),
     LocationUpdated(Location),
     SettingsUpdated(bool),
 }
 
-impl TableModeSwitch {
-    fn verify_state(state: LocationState, ctx: &Context<Self>) -> LocationState {
-        let props = ctx.props();
-        let scope = ctx.link();
-        match state.detail_table_mode {
-            TableMode::Titles | TableMode::Thumbnails if props.types.details() => state,
-            TableMode::WarningsReceived | TableMode::WarningsIssued if props.types.warnings() => {
-                state
-            }
-            _ => {
-                let state = LocationState {
-                    detail_table_mode: if props.types.details() {
-                        TableMode::Titles
-                    } else {
-                        TableMode::WarningsReceived
-                    },
-                    ..state
-                };
-                scope
-                    .navigator()
-                    .unwrap()
-                    .replace_with_state(&scope.route::<MainRoute>().unwrap(), state);
-                state
-            }
-        }
-    }
-}
-
-impl Component for TableModeSwitch {
+impl<T: Tabs> Component for TableModeSwitch<T> {
     type Properties = TableModeSwitchProps;
-    type Message = TableModeSwitchMessage;
+    type Message = TableModeSwitchMessage<T>;
 
     fn create(ctx: &Context<Self>) -> Self {
         let scope = ctx.link();
 
-        let location_state = match scope.location().unwrap().state::<LocationState>() {
-            Some(state) => Self::verify_state(*state, ctx),
+        let location_state = match scope.location().unwrap().state::<LocationState<T>>() {
+            Some(state) => *state,
             None => {
                 let state = LocationState::default();
                 scope
@@ -212,18 +77,14 @@ impl Component for TableModeSwitch {
             scope.callback(|s: SettingsContext| TableModeSwitchMessage::SettingsUpdated(s.settings().sticky_headers))
         ).expect("TableModeSwitch should be used inside of a SettingsProvider");
 
-        TableModeSwitch {
+        Self {
             current_mode: location_state.detail_table_mode,
             sticky_headers: settings.settings().sticky_headers,
 
-            set_titles_mode_cb: scope
-                .callback(|_| TableModeSwitchMessage::UpdateMode(TableMode::Titles)),
-            set_thumbs_mode_cb: scope
-                .callback(|_| TableModeSwitchMessage::UpdateMode(TableMode::Thumbnails)),
-            set_warnings_received_mode_cb: scope
-                .callback(|_| TableModeSwitchMessage::UpdateMode(TableMode::WarningsReceived)),
-            set_warnings_issued_mode_cb: scope
-                .callback(|_| TableModeSwitchMessage::UpdateMode(TableMode::WarningsIssued)),
+            callbacks: T::VARIANTS.iter()
+                .copied()
+                .map(|v| scope.callback(move |_| TableModeSwitchMessage::UpdateMode(v)))
+                .collect(),
 
             _location_handle: scope
                 .add_location_listener(scope.callback(TableModeSwitchMessage::LocationUpdated))
@@ -236,14 +97,9 @@ impl Component for TableModeSwitch {
         let classes = classes!("table-mode-switch", self.sticky_headers.then_some("sticky"));
         html! {
             <div class={classes}>
-                if ctx.props().types.details() {
-                    <span class="table-mode button" onclick={&self.set_titles_mode_cb} selected={self.current_mode == TableMode::Titles}>{"Titles"}</span>
-                    <span class="table-mode button" onclick={&self.set_thumbs_mode_cb} selected={self.current_mode == TableMode::Thumbnails}>{"Thumbnails"}</span>
-                }
-                if ctx.props().types.warnings() {
-                    <span class="table-mode button" onclick={&self.set_warnings_received_mode_cb} selected={self.current_mode == TableMode::WarningsReceived}>{"Warnings received"}</span>
-                    <span class="table-mode button" onclick={&self.set_warnings_issued_mode_cb} selected={self.current_mode == TableMode::WarningsIssued}>{"Warnings issued"}</span>
-                }
+                {for T::VARIANTS.iter().copied().zip(self.callbacks.iter()).map(|(v, onclick)| html! {
+                    <span class="table-mode button" {onclick} selected={self.current_mode == v}>{v.into()}</span>
+                })}
                 if let Some(count) = ctx.props().entry_count {
                     <span>
                         if count == 1 {
@@ -258,15 +114,14 @@ impl Component for TableModeSwitch {
     }
 
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
-        #[allow(clippy::match_same_arms)]
         match msg {
-            TableModeSwitchMessage::LocationUpdated(location) => {
+            Self::Message::LocationUpdated(location) => {
                 let scope = ctx.link();
                 let state = match location
-                    .state::<LocationState>()
+                    .state::<LocationState<T>>()
                     .or_else(|| scope.location().unwrap().state())
                 {
-                    Some(state) => Self::verify_state(*state, ctx),
+                    Some(state) => *state,
                     None => {
                         let state = LocationState::default();
                         scope
@@ -283,7 +138,7 @@ impl Component for TableModeSwitch {
                     true
                 }
             }
-            TableModeSwitchMessage::UpdateMode(new_mode) if new_mode != self.current_mode => {
+            Self::Message::UpdateMode(new_mode) if new_mode != self.current_mode => {
                 self.current_mode = new_mode;
                 let scope = ctx.link();
                 scope
@@ -298,12 +153,11 @@ impl Component for TableModeSwitch {
                     );
                 true
             }
-            TableModeSwitchMessage::UpdateMode(..) => false,
-            TableModeSwitchMessage::SettingsUpdated(new_sticky) if new_sticky != self.sticky_headers => {
+            Self::Message::SettingsUpdated(new_sticky) if new_sticky != self.sticky_headers => {
                 self.sticky_headers = new_sticky;
                 true
             }
-            TableModeSwitchMessage::SettingsUpdated(..) => false,
+            Self::Message::UpdateMode(..) | Self::Message::SettingsUpdated(..) => false,
         }
     }
 }
@@ -314,9 +168,9 @@ pub struct PageSelectProps {
 }
 
 #[function_component]
-pub fn PageSelect(props: &PageSelectProps) -> Html {
+pub fn PageSelect<T: Tabs>(props: &PageSelectProps) -> Html {
     let state_handle = use_location_state();
-    let state = state_handle.get_state();
+    let state = state_handle.get_state::<T>();
 
     let prev_page = {
         let state_handle = state_handle.clone();

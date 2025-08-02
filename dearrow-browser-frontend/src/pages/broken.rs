@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2023-2024 mini_bomba
+*  Copyright (C) 2023-2025 mini_bomba
 *
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -16,49 +16,68 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::rc::Rc;
-
+use dearrow_browser_api::unsync::{ApiThumbnail, ApiTitle};
+use reqwest::Url;
+use strum::{IntoStaticStr, VariantArray};
 use yew::prelude::*;
 
-use crate::components::tables::details::{DetailType, PaginatedDetailTableRenderer};
-use crate::components::tables::switch::{ModeSubtype, TableModeSwitch};
-use crate::contexts::WindowContext;
+use crate::components::tables::remote::{Endpoint, RemotePaginatedTable};
+use crate::components::tables::switch::TableModeSwitch;
 use crate::hooks::use_location_state;
+use crate::utils::ReqwestUrlExt;
+
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Default, VariantArray, IntoStaticStr)]
+enum BrokenPageTab {
+    #[default]
+    Titles,
+    Thumbnails,
+}
+
+#[derive(PartialEq, Eq, Clone, Copy)]
+struct BrokenTitles;
+#[derive(PartialEq, Eq, Clone, Copy)]
+struct BrokenThumbnails;
+
+impl Endpoint for BrokenTitles {
+    type Item = ApiTitle;
+    type LoadProgress = ();
+
+    fn create_url(&self, base_url: &Url) -> Url {
+        base_url.join_segments(&["api", "titles", "broken"]).expect("origin should be a valid base")
+    }
+}
+impl Endpoint for BrokenThumbnails {
+    type Item = ApiThumbnail;
+    type LoadProgress = ();
+
+    fn create_url(&self, base_url: &Url) -> Url {
+        base_url.join_segments(&["api", "thumbnails", "broken"]).expect("origin should be a valid base")
+    }
+}
 
 #[function_component]
 pub fn BrokenPage() -> Html {
-    let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
-    let state = use_location_state().get_state();
-    let entry_count = use_state_eq(|| None);
-
-    let url_and_mode = use_memo(state.detail_table_mode, |dtm| {
-        DetailType::try_from(*dtm).ok().map(|dtm| match dtm {
-            DetailType::Title => (
-                Rc::new(window_context.origin_join_segments(&["api", "titles", "broken"])),
-                dtm,
-            ),
-            DetailType::Thumbnail => (
-                Rc::new(window_context.origin_join_segments(&["api", "thumbnails", "broken"])),
-                dtm,
-            ),
-        })
-    });
-
-    let table_fallback = html! {
-        <center><b>{"Loading..."}</b></center>
+    let item_count: UseStateHandle<Option<usize>> = use_state_eq(|| None);
+    let state = use_location_state().get_state::<BrokenPageTab>();
+    let callback = {
+        let setter = item_count.setter();
+        use_callback((), move |new, ()| setter.set(new))
     };
 
-    html! {
-        <>
-            <h2>{"Broken database entries"}</h2>
-            <TableModeSwitch entry_count={*entry_count} types={ModeSubtype::Details} />
-            if let Some((url, mode)) = url_and_mode.as_ref() {
-                <Suspense fallback={table_fallback}>
-                    <PaginatedDetailTableRenderer mode={*mode} url={url.clone()} entry_count={entry_count.setter()} />
-                </Suspense>
-            } else {
-                {table_fallback}
-            }
-        </>
-    }
+    html! {<>
+        <h2>{"Broken database entries"}</h2>
+        <TableModeSwitch<BrokenPageTab> entry_count={*item_count} />
+        if let BrokenPageTab::Titles = state.detail_table_mode {
+            <RemotePaginatedTable<BrokenTitles, BrokenPageTab>
+                endpoint={BrokenTitles}
+                item_count_update={callback}
+            />
+        } else {
+            <RemotePaginatedTable<BrokenThumbnails, BrokenPageTab>
+                endpoint={BrokenThumbnails}
+                item_count_update={callback}
+            />
+        }
+    </>}
 }

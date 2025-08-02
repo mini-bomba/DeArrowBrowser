@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2023-2024 mini_bomba
+*  Copyright (C) 2023-2025 mini_bomba
 *
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -15,19 +15,23 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
+
 use std::rc::Rc;
 
-use dearrow_browser_api::unsync::User;
 use cloneable_errors::ErrorContext;
+use dearrow_browser_api::unsync::{ApiThumbnail, ApiTitle, ApiWarning, User};
+use strum::{IntoStaticStr, VariantArray};
 use yew::prelude::*;
 
 use crate::components::icon::*;
-use crate::components::tables::details::*;
-use crate::components::tables::switch::{ModeSubtype, TableMode, TableModeSwitch};
-use crate::components::tables::warnings::PaginatedWarningsTable;
+use crate::components::tables::remote::{Endpoint, RemotePaginatedTable};
+use crate::components::tables::switch::TableModeSwitch;
+use crate::components::tables::thumbs::ThumbTableSettings;
+use crate::components::tables::titles::TitleTableSettings;
+use crate::components::tables::warnings::WarningTableSettings;
 use crate::contexts::{StatusContext, WindowContext};
 use crate::hooks::{use_async_suspension, use_location_state};
-use crate::utils::{api_request, sbb_userid_link};
+use crate::utils::{api_request, sbb_userid_link, ReqwestUrlExt};
 
 #[derive(Properties, PartialEq)]
 struct UserDetailsProps {
@@ -84,6 +88,75 @@ fn UserDetails(props: &UserDetailsProps) -> HtmlResult {
     })
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Default, VariantArray, IntoStaticStr)]
+enum UserPageTab {
+    #[default]
+    Titles,
+    Thumbnails,
+    #[strum(serialize = "Warnings received")]
+    WarningsReceived,
+    #[strum(serialize = "Warnings issued")]
+    WarningsIssued,
+}
+
+#[derive(PartialEq, Eq, Clone)]
+struct UserTitles {
+    userid: AttrValue,
+}
+#[derive(PartialEq, Eq, Clone)]
+struct UserThumbnails {
+    userid: AttrValue,
+}
+#[derive(PartialEq, Eq, Clone)]
+struct UserWarningsRcv {
+    userid: AttrValue,
+}
+#[derive(PartialEq, Eq, Clone)]
+struct UserWarningsIss {
+    userid: AttrValue,
+}
+
+impl Endpoint for UserTitles {
+    type Item = ApiTitle;
+    type LoadProgress = ();
+
+    fn create_url(&self, base_url: &reqwest::Url) -> reqwest::Url {
+        base_url
+            .join_segments(&["api", "titles", "user_id", &self.userid])
+            .expect("base should be a valid base")
+    }
+}
+impl Endpoint for UserThumbnails {
+    type Item = ApiThumbnail;
+    type LoadProgress = ();
+
+    fn create_url(&self, base_url: &reqwest::Url) -> reqwest::Url {
+        base_url
+            .join_segments(&["api", "thumbnails", "user_id", &self.userid])
+            .expect("base should be a valid base")
+    }
+}
+impl Endpoint for UserWarningsRcv {
+    type Item = ApiWarning;
+    type LoadProgress = ();
+
+    fn create_url(&self, base_url: &reqwest::Url) -> reqwest::Url {
+        base_url
+            .join_segments(&["api", "warnings", "user_id", &self.userid, "received"])
+            .expect("base should be a valid base")
+    }
+}
+impl Endpoint for UserWarningsIss {
+    type Item = ApiWarning;
+    type LoadProgress = ();
+
+    fn create_url(&self, base_url: &reqwest::Url) -> reqwest::Url {
+        base_url
+            .join_segments(&["api", "warnings", "user_id", &self.userid, "issued"])
+            .expect("base should be a valid base")
+    }
+}
+
 #[derive(Properties, PartialEq)]
 pub struct UserPageProps {
     pub userid: AttrValue,
@@ -91,63 +164,16 @@ pub struct UserPageProps {
 
 #[function_component]
 pub fn UserPage(props: &UserPageProps) -> Html {
-    let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
-    let state = use_location_state().get_state();
+    let state = use_location_state().get_state::<UserPageTab>();
     let entry_count = use_state_eq(|| None);
+    let callback = {
+        let setter = entry_count.setter();
+        use_callback((), move |new, ()| setter.set(new))
+    };
 
     let details_fallback = html! {
         <div><b>{"Loading..."}</b></div>
     };
-    let table_fallback = html! {
-        <center><b>{"Loading..."}</b></center>
-    };
-
-    let table_html = use_memo(
-        (state.detail_table_mode, props.userid.clone()),
-        |(dtm, userid)| match dtm {
-            TableMode::Titles => {
-                let url = Rc::new(
-                    window_context.origin_join_segments(&["api", "titles", "user_id", userid]),
-                );
-                html! {
-                    <Suspense fallback={table_fallback.clone()}>
-                        <PaginatedDetailTableRenderer mode={DetailType::Title} {url} entry_count={entry_count.setter()} hide_userid=true hide_username=true />
-                    </Suspense>
-                }
-            }
-            TableMode::Thumbnails => {
-                let url = Rc::new(window_context.origin_join_segments(&[
-                    "api",
-                    "thumbnails",
-                    "user_id",
-                    userid,
-                ]));
-                html! {
-                    <Suspense fallback={table_fallback.clone()}>
-                        <PaginatedDetailTableRenderer mode={DetailType::Thumbnail} {url} entry_count={entry_count.setter()} hide_userid=true hide_username=true />
-                    </Suspense>
-                }
-            }
-            TableMode::WarningsIssued => {
-                let url = Rc::new(
-                    window_context
-                        .origin_join_segments(&["api", "warnings", "user_id", userid, "issued"]),
-                );
-                html! {
-                    <PaginatedWarningsTable {url} entry_count={entry_count.setter()} hide_issuer=true />
-                }
-            }
-            TableMode::WarningsReceived => {
-                let url = Rc::new(
-                    window_context
-                        .origin_join_segments(&["api", "warnings", "user_id", userid, "received"]),
-                );
-                html! {
-                    <PaginatedWarningsTable {url} entry_count={entry_count.setter()} hide_receiver=true />
-                }
-            }
-        },
-    );
 
     html! {
         <>
@@ -156,8 +182,63 @@ pub fn UserPage(props: &UserPageProps) -> Html {
                     <Suspense fallback={details_fallback}><UserDetails userid={props.userid.clone()} /></Suspense>
                 </div>
             </div>
-            <TableModeSwitch entry_count={*entry_count} types={ModeSubtype::Details | ModeSubtype::Warnings} />
-            {(*table_html).clone()}
+            <TableModeSwitch<UserPageTab> entry_count={*entry_count} />
+            {match state.detail_table_mode {
+                UserPageTab::Titles => {
+                    const SETTINGS: TitleTableSettings = TitleTableSettings {
+                        hide_username: true,
+                        hide_userid: true,
+                        hide_videoid: false,
+                    };
+                    html! {
+                        <RemotePaginatedTable<UserTitles, UserPageTab>
+                            endpoint={UserTitles { userid: props.userid.clone() }}
+                            settings={SETTINGS}
+                            item_count_update={callback.clone()}
+                        />
+                    }
+                }
+                UserPageTab::Thumbnails => {
+                    const SETTINGS: ThumbTableSettings = ThumbTableSettings {
+                        hide_username: true,
+                        hide_userid: true,
+                        hide_videoid: false,
+                    };
+                    html! {
+                        <RemotePaginatedTable<UserThumbnails, UserPageTab>
+                            endpoint={UserThumbnails { userid: props.userid.clone() }}
+                            settings={SETTINGS}
+                            item_count_update={callback.clone()}
+                        />
+                    }
+                }
+                UserPageTab::WarningsIssued => {
+                    const SETTINGS: WarningTableSettings = WarningTableSettings {
+                        hide_issuer: true,
+                        hide_receiver: false,
+                    };
+                    html! {
+                        <RemotePaginatedTable<UserWarningsIss, UserPageTab>
+                            endpoint={UserWarningsIss { userid: props.userid.clone() }}
+                            settings={SETTINGS}
+                            item_count_update={callback.clone()}
+                        />
+                    }
+                }
+                UserPageTab::WarningsReceived => {
+                    const SETTINGS: WarningTableSettings = WarningTableSettings {
+                        hide_issuer: false,
+                        hide_receiver: true,
+                    };
+                    html! {
+                        <RemotePaginatedTable<UserWarningsRcv, UserPageTab>
+                            endpoint={UserWarningsRcv { userid: props.userid.clone() }}
+                            settings={SETTINGS}
+                            item_count_update={callback.clone()}
+                        />
+                    }
+                }
+            }}
         </>
     }
 }

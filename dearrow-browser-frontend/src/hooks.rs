@@ -1,7 +1,7 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2023-2024 mini_bomba
-*  
+*  Copyright (C) 2023-2025 mini_bomba
+*
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
 *  the Free Software Foundation, either version 3 of the License, or
@@ -15,13 +15,14 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use std::{future::Future, cell::{RefCell, Cell}, rc::Rc};
+
+use std::{future::Future, cell::RefCell, rc::Rc};
 use yew::prelude::*;
 use yew::platform::spawn_local;
 use yew::suspense::{SuspensionResult, Suspension};
 use yew_router::prelude::*;
 
-use crate::pages::{LocationState, MainRoute};
+use crate::{components::tables::switch::Tabs, pages::{MainRoute, LocationState}};
 
 
 enum UseAsyncSuspensionState<R>
@@ -60,78 +61,6 @@ where
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum LoopControl {
-    Continue,
-    Terminate,
-}
-
-pub struct IterationResult<R, S> {
-    pub result: R,
-    pub control: LoopControl,
-    pub state: S,
-}
-
-/// A hook that runs an async function in a loop.
-///
-/// The function will keep getting called until either it returns LoopControl::Terminate, or the
-/// dependencies change.
-#[hook]
-pub fn use_async_loop<FF, F, D, R, S>(future: FF, deps: D) -> UseStateHandle<R>
-where
-    FF: 'static + Fn(D, S) -> F,
-    F:  'static + Future<Output = IterationResult<R, S>>,
-    D:  'static + PartialEq + Clone,
-    R:  'static + Default + Clone,
-    S:  'static + Default
-{
-
-    let result_state: UseStateHandle<R> = use_state(|| Default::default());
-    let reset_counter: Rc<Cell<usize>> = use_memo((), |()| Cell::default());
-    {
-        let result_state = result_state.clone();
-        use_memo(deps, move |deps| {
-            let deps = deps.clone();
-            reset_counter.set(reset_counter.get()+1);
-            result_state.set(Default::default());
-            let reset_idx = reset_counter.get();
-            spawn_local(async move {
-                let mut internal_state: S = Default::default();
-                loop {
-                    let res = future(deps.clone(), internal_state).await;
-                    internal_state = res.state;
-                    if reset_idx != reset_counter.get() {
-                        return;
-                    }
-                    result_state.set(res.result);
-                    if res.control == LoopControl::Terminate {
-                        return;
-                    }
-                }
-            });
-        });
-    }
-    result_state
-}
-
-#[hook]
-pub fn use_memo_state_eq<T, F, D>(deps: D, init_fn: F) -> UseStateHandle<T> 
-where
-    T: 'static + PartialEq,
-    F: Fn() -> T,
-    D: 'static + PartialEq + Clone,
-{
-    let state = use_state_eq(&init_fn);
-    {
-        // yes, we're using use_memo to reset a state on changes to props
-        let state = state.clone();
-        use_memo(deps, move |_| {
-            state.set(init_fn());
-        });
-    }
-    state
-}
-
 #[derive(Clone)]
 pub struct LocationStateHandle {
     navigator: Navigator,
@@ -140,8 +69,8 @@ pub struct LocationStateHandle {
 }
 
 impl LocationStateHandle {
-    pub fn get_state(&self) -> LocationState {
-        match self.location.state::<LocationState>() {
+    pub fn get_state<T: Tabs>(&self) -> LocationState<T> {
+        match self.location.state::<LocationState<T>>() {
             Some(state) => *state,
             None => {
                 let state = LocationState::default();
@@ -151,11 +80,11 @@ impl LocationStateHandle {
         }
     }
 
-    pub fn push_state(&self, new_state: LocationState) {
+    pub fn push_state<T: Tabs>(&self, new_state: LocationState<T>) {
         self.navigator.push_with_state(&self.route, new_state);
     }
 
-    pub fn replace_state(&self, new_state: LocationState) {
+    pub fn replace_state<T: Tabs>(&self, new_state: LocationState<T>) {
         self.navigator.replace_with_state(&self.route, new_state);
     }
 }

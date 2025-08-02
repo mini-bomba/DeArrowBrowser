@@ -15,13 +15,13 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use std::{ops::Deref, rc::Rc, fmt::Write};
+use std::{cell::Cell, fmt::Write, ops::Deref, rc::Rc};
 
 use chrono::{DateTime, Utc, NaiveDateTime};
 use cloneable_errors::{bail, ErrContext, ErrorContext, ResContext, SerializableError};
 use reqwest::Url;
 use sha2::{digest::array::Array, Digest, Sha256};
-use yew::Html;
+use yew::{html::ImplicitClone, Html};
 
 use crate::constants::{REQWEST_CLIENT, SBB_BASE};
 
@@ -183,6 +183,7 @@ impl<T: ?Sized> Clone for RcEq<T> {
         Self(self.0.clone())
     }
 }
+impl<T: ?Sized> ImplicitClone for RcEq<T> {}
 
 impl<T> From<T> for RcEq<T> {
     fn from(value: T) -> Self {
@@ -308,4 +309,51 @@ pub fn sponsorblock_hash(data: &[u8], times: usize) -> String {
     }
 
     hex_buffer
+}
+
+/// A value that triggers it's corresponding [`CancelWatcher`]s on drop.
+#[derive(Default)]
+pub struct CancelHandle {
+    inner: Rc<Cell<bool>>,
+}
+
+impl CancelHandle {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Creates a new [`CancelWatcher`] for this handle
+    pub fn watch(&self) -> CancelWatcher {
+        CancelWatcher { inner: self.inner.clone() }
+    }
+
+    /// Check whether a [`CancelWatcher`] is assigned to this handle
+    pub fn compare(&self, watcher: &CancelWatcher) -> bool {
+        Rc::ptr_eq(&self.inner, &watcher.inner)
+    }
+}
+
+impl Drop for CancelHandle {
+    fn drop(&mut self) {
+        self.inner.set(true);
+    }
+}
+
+/// Cloneable value that "monitors the state" of it's corresponding [`CancelHandle`].
+#[derive(Clone)]
+pub struct CancelWatcher {
+    inner: Rc<Cell<bool>>,
+}
+
+impl CancelWatcher {
+    pub fn check(&self) -> bool {
+        self.inner.get()
+    }
+}
+
+#[derive(PartialEq, Eq, Clone)]
+pub enum SimpleLoadState<T> {
+    Loading,
+    Failed,
+    Ready(T),
 }

@@ -263,14 +263,13 @@ struct UUIDTitleProps {
 #[function_component]
 fn UUIDTitle(props: &UUIDTitleProps) -> Html {
     let title = &props.title;
-    let inline_placeholder = html! {<span>{"Loading..."}</span>};
 
     html! {
         <div class="page-details">
             <div class="info-table">
                 <div>{"Video ID: "}<YoutubeVideoLink videoid={title.video_id.clone()} multiline={false} /></div>
                 <div>{"Title: "}{title.title.clone()}</div>
-                <div>{"Original title: "}<Suspense fallback={inline_placeholder}><OriginalTitle videoid={title.video_id.clone()} /></Suspense></div>
+                <div>{"Original title: "}<OriginalTitle videoid={title.video_id.clone()} /></div>
                 <div>
                     if title.votes_missing {
                         {"Score: No data"}
@@ -358,8 +357,6 @@ fn UUIDThumbnail(props: &UUIDThumbnailProps) -> Html {
         }
     });
 
-    let inline_placeholder = html! {<span>{"Loading..."}</span>};
-
     html! {
         <div class="page-details">
             <div class="info-table">
@@ -373,7 +370,7 @@ fn UUIDThumbnail(props: &UUIDThumbnailProps) -> Html {
                         {"Original thumbnail"}
                     }
                 </div>
-                <div>{"Original title: "}<Suspense fallback={inline_placeholder}><OriginalTitle videoid={thumbnail.video_id.clone()} /></Suspense></div>
+                <div>{"Original title: "}<OriginalTitle videoid={thumbnail.video_id.clone()} /></div>
                 <div>
                     if thumbnail.votes_missing {
                         {"Score: No data"}

@@ -15,31 +15,33 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
+
 use std::rc::Rc;
 
-use dearrow_browser_api::unsync::{InnertubeVideo, Video};
-use cloneable_errors::{anyhow, ErrContext, ErrorContext, ResContext};
+use cloneable_errors::{ErrorContext, ResContext};
+use dearrow_browser_api::unsync::{ApiThumbnail, ApiTitle, InnertubeVideo, Video};
 use gloo_console::error;
+use reqwest::Url;
+use strum::{IntoStaticStr, VariantArray};
 use yew::prelude::*;
-use yew_hooks::{use_async_with_options, UseAsyncHandle, UseAsyncOptions};
-use yew_router::prelude::Link;
+use yew_router::prelude::{Location, LocationHandle, RouterScopeExt};
 
-use crate::components::icon::{Icon, IconType};
-use crate::components::tables::details::*;
-use crate::components::tables::switch::{ModeSubtype, TableMode, TableModeSwitch};
-use crate::components::youtube::{OriginalTitle, YoutubeIframe};
+use crate::components::tables::remote::{Endpoint, RemotePaginatedTable};
+use crate::components::tables::switch::TableModeSwitch;
+use crate::components::tables::thumbs::ThumbTableSettings;
+use crate::components::tables::titles::TitleTableSettings;
+use crate::components::youtube::{ChannelLink, OriginalTitle, YoutubeIframe};
 use crate::contexts::WindowContext;
-use crate::hooks::{use_async_suspension, use_location_state};
-use crate::innertube::{self, youtu_be_link};
-use crate::pages::MainRoute;
+use crate::innertube::youtu_be_link;
+use crate::pages::{MainRoute, LocationState};
 use crate::thumbnails::components::{Thumbnail, ThumbnailCaption};
-use crate::utils::{api_request, sbb_video_link, RcEq};
+use crate::utils::{api_request, sbb_video_link, RcEq, ReqwestUrlExt, SimpleLoadState};
 
 #[derive(Properties, PartialEq)]
 struct VideoDetailsTableProps {
     videoid: AttrValue,
-    mode: TableMode,
-    metadata: UseAsyncHandle<Rc<Video>, RcEq<ErrorContext>>,
+    tab: VideoPageTab,
+    metadata: MetadataState,
 }
 
 #[function_component]
@@ -50,48 +52,45 @@ fn VideoDetailsTable(props: &VideoDetailsTableProps) -> Html {
     let sbb_url: Rc<AttrValue> = use_memo(props.videoid.clone(), |vid| {
         AttrValue::Rc(sbb_video_link(vid).as_str().into())
     });
-    let fallback = html! {
-        <span><em>{"Loading..."}</em></span>
-    };
     html! {
         <div class="info-table">
             <div>{format!("Video ID: {}", props.videoid)}</div>
             <div>
                 {"Channel: "}
-                <Suspense fallback={fallback.clone()}><ChannelLink videoid={props.videoid.clone()} /></Suspense>
+                <ChannelLink videoid={props.videoid.clone()} />
             </div>
-            <div hidden={props.mode != TableMode::Titles}>
+            <div hidden={props.tab != VideoPageTab::Titles}>
                 {"Original title: "}
-                <Suspense {fallback}><OriginalTitle videoid={props.videoid.clone()} /></Suspense>
+                <OriginalTitle videoid={props.videoid.clone()} />
             </div>
-            if props.metadata.loading {
-                <div><em>{"Loading extra metadata..."}</em></div>
-            } else if let Some(ref data) = props.metadata.data {
-                if let Some(duration) = data.duration {
-                    if props.mode == TableMode::Thumbnails {
-                        <div>{format!("Random thumbnail timestamp: {}", duration*data.random_thumbnail)}</div>
-                    }
-                    <div>{format!("Video duration: {duration}")}</div>
-                } else {
-                    if props.mode == TableMode::Thumbnails {
-                        <div>{format!("Random thumbnail: {}%", data.random_thumbnail*100.)}</div>
-                    }
-                    <div>{"Video duration: "}<em>{"Unknown"}</em></div>
-                }
-                <div title="This is the fraction of the video that has not been covered by any live SponsorBlock skip segments. Sections marked by SponsorBlock are excluded from possible random thumbnail timestamp picks">
-                    {format!("% of video unmarked: {}%", data.fraction_unmarked*100.)}
-                </div>
-                <div title="If there is no marked outro, the last 10% of the video is assumed to be an outro and is excluded from possible random thumbnail timestamp picks">
-                    {"Has a marked outro: "}
-                    if data.has_outro {
-                        {"Yes"}
+            {match &props.metadata {
+                MetadataState::Loading => html! {<div><em>{"Loading extra metadata..."}</em></div>},
+                MetadataState::Failed => html! {<div><em>{"Failed to fetch extra metadata."}</em></div>},
+                MetadataState::Ready(data) => html! {<>
+                    if let Some(duration) = data.duration {
+                        if props.tab == VideoPageTab::Thumbnails {
+                            <div>{format!("Random thumbnail timestamp: {}", duration*data.random_thumbnail)}</div>
+                        }
+                        <div>{format!("Video duration: {duration}")}</div>
                     } else {
-                        {"No"}
+                        if props.tab == VideoPageTab::Thumbnails {
+                            <div>{format!("Random thumbnail: {}%", data.random_thumbnail*100.)}</div>
+                        }
+                        <div>{"Video duration: "}<em>{"Unknown"}</em></div>
                     }
-                </div>
-            } else {
-                <div><em>{"Failed to fetch extra metadata."}</em></div>
-            }
+                    <div title="This is the fraction of the video that has not been covered by any live SponsorBlock skip segments. Sections marked by SponsorBlock are excluded from possible random thumbnail timestamp picks">
+                        {format!("% of video unmarked: {}%", data.fraction_unmarked*100.)}
+                    </div>
+                    <div title="If there is no marked outro, the last 10% of the video is assumed to be an outro and is excluded from possible random thumbnail timestamp picks">
+                        {"Has a marked outro: "}
+                        if data.has_outro {
+                            {"Yes"}
+                        } else {
+                            {"No"}
+                        }
+                    </div>
+                </>},
+            }}
 
             <div><a href={&*youtube_url}>{"View on YouTube"}</a></div>
             <div><a href={&*sbb_url}>{"View on SB Browser"}</a></div>
@@ -99,163 +98,299 @@ fn VideoDetailsTable(props: &VideoDetailsTableProps) -> Html {
     }
 }
 
-#[function_component]
-fn ChannelLink(props: &VideoPageProps) -> HtmlResult {
-    let channel_handle = use_async_suspension(
-        |vid| async move {
-            let result = innertube::get_oembed_info(&vid).await;
-            if let Err(ref e) = result {
-                error!(format!(
-                    "Failed to fetch oembed info for video {vid}: {e:?}"
-                ));
-            }
-            let result = result?;
-            let url = match reqwest::Url::parse(&result.author_url) {
-                Err(e) => {
-                    error!(format!(
-                        "Failed to parse channel url for video {vid}: {e:?}"
-                    ));
-                    return Err(e.context("Failed to parse channel URL"));
-                }
-                Ok(u) => u,
-            };
-            match url
-                .path_segments()
-                .and_then(|ps| ps.filter(|s| !s.is_empty()).next_back())
-            {
-                Some(handle) => Ok(AttrValue::from(handle.to_owned())),
-                None => {
-                    error!(format!(
-                        "Failed to extract channel handle from url for video {vid}!"
-                    ));
-                    Err(anyhow!("Failed to extract channel handle"))
-                }
-            }
-        },
-        props.videoid.clone(),
-    )?;
-
-    let Ok(ref channel_handle) = *channel_handle else {
-        return Ok(html! {<span><em>{"Unknown"}</em></span>});
-    };
-    let route = MainRoute::Channel {
-        id: channel_handle.clone(),
-    };
-
-    Ok(html! {
-        <Link<MainRoute> to={route}>{channel_handle}<Icon r#type={IconType::DABLogo} /></Link<MainRoute>>
-    })
-}
-
 #[derive(Properties, PartialEq)]
 pub struct VideoPageProps {
     pub videoid: AttrValue,
 }
 
-#[function_component]
-pub fn VideoPage(props: &VideoPageProps) -> Html {
-    let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
-    let state = use_location_state().get_state();
-    let entry_count = use_state_eq(|| None);
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Default, VariantArray, IntoStaticStr)]
+enum VideoPageTab {
+    #[default]
+    Titles,
+    Thumbnails,
+}
 
-    let metadata: UseAsyncHandle<Rc<Video>, RcEq<ErrorContext>> = {
-        let video_id = props.videoid.clone();
-        let window_context = window_context.clone();
-        use_async_with_options(
-            async move {
-                async move {
-                    let dab_api_url =
-                        window_context.origin_join_segments(&["api", "videos", &video_id]);
-                    let mut video: Video = api_request(dab_api_url)
-                        .await
-                        .context("Metadata request failed")?;
+#[derive(PartialEq, Eq, Clone)]
+struct VideoPageTitles {
+    videoid: AttrValue,
+}
+#[derive(PartialEq, Eq, Clone)]
+struct VideoPageThumbnails {
+    videoid: AttrValue,
+}
 
-                    if video.duration.is_none() {
-                        let it_duration: Result<u64, ErrorContext> = async move {
-                            let it_dab_url = window_context.origin_join_segments(&[
-                                "innertube",
-                                "video",
-                                &video_id,
-                            ]);
-                            let it_video: InnertubeVideo = api_request(it_dab_url)
-                                .await
-                                .context("Proxied innertube request failed")?;
-                            Ok(it_video.duration)
-                        }
-                        .await;
-                        match it_duration {
-                            Err(e) => error!(format!(
-                                "Failed to fetch video duration from innertube: {e:?}"
-                            )),
-                            #[allow(clippy::cast_precision_loss)]
-                            Ok(d) => video.duration = Some(d as f64),
-                        }
+impl Endpoint for VideoPageTitles {
+    type Item = ApiTitle;
+    type LoadProgress = ();
+
+    fn create_url(&self, base_url: &Url) -> Url {
+        base_url
+            .join_segments(&["api", "titles", "video_id", &self.videoid])
+            .expect("base_url should be a valid base")
+    }
+}
+impl Endpoint for VideoPageThumbnails {
+    type Item = ApiThumbnail;
+    type LoadProgress = ();
+
+    fn create_url(&self, base_url: &Url) -> Url {
+        base_url
+            .join_segments(&["api", "thumbnails", "video_id", &self.videoid])
+            .expect("base_url should be a valid base")
+    }
+}
+
+pub type MetadataState = SimpleLoadState<RcEq<Video>>;
+
+pub struct VideoPage {
+    tab: VideoPageTab,
+    origin: Url,
+    rc_videoid: Rc<str>,
+
+    entry_count: Option<usize>,
+    entry_count_callback: Callback<Option<usize>>,
+    metadata: MetadataState,
+    version: u8,
+
+    _location_listener: LocationHandle,
+    _wc_listener: ContextHandle<Rc<WindowContext>>,
+}
+
+impl VideoPage {
+    fn refresh(&mut self, ctx: &Context<Self>) {
+        self.version = self.version.wrapping_add(1);
+        self.metadata = MetadataState::Loading;
+        let version = self.version;
+        let video_id = ctx.props().videoid.clone();
+        let dab_api_url = self
+            .origin
+            .join_segments(&["api", "videos", &video_id])
+            .expect("origin should be a base");
+        let it_dab_url = self
+            .origin
+            .join_segments(&["innertube", "video", &video_id])
+            .expect("origin should be a base");
+        ctx.link().send_future(async move {
+            let result: Result<_, ErrorContext> = async {
+                let mut video: Video = api_request(dab_api_url)
+                    .await
+                    .context("Metadata request failed")?;
+
+                if video.duration.is_none() {
+                    let it_duration: Result<u64, ErrorContext> = async move {
+                        let it_video: InnertubeVideo = api_request(it_dab_url)
+                            .await
+                            .context("Proxied innertube request failed")?;
+                        Ok(it_video.duration)
                     }
-
-                    Ok(video)
+                    .await;
+                    match it_duration {
+                        Err(e) => error!(format!(
+                            "Failed to fetch video duration from innertube: {e:?}"
+                        )),
+                        #[allow(clippy::cast_precision_loss)]
+                        Ok(d) => video.duration = Some(d as f64),
+                    }
                 }
-                .await
-                .map(Rc::new)
-                .map_err(RcEq::new)
+                Ok(RcEq::from(video))
+            }
+            .await;
+            let result = match result {
+                Ok(meta) => MetadataState::Ready(meta),
+                Err(err) => {
+                    error!(format!(
+                        "Failed to fetch extra metadata for video {video_id}: {err:?}"
+                    ));
+                    MetadataState::Failed
+                }
+            };
+            VideoPageMessage::MetadataFetched {
+                data: result,
+                version,
+            }
+        });
+    }
+}
+
+pub enum VideoPageMessage {
+    LocationUpdated(Location),
+    OriginUpdated(Url),
+    EntryCountUpdate(Option<usize>),
+    MetadataFetched { data: MetadataState, version: u8 },
+}
+
+impl Component for VideoPage {
+    type Properties = VideoPageProps;
+    type Message = VideoPageMessage;
+
+    fn create(ctx: &Context<Self>) -> Self {
+        let scope = ctx.link();
+
+        let state = match scope
+            .location()
+            .unwrap()
+            .state::<LocationState<VideoPageTab>>()
+        {
+            Some(state) => *state,
+            None => {
+                let state = LocationState::default();
+                scope
+                    .navigator()
+                    .unwrap()
+                    .replace_with_state(&scope.route::<MainRoute>().unwrap(), state);
+                state
+            }
+        };
+
+        let (wc, wc_listener) = scope
+            .context(scope.callback(|wc: Rc<WindowContext>| {
+                VideoPageMessage::OriginUpdated(wc.origin.clone())
+            }))
+            .expect("WindowContext should be available");
+
+        let mut this = Self {
+            tab: state.detail_table_mode,
+            origin: wc.origin.clone(),
+            rc_videoid: match ctx.props().videoid {
+                AttrValue::Rc(ref rc) => rc.clone(),
+                AttrValue::Static(s) => s.into(),
             },
-            UseAsyncOptions::enable_auto(),
-        )
-    };
 
-    let url_and_mode = use_memo(
-        (state.detail_table_mode, props.videoid.clone()),
-        |(dtm, vid)| {
-            DetailType::try_from(*dtm).ok().map(|dtm| match dtm {
-                DetailType::Title => (
-                    Rc::new(
-                        window_context.origin_join_segments(&["api", "titles", "video_id", vid]),
-                    ),
-                    dtm,
-                ),
-                DetailType::Thumbnail => (
-                    Rc::new(window_context.origin_join_segments(&[
-                        "api",
-                        "thumbnails",
-                        "video_id",
-                        vid,
-                    ])),
-                    dtm,
-                ),
-            })
-        },
-    );
+            entry_count: None,
+            entry_count_callback: scope.callback(VideoPageMessage::EntryCountUpdate),
+            metadata: MetadataState::Loading,
+            version: 0,
 
-    let rc_videoid = use_memo(props.videoid.clone(), |videoid| match videoid {
-        AttrValue::Rc(ref rc) => rc.clone(),
-        AttrValue::Static(s) => (*s).into(),
-    });
+            _location_listener: scope
+                .add_location_listener(scope.callback(VideoPageMessage::LocationUpdated))
+                .unwrap(),
+            _wc_listener: wc_listener,
+        };
+        this.refresh(ctx);
+        this
+    }
 
-    let fallback = html! {
-        <center><b>{"Loading..."}</b></center>
-    };
+    fn view(&self, ctx: &Context<Self>) -> Html {
+        const TITLE_SETTINGS: TitleTableSettings = TitleTableSettings {
+            hide_videoid: true,
+            hide_userid: false,
+            hide_username: false,
+        };
+        const THUMB_SETTINGS: ThumbTableSettings = ThumbTableSettings {
+            hide_videoid: true,
+            hide_userid: false,
+            hide_username: false,
+        };
 
-    html! {
-        <>
+        let props = ctx.props();
+        html! {<>
             <div class="page-details">
                 <YoutubeIframe videoid={props.videoid.clone()} />
-                if state.detail_table_mode == TableMode::Thumbnails {
-                    <Thumbnail video_id={(*rc_videoid).clone()} timestamp={None} caption={ThumbnailCaption::Text("Original thumbnail".into())} />
-                    if let Some(ref metadata) = metadata.data {
-                        if let Some(duration) = metadata.duration {
-                            <Thumbnail video_id={(*rc_videoid).clone()} timestamp={Some(duration*metadata.random_thumbnail)} caption={ThumbnailCaption::Text("Random thumbnail".into())} />
+                if self.tab == VideoPageTab::Thumbnails {
+                    <Thumbnail
+                        video_id={self.rc_videoid.clone()}
+                        timestamp={None}
+                        caption={ThumbnailCaption::Text("Original thumbnail".into())}
+                    />
+                    if let MetadataState::Ready(metadata) = &self.metadata {
+                        if let Video {duration: Some(duration), random_thumbnail, ..} = **metadata {
+                            <Thumbnail
+                                video_id={self.rc_videoid.clone()}
+                                timestamp={Some(duration*random_thumbnail)}
+                                caption={ThumbnailCaption::Text("Random thumbnail".into())}
+                            />
                         }
                     }
                 }
-                <VideoDetailsTable videoid={props.videoid.clone()} mode={state.detail_table_mode} {metadata} />
+                <VideoDetailsTable videoid={props.videoid.clone()} tab={self.tab} metadata={self.metadata.clone()} />
             </div>
-            <TableModeSwitch entry_count={*entry_count} types={ModeSubtype::Details} />
-            if let Some((url, mode)) = url_and_mode.as_ref() {
-                <Suspense {fallback}>
-                    <PaginatedDetailTableRenderer mode={*mode} url={url.clone()} entry_count={entry_count.setter()} hide_videoid=true />
-                </Suspense>
-            } else {
-                {fallback}
+            <TableModeSwitch<VideoPageTab> entry_count={self.entry_count} />
+            {match self.tab {
+                VideoPageTab::Titles => html! {
+                    <RemotePaginatedTable<VideoPageTitles, VideoPageTab>
+                        endpoint={VideoPageTitles {
+                            videoid: props.videoid.clone()
+                        }}
+                        item_count_update={self.entry_count_callback.clone()}
+                        settings={TITLE_SETTINGS}
+                    />
+                },
+                VideoPageTab::Thumbnails => html! {
+                    <RemotePaginatedTable<VideoPageThumbnails, VideoPageTab>
+                        endpoint={VideoPageThumbnails {
+                            videoid: props.videoid.clone()
+                        }}
+                        item_count_update={self.entry_count_callback.clone()}
+                        settings={THUMB_SETTINGS}
+                    />
+                },
+            }}
+        </>}
+    }
+
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+        match msg {
+            VideoPageMessage::OriginUpdated(origin) => {
+                if self.origin == origin {
+                    false
+                } else {
+                    self.origin = origin;
+                    self.refresh(ctx);
+                    true
+                }
             }
-        </>
+            VideoPageMessage::LocationUpdated(location) => {
+                let scope = ctx.link();
+                let state = match location
+                    .state::<LocationState<VideoPageTab>>()
+                    .or_else(|| scope.location().unwrap().state())
+                {
+                    Some(state) => *state,
+                    None => {
+                        let state = LocationState::default();
+                        scope
+                            .navigator()
+                            .unwrap()
+                            .replace_with_state(&scope.route::<MainRoute>().unwrap(), state);
+                        state
+                    }
+                };
+                if self.tab == state.detail_table_mode {
+                    false
+                } else {
+                    self.tab = state.detail_table_mode;
+                    true
+                }
+            }
+            VideoPageMessage::EntryCountUpdate(entry_count) => {
+                if self.entry_count == entry_count {
+                    false
+                } else {
+                    self.entry_count = entry_count;
+                    true
+                }
+            }
+            VideoPageMessage::MetadataFetched { data, version } => {
+                if self.version == version {
+                    self.metadata = data;
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+    }
+
+    fn changed(&mut self, ctx: &Context<Self>, old_props: &Self::Properties) -> bool {
+        if ctx.props().videoid == old_props.videoid {
+            false
+        } else {
+            self.rc_videoid = match ctx.props().videoid {
+                AttrValue::Rc(ref rc) => rc.clone(),
+                AttrValue::Static(str) => str.into(),
+            };
+            self.refresh(ctx);
+            true
+        }
     }
 }

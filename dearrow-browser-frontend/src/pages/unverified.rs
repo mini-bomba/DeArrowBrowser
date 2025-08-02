@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2023-2024 mini_bomba
+*  Copyright (C) 2023-2025 mini_bomba
 *
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -15,41 +15,55 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use std::rc::Rc;
 
+use dearrow_browser_api::unsync::ApiTitle;
+use reqwest::Url;
+use strum::{IntoStaticStr, VariantArray};
 use yew::prelude::*;
 
-use crate::components::tables::details::*;
-use crate::contexts::WindowContext;
+use crate::components::tables::remote::{Endpoint, RemotePaginatedTable};
+use crate::utils::ReqwestUrlExt;
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Default, VariantArray, IntoStaticStr)]
+enum UnverifiedPageTab {
+    #[default]
+    Titles,
+}
+
+#[derive(PartialEq, Eq, Clone, Copy)]
+struct UnverifiedTitles;
+
+impl Endpoint for UnverifiedTitles {
+    type Item = ApiTitle;
+    type LoadProgress = ();
+
+    fn create_url(&self, base_url: &Url) -> Url {
+        base_url.join_segments(&["api", "titles", "unverified"]).expect("origin should be a valid base")
+    }
+}
 
 #[function_component]
 pub fn UnverifiedPage() -> Html {
-    let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
-    let entry_count = use_state_eq(|| None);
-
-    let url = use_memo((), |()| {
-        window_context.origin_join_segments(&["api", "titles", "unverified"])
-    });
-
-    let fallback = html! {
-        <center><b>{"Loading..."}</b></center>
+    let item_count: UseStateHandle<Option<usize>> = use_state_eq(|| None);
+    let callback = {
+        let setter = item_count.setter();
+        use_callback((), move |new, ()| setter.set(new))
     };
 
-    html! {
-        <>
-            <h2>{"Unverified titles"}</h2>
-            if let Some(count) = *entry_count {
-                <span>
-                    if count == 1 {
-                        {"1 entry"}
-                    } else {
-                        {format!("{count} entries")}
-                    }
-                </span>
+    html! {<>
+        <h2>{"Unverified titles"}</h2>
+        <span>
+            if let Some(count) = *item_count {
+                if count == 1 {
+                    {"1 entry"}
+                } else {
+                    {format!("{count} entries")}
+                }
             }
-            <Suspense {fallback}>
-                <PaginatedDetailTableRenderer mode={DetailType::Title} {url} entry_count={entry_count.setter()} />
-            </Suspense>
-        </>
-    }
+        </span>
+        <RemotePaginatedTable<UnverifiedTitles, UnverifiedPageTab>
+            endpoint={UnverifiedTitles}
+            item_count_update={callback}
+        />
+    </>}
 }

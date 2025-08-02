@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2023-2024 mini_bomba
+*  Copyright (C) 2023-2025 mini_bomba
 *
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -15,14 +15,13 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use strum::IntoStaticStr;
+use strum::{IntoStaticStr, VariantArray};
 use web_sys::window;
 use yew::prelude::*;
 use yew_router::prelude::*;
 
 use crate::components::header_footer::*;
 use crate::components::modals::ModalRenderer;
-use crate::components::tables::switch::TableMode;
 
 mod broken;
 mod channel;
@@ -64,8 +63,10 @@ pub enum MainRoute {
 }
 
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
-pub struct LocationState {
-    pub detail_table_mode: TableMode,
+pub struct LocationState<T>
+where T: VariantArray + Into<&'static str> + Copy + Sized + Default + Eq
+{
+    pub detail_table_mode: T,
     pub detail_table_page: usize,
 }
 

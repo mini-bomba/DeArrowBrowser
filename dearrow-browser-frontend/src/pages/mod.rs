@@ -66,16 +66,17 @@ pub enum MainRoute {
 }
 
 #[inline(always)]
-fn is_zero(n: &usize) -> bool {
-    *n == 0
+fn is_default<T: Default + Eq>(n: &T) -> bool {
+    *n == T::default()
 }
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(bound = "T: Tabs")]
 pub struct LocationState<T: Tabs>
 {
+    #[serde(default)]
     pub tab: T,
-    #[serde(default, skip_serializing_if="is_zero")]
+    #[serde(default, skip_serializing_if="is_default")]
     pub page: usize,
 }
 

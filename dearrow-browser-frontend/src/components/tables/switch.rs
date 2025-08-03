@@ -18,6 +18,8 @@
 
 use std::str::FromStr;
 
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use strum::VariantArray;
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
@@ -25,12 +27,24 @@ use yew_router::prelude::*;
 
 use crate::contexts::SettingsContext;
 use crate::hooks::use_location_state;
-use crate::pages::MainRoute;
+use crate::hooks::ScopeExt;
 use crate::pages::LocationState;
 
-pub trait Tabs: VariantArray + Into<&'static str> + Copy + Sized + Default + Eq {}
-impl<T> Tabs for T
-where T: VariantArray + Into<&'static str> + Copy + Sized + Default + Eq {}
+pub trait Tabs:
+    VariantArray + Into<&'static str> + Copy + Sized + Default + Eq + Serialize + DeserializeOwned
+{
+}
+impl<T> Tabs for T where
+    T: VariantArray
+        + Into<&'static str>
+        + Copy
+        + Sized
+        + Default
+        + Eq
+        + Serialize
+        + DeserializeOwned
+{
+}
 
 #[derive(Properties, PartialEq)]
 pub struct TableModeSwitchProps {
@@ -50,7 +64,7 @@ pub struct TableModeSwitch<T: Tabs> {
 
 pub enum TableModeSwitchMessage<T: Tabs> {
     UpdateMode(T),
-    LocationUpdated(Location),
+    LocationUpdated,
     SettingsUpdated(bool),
 }
 
@@ -61,33 +75,26 @@ impl<T: Tabs> Component for TableModeSwitch<T> {
     fn create(ctx: &Context<Self>) -> Self {
         let scope = ctx.link();
 
-        let location_state = match scope.location().unwrap().state::<LocationState<T>>() {
-            Some(state) => *state,
-            None => {
-                let state = LocationState::default();
-                scope
-                    .navigator()
-                    .unwrap()
-                    .replace_with_state(&scope.route::<MainRoute>().unwrap(), state);
-                state
-            }
-        };
+        let location_state = scope.get_state::<T>();
 
-        let (settings, settings_handle) = scope.context::<SettingsContext>(
-            scope.callback(|s: SettingsContext| TableModeSwitchMessage::SettingsUpdated(s.settings().sticky_headers))
-        ).expect("TableModeSwitch should be used inside of a SettingsProvider");
+        let (settings, settings_handle) = scope
+            .context::<SettingsContext>(scope.callback(|s: SettingsContext| {
+                TableModeSwitchMessage::SettingsUpdated(s.settings().sticky_headers)
+            }))
+            .expect("TableModeSwitch should be used inside of a SettingsProvider");
 
         Self {
-            current_mode: location_state.detail_table_mode,
+            current_mode: location_state.tab,
             sticky_headers: settings.settings().sticky_headers,
 
-            callbacks: T::VARIANTS.iter()
+            callbacks: T::VARIANTS
+                .iter()
                 .copied()
                 .map(|v| scope.callback(move |_| TableModeSwitchMessage::UpdateMode(v)))
                 .collect(),
 
             _location_handle: scope
-                .add_location_listener(scope.callback(TableModeSwitchMessage::LocationUpdated))
+                .add_location_listener(scope.callback(|_| TableModeSwitchMessage::LocationUpdated))
                 .unwrap(),
             _settings_handle: settings_handle,
         }
@@ -115,42 +122,23 @@ impl<T: Tabs> Component for TableModeSwitch<T> {
 
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
-            Self::Message::LocationUpdated(location) => {
-                let scope = ctx.link();
-                let state = match location
-                    .state::<LocationState<T>>()
-                    .or_else(|| scope.location().unwrap().state())
-                {
-                    Some(state) => *state,
-                    None => {
-                        let state = LocationState::default();
-                        scope
-                            .navigator()
-                            .unwrap()
-                            .replace_with_state(&scope.route::<MainRoute>().unwrap(), state);
-                        state
-                    }
-                };
-                if self.current_mode == state.detail_table_mode {
+            Self::Message::LocationUpdated => {
+                let state = ctx.link().get_state::<T>();
+                if self.current_mode == state.tab {
                     false
                 } else {
-                    self.current_mode = state.detail_table_mode;
+                    self.current_mode = state.tab;
                     true
                 }
             }
             Self::Message::UpdateMode(new_mode) if new_mode != self.current_mode => {
                 self.current_mode = new_mode;
-                let scope = ctx.link();
-                scope
-                    .navigator()
-                    .unwrap()
-                    .replace_with_state(
-                        &scope.route::<MainRoute>().unwrap(),
-                        LocationState {
-                            detail_table_mode: new_mode,
-                            detail_table_page: 0,
-                        },
-                    );
+                ctx.link().replace_state(
+                    &LocationState {
+                        tab: new_mode,
+                        page: 0,
+                    },
+                );
                 true
             }
             Self::Message::SettingsUpdated(new_sticky) if new_sticky != self.sticky_headers => {
@@ -170,14 +158,19 @@ pub struct PageSelectProps {
 #[function_component]
 pub fn PageSelect<T: Tabs>(props: &PageSelectProps) -> Html {
     let state_handle = use_location_state();
-    let state = state_handle.get_state::<T>();
+    let mut state = state_handle.get_state::<T>();
+
+    if props.page_count <= state.page {
+        state.page = props.page_count - 1;
+        state_handle.replace_state(&state);
+    }
 
     let prev_page = {
         let state_handle = state_handle.clone();
         Callback::from(move |_| {
             let mut state = state;
-            state.detail_table_page = state.detail_table_page.saturating_sub(1);
-            state_handle.replace_state(state);
+            state.page = state.page.saturating_sub(1);
+            state_handle.replace_state(&state);
         })
     };
     let next_page = {
@@ -185,8 +178,8 @@ pub fn PageSelect<T: Tabs>(props: &PageSelectProps) -> Html {
         let max_page = props.page_count - 1;
         Callback::from(move |_| {
             let mut state = state;
-            state.detail_table_page = max_page.min(state.detail_table_page + 1);
-            state_handle.replace_state(state);
+            state.page = max_page.min(state.page + 1);
+            state_handle.replace_state(&state);
         })
     };
     let input_changed = {
@@ -198,11 +191,11 @@ pub fn PageSelect<T: Tabs>(props: &PageSelectProps) -> Html {
             match usize::from_str(&input.value()) {
                 Err(_) => {}
                 Ok(new_page) => {
-                    state.detail_table_page = new_page.clamp(1, page_count) - 1;
-                    state_handle.replace_state(state);
+                    state.page = new_page.clamp(1, page_count) - 1;
+                    state_handle.replace_state(&state);
                 }
             }
-            input.set_value(&format!("{}", state.detail_table_page + 1));
+            input.set_value(&format!("{}", state.page + 1));
         })
     };
 
@@ -211,7 +204,7 @@ pub fn PageSelect<T: Tabs>(props: &PageSelectProps) -> Html {
             <div class="button" onclick={prev_page}>{"prev"}</div>
             <div>
                 {"page"}
-                <input type="number" min=1 max={format!("{}", props.page_count)} ~value={format!("{}", state.detail_table_page+1)} onchange={input_changed} />
+                <input type="number" min=1 max={format!("{}", props.page_count)} ~value={format!("{}", state.page+1)} onchange={input_changed} />
                 {format!("/{}", props.page_count)}
             </div>
             <div class="button" onclick={next_page}>{"next"}</div>

@@ -22,9 +22,10 @@ use cloneable_errors::{ErrorContext, ResContext};
 use dearrow_browser_api::unsync::{ApiCasualTitle, ApiThumbnail, ApiTitle, InnertubeVideo, Video};
 use gloo_console::error;
 use reqwest::Url;
+use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 use yew::prelude::*;
-use yew_router::prelude::{Location, LocationHandle, RouterScopeExt};
+use yew_router::prelude::{LocationHandle, RouterScopeExt};
 
 use crate::components::tables::casual::CasualTableSettings;
 use crate::components::tables::remote::{Endpoint, RemotePaginatedTable};
@@ -33,8 +34,8 @@ use crate::components::tables::thumbs::ThumbTableSettings;
 use crate::components::tables::titles::TitleTableSettings;
 use crate::components::youtube::{ChannelLink, OriginalTitle, YoutubeIframe};
 use crate::contexts::WindowContext;
+use crate::hooks::ScopeExt;
 use crate::innertube::youtu_be_link;
-use crate::pages::{MainRoute, LocationState};
 use crate::thumbnails::components::{Thumbnail, ThumbnailCaption};
 use crate::utils::{api_request, sbb_video_link, RcEq, ReqwestUrlExt, SimpleLoadState};
 
@@ -104,12 +105,15 @@ pub struct VideoPageProps {
     pub videoid: AttrValue,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Default, VariantArray, IntoStaticStr)]
+#[derive(
+    Debug, PartialEq, Eq, Clone, Copy, Default, VariantArray, IntoStaticStr, Serialize, Deserialize,
+)]
+#[serde(rename_all="snake_case")]
 enum VideoPageTab {
     #[default]
     Titles,
     Thumbnails,
-    #[strum(serialize="Casual titles")]
+    #[strum(serialize = "Casual titles")]
     CasualTitles,
 }
 
@@ -230,7 +234,7 @@ impl VideoPage {
 }
 
 pub enum VideoPageMessage {
-    LocationUpdated(Location),
+    LocationUpdated,
     OriginUpdated(Url),
     EntryCountUpdate(Option<usize>),
     MetadataFetched { data: MetadataState, version: u8 },
@@ -243,21 +247,7 @@ impl Component for VideoPage {
     fn create(ctx: &Context<Self>) -> Self {
         let scope = ctx.link();
 
-        let state = match scope
-            .location()
-            .unwrap()
-            .state::<LocationState<VideoPageTab>>()
-        {
-            Some(state) => *state,
-            None => {
-                let state = LocationState::default();
-                scope
-                    .navigator()
-                    .unwrap()
-                    .replace_with_state(&scope.route::<MainRoute>().unwrap(), state);
-                state
-            }
-        };
+        let state = scope.get_state::<VideoPageTab>();
 
         let (wc, wc_listener) = scope
             .context(scope.callback(|wc: Rc<WindowContext>| {
@@ -266,7 +256,7 @@ impl Component for VideoPage {
             .expect("WindowContext should be available");
 
         let mut this = Self {
-            tab: state.detail_table_mode,
+            tab: state.tab,
             origin: wc.origin.clone(),
             rc_videoid: match ctx.props().videoid {
                 AttrValue::Rc(ref rc) => rc.clone(),
@@ -279,7 +269,7 @@ impl Component for VideoPage {
             version: 0,
 
             _location_listener: scope
-                .add_location_listener(scope.callback(VideoPageMessage::LocationUpdated))
+                .add_location_listener(scope.callback(|_| VideoPageMessage::LocationUpdated))
                 .unwrap(),
             _wc_listener: wc_listener,
         };
@@ -298,9 +288,7 @@ impl Component for VideoPage {
             hide_userid: false,
             hide_username: false,
         };
-        const CASUAL_SETTINGS: CasualTableSettings = CasualTableSettings {
-            hide_videoid: true,
-        };
+        const CASUAL_SETTINGS: CasualTableSettings = CasualTableSettings { hide_videoid: true };
 
         let props = ctx.props();
         html! {<>
@@ -368,26 +356,12 @@ impl Component for VideoPage {
                     true
                 }
             }
-            VideoPageMessage::LocationUpdated(location) => {
-                let scope = ctx.link();
-                let state = match location
-                    .state::<LocationState<VideoPageTab>>()
-                    .or_else(|| scope.location().unwrap().state())
-                {
-                    Some(state) => *state,
-                    None => {
-                        let state = LocationState::default();
-                        scope
-                            .navigator()
-                            .unwrap()
-                            .replace_with_state(&scope.route::<MainRoute>().unwrap(), state);
-                        state
-                    }
-                };
-                if self.tab == state.detail_table_mode {
+            VideoPageMessage::LocationUpdated => {
+                let state = ctx.link().get_state::<VideoPageTab>();
+                if self.tab == state.tab {
                     false
                 } else {
-                    self.tab = state.detail_table_mode;
+                    self.tab = state.tab;
                     true
                 }
             }

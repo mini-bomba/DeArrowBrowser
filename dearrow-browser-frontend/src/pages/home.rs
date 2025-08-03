@@ -18,6 +18,7 @@
 
 use dearrow_browser_api::unsync::{ApiCasualTitle, ApiThumbnail, ApiTitle};
 use reqwest::Url;
+use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 use yew::prelude::*;
 
@@ -28,7 +29,8 @@ use crate::contexts::{SettingsContext, StatusContext};
 use crate::hooks::use_location_state;
 use crate::utils::ReqwestUrlExt;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Default, VariantArray, IntoStaticStr)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Default, VariantArray, IntoStaticStr, Serialize, Deserialize)]
+#[serde(rename_all="snake_case")]
 enum HomePageTab {
     #[default]
     Titles,
@@ -104,14 +106,14 @@ pub fn HomePage() -> Html {
     let entries_per_page = settings.entries_per_page.get();
     let state = use_location_state().get_state::<HomePageTab>();
 
-    match state.detail_table_mode {
+    match state.tab {
         HomePageTab::Titles => html! {<>
             <div class="page-details">
                 <Searchbar />
             </div>
             <TableModeSwitch<HomePageTab> entry_count={status.as_ref().and_then(|s| s.titles)} />
             <RemoteUnpaginatedTable<HomePageTitles> endpoint={HomePageTitles {
-                offset: state.detail_table_page * entries_per_page,
+                offset: state.page * entries_per_page,
                 count: entries_per_page,
             }} />
             if let Some(page_count) = status.as_ref().and_then(|s| s.titles.map(|c| c.div_ceil(entries_per_page))) {
@@ -124,7 +126,7 @@ pub fn HomePage() -> Html {
             </div>
             <TableModeSwitch<HomePageTab> entry_count={status.as_ref().and_then(|s| s.thumbnails)} />
             <RemoteUnpaginatedTable<HomePageThumbnails> endpoint={HomePageThumbnails {
-                offset: state.detail_table_page * entries_per_page,
+                offset: state.page * entries_per_page,
                 count: entries_per_page,
             }} />
             if let Some(page_count) = status.as_ref().and_then(|s| s.thumbnails.map(|c| c.div_ceil(entries_per_page))) {
@@ -137,7 +139,7 @@ pub fn HomePage() -> Html {
             </div>
             <TableModeSwitch<HomePageTab> entry_count={status.as_ref().and_then(|s| s.casual_titles)} />
             <RemoteUnpaginatedTable<HomePageCasualTitles> endpoint={HomePageCasualTitles {
-                offset: state.detail_table_page * entries_per_page,
+                offset: state.page * entries_per_page,
                 count: entries_per_page,
             }} />
             if let Some(page_count) = status.as_ref().and_then(|s| s.casual_titles.map(|c| c.div_ceil(entries_per_page))) {

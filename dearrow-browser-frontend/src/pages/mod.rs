@@ -15,13 +15,16 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use strum::{IntoStaticStr, VariantArray};
+
+use serde::{Deserialize, Serialize};
+use strum::IntoStaticStr;
 use web_sys::window;
 use yew::prelude::*;
 use yew_router::prelude::*;
 
 use crate::components::header_footer::*;
 use crate::components::modals::ModalRenderer;
+use crate::components::tables::switch::Tabs;
 
 mod broken;
 mod channel;
@@ -62,12 +65,18 @@ pub enum MainRoute {
     NotFound,
 }
 
-#[derive(Clone, Copy, Default, PartialEq, Eq)]
-pub struct LocationState<T>
-where T: VariantArray + Into<&'static str> + Copy + Sized + Default + Eq
+#[inline(always)]
+fn is_zero(n: &usize) -> bool {
+    *n == 0
+}
+
+#[derive(Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(bound = "T: Tabs")]
+pub struct LocationState<T: Tabs>
 {
-    pub detail_table_mode: T,
-    pub detail_table_page: usize,
+    pub tab: T,
+    #[serde(default, skip_serializing_if="is_zero")]
+    pub page: usize,
 }
 
 #[allow(clippy::needless_pass_by_value)]

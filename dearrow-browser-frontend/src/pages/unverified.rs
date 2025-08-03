@@ -18,13 +18,15 @@
 
 use dearrow_browser_api::unsync::ApiTitle;
 use reqwest::Url;
+use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 use yew::prelude::*;
 
 use crate::components::tables::remote::{Endpoint, RemotePaginatedTable};
 use crate::utils::ReqwestUrlExt;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Default, VariantArray, IntoStaticStr)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Default, VariantArray, IntoStaticStr, Serialize, Deserialize)]
+#[serde(rename_all="snake_case")]
 enum UnverifiedPageTab {
     #[default]
     Titles,

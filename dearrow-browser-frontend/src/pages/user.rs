@@ -20,6 +20,7 @@ use std::rc::Rc;
 
 use cloneable_errors::ErrorContext;
 use dearrow_browser_api::unsync::{ApiThumbnail, ApiTitle, ApiWarning, User};
+use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 use yew::prelude::*;
 
@@ -88,7 +89,8 @@ fn UserDetails(props: &UserDetailsProps) -> HtmlResult {
     })
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Default, VariantArray, IntoStaticStr)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Default, VariantArray, IntoStaticStr, Serialize, Deserialize)]
+#[serde(rename_all="snake_case")]
 enum UserPageTab {
     #[default]
     Titles,
@@ -183,7 +185,7 @@ pub fn UserPage(props: &UserPageProps) -> Html {
                 </div>
             </div>
             <TableModeSwitch<UserPageTab> entry_count={*entry_count} />
-            {match state.detail_table_mode {
+            {match state.tab {
                 UserPageTab::Titles => {
                     const SETTINGS: TitleTableSettings = TitleTableSettings {
                         hide_username: true,

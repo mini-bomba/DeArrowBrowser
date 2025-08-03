@@ -16,14 +16,17 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::{future::Future, cell::RefCell, rc::Rc};
-use yew::prelude::*;
+use std::{cell::RefCell, future::Future, rc::Rc};
+use yew::html::Scope;
 use yew::platform::spawn_local;
-use yew::suspense::{SuspensionResult, Suspension};
+use yew::prelude::*;
+use yew::suspense::{Suspension, SuspensionResult};
 use yew_router::prelude::*;
 
-use crate::{components::tables::switch::Tabs, pages::{MainRoute, LocationState}};
-
+use crate::{
+    components::tables::switch::Tabs,
+    pages::{LocationState, MainRoute},
+};
 
 enum UseAsyncSuspensionState<R>
 where
@@ -35,14 +38,16 @@ where
 }
 
 #[hook]
-pub fn use_async_suspension<FF, F, D, R>(future: FF, deps: D) -> SuspensionResult<Rc<R>> 
+pub fn use_async_suspension<FF, F, D, R>(future: FF, deps: D) -> SuspensionResult<Rc<R>>
 where
     FF: 'static + FnOnce(D) -> F,
-    F:  'static + Future<Output = R>,
-    D:  'static + PartialEq + Clone,
-    R:  'static,
+    F: 'static + Future<Output = R>,
+    D: 'static + PartialEq + Clone,
+    R: 'static,
 {
-    let state_ref: Rc<RefCell<UseAsyncSuspensionState<R>>> = use_memo(deps.clone(), |_| RefCell::new(UseAsyncSuspensionState::Reset));
+    let state_ref: Rc<RefCell<UseAsyncSuspensionState<R>>> = use_memo(deps.clone(), |_| {
+        RefCell::new(UseAsyncSuspensionState::Reset)
+    });
     let mut state = state_ref.borrow_mut();
     match *state {
         UseAsyncSuspensionState::Running(ref sus) => Err(sus.clone()),
@@ -70,22 +75,26 @@ pub struct LocationStateHandle {
 
 impl LocationStateHandle {
     pub fn get_state<T: Tabs>(&self) -> LocationState<T> {
-        match self.location.state::<LocationState<T>>() {
-            Some(state) => *state,
-            None => {
+        match self.location.query::<LocationState<T>>() {
+            Ok(state) => state,
+            Err(..) => {
                 let state = LocationState::default();
-                self.replace_state(state);
+                self.replace_state(&state);
                 state
             }
         }
     }
 
-    pub fn push_state<T: Tabs>(&self, new_state: LocationState<T>) {
-        self.navigator.push_with_state(&self.route, new_state);
+    pub fn push_state<T: Tabs>(&self, new_state: &LocationState<T>) {
+        self.navigator
+            .push_with_query(&self.route, new_state)
+            .expect("Failed to push query state");
     }
 
-    pub fn replace_state<T: Tabs>(&self, new_state: LocationState<T>) {
-        self.navigator.replace_with_state(&self.route, new_state);
+    pub fn replace_state<T: Tabs>(&self, new_state: &LocationState<T>) {
+        self.navigator
+            .replace_with_query(&self.route, new_state)
+            .expect("Failed to replace query state");
     }
 }
 
@@ -96,6 +105,57 @@ pub fn use_location_state() -> LocationStateHandle {
     let location = use_location().expect("Location should be present");
 
     LocationStateHandle {
-        navigator, route, location
+        navigator,
+        route,
+        location,
+    }
+}
+
+pub trait ScopeExt {
+    fn get_state<T: Tabs>(&self) -> LocationState<T>;
+    fn push_state<T: Tabs>(&self, state: &LocationState<T>);
+    fn replace_state<T: Tabs>(&self, state: &LocationState<T>);
+}
+
+impl<C: Component> ScopeExt for Scope<C> {
+    fn get_state<T: Tabs>(&self) -> LocationState<T> {
+        match self
+            .location()
+            .expect("Location should be available")
+            .query::<LocationState<T>>()
+        {
+            Ok(state) => state,
+            Err(..) => {
+                let state = LocationState::default();
+                let route = self
+                    .route::<MainRoute>()
+                    .expect("Expected to be on the main route");
+                self.navigator()
+                    .expect("Navigator should be available")
+                    .replace_with_query(&route, &state)
+                    .expect("Failed to replace query state");
+                state
+            }
+        }
+    }
+
+    fn push_state<T: Tabs>(&self, state: &LocationState<T>) {
+        let route = self
+            .route::<MainRoute>()
+            .expect("Expected to be on the main route");
+        self.navigator()
+            .expect("Navigator should be available")
+            .push_with_query(&route, state)
+            .expect("Failed to push query state");
+    }
+
+    fn replace_state<T: Tabs>(&self, state: &LocationState<T>) {
+        let route = self
+            .route::<MainRoute>()
+            .expect("Expected to be on the main route");
+        self.navigator()
+            .expect("Navigator should be available")
+            .replace_with_query(&route, state)
+            .expect("Failed to push query state");
     }
 }

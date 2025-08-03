@@ -105,7 +105,7 @@ pub fn PaginatedTableRenderer<T: TableRender, S: Tabs>(props: &PaginatedTableRen
             items={props.items.clone()}
             settings={props.settings}
             count={entries_per_page}
-            start={state.detail_table_page*entries_per_page}
+            start={state.page*entries_per_page}
         />
         if page_count > 1 {
             <PageSelect<S> {page_count} />

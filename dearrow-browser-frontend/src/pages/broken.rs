@@ -18,6 +18,7 @@
 
 use dearrow_browser_api::unsync::{ApiThumbnail, ApiTitle};
 use reqwest::Url;
+use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 use yew::prelude::*;
 
@@ -27,7 +28,8 @@ use crate::hooks::use_location_state;
 use crate::utils::ReqwestUrlExt;
 
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Default, VariantArray, IntoStaticStr)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Default, VariantArray, IntoStaticStr, Serialize, Deserialize)]
+#[serde(rename_all="snake_case")]
 enum BrokenPageTab {
     #[default]
     Titles,
@@ -68,7 +70,7 @@ pub fn BrokenPage() -> Html {
     html! {<>
         <h2>{"Broken database entries"}</h2>
         <TableModeSwitch<BrokenPageTab> entry_count={*item_count} />
-        if let BrokenPageTab::Titles = state.detail_table_mode {
+        if let BrokenPageTab::Titles = state.tab {
             <RemotePaginatedTable<BrokenTitles, BrokenPageTab>
                 endpoint={BrokenTitles}
                 item_count_update={callback}

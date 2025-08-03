@@ -21,6 +21,7 @@ use dearrow_browser_api::unsync::{ApiCasualTitle, ApiThumbnail, ApiTitle, Channe
 use cloneable_errors::ResContext;
 use gloo_console::error;
 use reqwest::Url;
+use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 use yew::platform::spawn_local;
 use yew::prelude::*;
@@ -182,7 +183,8 @@ pub struct ChannelPageProps {
     pub channel: AttrValue,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Default, VariantArray, IntoStaticStr)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Default, VariantArray, IntoStaticStr, Serialize, Deserialize)]
+#[serde(rename_all="snake_case")]
 enum ChannelPageTab {
     #[default]
     Titles,
@@ -268,7 +270,7 @@ pub fn ChannelPage(props: &ChannelPageProps) -> Html {
                 </div>
             </div>
             <TableModeSwitch<ChannelPageTab> entry_count={*entry_count} />
-            {match state.detail_table_mode {
+            {match state.tab {
                 ChannelPageTab::Titles => html! {
                     <RemotePaginatedTable<ChannelTitles, ChannelPageTab>
                         endpoint={ChannelTitles { channel: props.channel.clone() }}

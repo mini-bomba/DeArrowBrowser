@@ -321,12 +321,15 @@ fn UUIDTitle(props: &UUIDTitleProps) -> Html {
                 <div>{"Submitted at: "}{DateTime::from_timestamp_millis(title.time_submitted).map_or(title.time_submitted.to_string(), render_datetime)}</div>
                 <div>{"User ID: "}{title.user_id.clone()}{" "}{userid_link(title.user_id.clone().into())}</div>
                 <div class="useragent-row">
+                    <span>
                     {"User agent: "}
                     if title.user_agent.is_empty() {
                         <em>{"Unknown"}</em>
                     } else {
-                        {title.user_agent.clone()}{user_agent_icon(&title.user_agent)}
+                        {title.user_agent.clone()}
                     }
+                    </span>
+                    {user_agent_icon(&title.user_agent)}
                 </div>
                 <div>
                     {"Username: "}

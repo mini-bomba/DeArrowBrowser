@@ -23,7 +23,7 @@ use strum::{IntoStaticStr, VariantArray};
 use yew::prelude::*;
 
 use crate::components::tables::remote::{Endpoint, RemotePaginatedTable};
-use crate::utils::ReqwestUrlExt;
+use crate::utils_common::ReqwestUrlExt;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Default, VariantArray, IntoStaticStr, Serialize, Deserialize)]
 #[serde(rename_all="snake_case")]

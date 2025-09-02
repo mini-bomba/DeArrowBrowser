@@ -18,7 +18,7 @@
 
 use yew::{Html, html};
 
-use crate::utils::html_length;
+use crate::utils_app::html_length;
 
 /// This is for the compact mode, to avoid a trailing bar
 ///

@@ -22,7 +22,7 @@ use crate::{
     components::tables::{switch::{PageSelect, Tabs}, r#trait::TableRender},
     contexts::SettingsContext,
     hooks::use_location_state,
-    utils::RcEq,
+    utils_app::RcEq,
 };
 
 #[derive(Properties)]

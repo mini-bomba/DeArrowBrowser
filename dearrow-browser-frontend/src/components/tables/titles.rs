@@ -31,7 +31,7 @@ use crate::{
     score_col,
     settings::{Settings, TableLayout},
     userid_cell, username_cell,
-    utils::render_datetime,
+    utils_app::render_datetime,
     uuid_cell,
 };
 

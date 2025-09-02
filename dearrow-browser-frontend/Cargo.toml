@@ -73,8 +73,8 @@ git2.workspace = true
 
 [[bin]]
 name="app"
-path="src/main.rs"
+path="src/app.rs"
 
 [[bin]]
-name="thumbnails_worker"
-path="src/thumbnails/worker.rs"
+name="worker"
+path="src/worker.rs"

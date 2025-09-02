@@ -29,7 +29,8 @@ use crate::components::links::userid_link;
 use crate::components::youtube::{OriginalTitle, YoutubeIframe, YoutubeVideoLink};
 use crate::constants::REQWEST_CLIENT;
 use crate::thumbnails::components::{Thumbnail, ThumbnailCaption};
-use crate::utils::{html_length, render_datetime, RcEq, ReqwestResponseExt, ReqwestUrlExt};
+use crate::utils_app::{html_length, render_datetime, RcEq};
+use crate::utils_common::{ReqwestResponseExt, ReqwestUrlExt};
 use crate::WindowContext;
 
 #[derive(Properties, PartialEq, Clone)]

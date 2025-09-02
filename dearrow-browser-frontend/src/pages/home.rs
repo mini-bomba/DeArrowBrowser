@@ -27,7 +27,7 @@ use crate::components::tables::remote::{Endpoint, RemoteUnpaginatedTable};
 use crate::components::tables::switch::*;
 use crate::contexts::{SettingsContext, StatusContext};
 use crate::hooks::use_location_state;
-use crate::utils::ReqwestUrlExt;
+use crate::utils_common::ReqwestUrlExt;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Default, VariantArray, IntoStaticStr, Serialize, Deserialize)]
 #[serde(rename_all="snake_case")]

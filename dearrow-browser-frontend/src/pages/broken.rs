@@ -25,7 +25,7 @@ use yew::prelude::*;
 use crate::components::tables::remote::{Endpoint, RemotePaginatedTable};
 use crate::components::tables::switch::TableModeSwitch;
 use crate::hooks::use_location_state;
-use crate::utils::ReqwestUrlExt;
+use crate::utils_common::ReqwestUrlExt;
 
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Default, VariantArray, IntoStaticStr, Serialize, Deserialize)]

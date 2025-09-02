@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2024 mini_bomba
+*  Copyright (C) 2024-2025 mini_bomba
 *  
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -20,26 +20,27 @@ use std::rc::Rc;
 
 use gloo_console::{error, log};
 use reqwest::Url;
+use yew::html::ChildrenProps;
 use yew::prelude::*;
-use yew_hooks::{use_async_with_options, UseAsyncHandle, UseAsyncOptions};
 
 use crate::components::modals::{thumbnail::ThumbnailModal, ModalMessage};
 use crate::hooks::use_async_suspension;
+use crate::utils_app::RcEq;
+use crate::worker_api::{WorkerRequest, WorkerSetting};
+use crate::worker_client::{Error, WorkerState};
 use crate::{ModalRendererControls, SettingsContext};
-use crate::utils::RcEq;
 
 use super::common::{ThumbgenStats, ThumbnailKey};
 use super::local::{LocalBlobLink, LocalThumbGenerator};
-use super::remote::{Error, RemoteBlobLink, ThumbnailWorker};
-use super::worker_api::{ThumbnailWorkerRequest, WorkerSetting};
+use super::remote::{RemoteBlobLink, RemoteThumbnailGenerator};
 
 #[derive(Clone, Eq, PartialEq)]
 pub enum Thumbgen {
-    Remote(ThumbnailWorker),
+    Remote(RemoteThumbnailGenerator),
     Local{
         gen: LocalThumbGenerator,
         /// Error from the attempt to initialize the remote thumbnail worker
-        error: RcEq<super::remote::Error>,
+        error: RcEq<Error>,
     },
 }
 
@@ -59,6 +60,44 @@ impl ThumbnailUrl {
 }
 
 impl Thumbgen {
+    fn from_worker_state(worker_state: WorkerState) -> Option<Self> {
+        match worker_state {
+            WorkerState::Initializing => None,
+            WorkerState::Ready(client) => Some(Self::Remote(RemoteThumbnailGenerator { client })),
+            WorkerState::Failed(error) => Some(Self::Local {
+                error: error.into(),
+                gen: LocalThumbGenerator::new(),
+            }),
+        }
+    }
+
+    fn update_url(&self, new_url: &str) {
+        match self {
+            Thumbgen::Remote(worker) => {
+                if let Err(e) = worker.client.post_request(WorkerRequest::SettingUpdated {
+                    setting: WorkerSetting::ThumbgenBaseUrl(new_url.to_string())
+                }) {
+                    error!(format!("Failed to notify Thumbgen::Remote about a thumbgen API base URL change: {e}"));
+                }
+            },
+            Thumbgen::Local { r#gen, .. } => {
+                let mut url = match Url::parse(new_url) {
+                    Ok(url) => url,
+                    Err(e) => return error!(format!("Failed to parse new ThumbgenBaseUrl: {e}")),
+                };
+                {
+                    let Ok(mut path) = url.path_segments_mut() else {
+                        return error!(format!("Failed to append API endpoint to new ThumbgenBaseUrl: {new_url} cannot be a base"))
+                    };
+                    path.extend(&["api", "v1", "getThumbnail"]);
+                };
+                r#gen.set_api_url(url);
+                let errors_removed = r#gen.clear_errors();
+                log!(format!("Cleared {errors_removed} error entries after updating thumbgen API URL"));
+            }
+        }
+    }
+
     pub async fn get_thumbnail(&self, key: &ThumbnailKey) -> Result<ThumbnailUrl, Error> {
         match self {
             Self::Remote(worker) => worker.get_thumbnail(key.clone()).await.map(|t| ThumbnailUrl::Remote(Rc::new(t))),
@@ -73,9 +112,9 @@ impl Thumbgen {
         }
     }
 
-    pub async fn clear_errors(&self) {
+    pub fn clear_errors(&self) {
         match self {
-            Self::Remote(worker) => drop(worker.request(ThumbnailWorkerRequest::ClearErrors).await),
+            Self::Remote(worker) => worker.clear_errors(),
             Self::Local { gen, .. } => drop(gen.clear_errors()),
         }
     }
@@ -92,7 +131,7 @@ impl ThumbgenContextExt for ThumbgenContext {
             None => "Initializing",
             Some(Thumbgen::Local {..}) => "Ready",
             Some(Thumbgen::Remote(ref gen)) => {
-                if gen.is_protocol_mismatched() {
+                if gen.client.is_protocol_mismatched() {
                     "Ready (mismatched protocol)"
                 } else {
                     "Ready"
@@ -102,24 +141,15 @@ impl ThumbgenContextExt for ThumbgenContext {
     }
 }
 
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub struct ThumbgenRefreshValue(pub u8);
-
-impl ThumbgenRefreshValue {
-    fn bump(self) -> Self {
-        Self(self.0.wrapping_add(1))
-    }
+#[derive(Clone, PartialEq)]
+pub struct ThumbgenRefreshContext {
+    pub value: u8,
+    bump_callback: Callback<()>,
 }
 
-pub type ThumbgenRefreshContext = UseStateHandle<ThumbgenRefreshValue>;
-pub trait TRExt {
-    fn trigger_refresh(&self);
-}
-
-impl TRExt for ThumbgenRefreshContext {
-    fn trigger_refresh(&self) {
-        self.set(self.bump());
+impl ThumbgenRefreshContext {
+    pub fn trigger_refresh(&self) {
+        self.bump_callback.emit(());
     }
 }
 
@@ -128,65 +158,91 @@ pub struct ThumbnailGeneratorProviderProps {
     pub children: Html
 }
 
-#[function_component]
-pub fn ThumbgenProvider(props: &ThumbnailGeneratorProviderProps) -> Html {
-    let settings_context: SettingsContext = use_context().expect("ThumbnailProvider must be placed under a SettingsContext provider");
-    let settings = settings_context.settings();
-    let disable_sharedworker = settings.disable_sharedworker;
-    let thumgen_state: UseAsyncHandle<Thumbgen, ()> = use_async_with_options(async move {
-        if disable_sharedworker {
-            Ok(Thumbgen::Local { 
-                gen: LocalThumbGenerator::new(), 
-                error: RcEq::new(Error::ConfigDisabled), 
-            })
-        } else {
-            Ok(match ThumbnailWorker::new().await {
-                Ok(worker) => Thumbgen::Remote(worker),
-                Err(err) => Thumbgen::Local {
-                    gen: LocalThumbGenerator::new(),
-                    error: RcEq::new(err),
-                },
-            })
-        }
-    }, UseAsyncOptions::enable_auto());
-    let refresh_state = use_state(|| ThumbgenRefreshValue(0));
+pub struct ThumbgenProvider {
+    refresh_ctx: ThumbgenRefreshContext,
+    thumbgen: Option<Thumbgen>,
+    thumbgen_url: Rc<str>,
 
-    // Thumbgen API URL updates
-    use_memo((thumgen_state.data.clone(), settings.thumbgen_api_base_url.clone()), |(thumbgen, api_base_url)| {
-        match thumbgen {
-            None => (),
-            Some(Thumbgen::Remote(worker)) => {
-                if let Err(e) = worker.post_request(ThumbnailWorkerRequest::SettingUpdated {
-                    setting: WorkerSetting::ThumbgenBaseUrl(api_base_url.to_string())
-                }) {
-                    error!(format!("Failed to notify Thumbgen::Remote about a thumbgen API base URL change: {e}"));
-                }
+    _worker_context: ContextHandle<WorkerState>,
+    _settings_context: ContextHandle<SettingsContext>,
+}
+
+pub enum ThumbgenProviderMessage {
+    WorkerStateUpdate(WorkerState),
+    ThumbgenUrlUpdate(Rc<str>),
+    BumpRefreshIdx,
+}
+
+impl Component for ThumbgenProvider {
+    type Properties = ChildrenProps;
+    type Message = ThumbgenProviderMessage;
+
+    fn create(ctx: &Context<Self>) -> Self {
+        let scope = ctx.link();
+        let (worker_state, worker_context) = scope
+            .context::<WorkerState>(scope.callback(ThumbgenProviderMessage::WorkerStateUpdate))
+            .expect("Worker client should be available");
+        let (settings, settings_context) = scope
+            .context::<SettingsContext>(scope.callback(|s: SettingsContext| {
+                ThumbgenProviderMessage::ThumbgenUrlUpdate(
+                    s.settings().thumbgen_api_base_url.clone(),
+                )
+            }))
+            .expect("Settings should be available");
+
+        let this = Self {
+            thumbgen: Thumbgen::from_worker_state(worker_state),
+            refresh_ctx: ThumbgenRefreshContext {
+                value: 0,
+                bump_callback: scope.callback(|()| ThumbgenProviderMessage::BumpRefreshIdx),
             },
-            Some(Thumbgen::Local { r#gen, .. }) => {
-                let mut url = match Url::parse(api_base_url) {
-                    Ok(url) => url,
-                    Err(e) => return error!(format!("Failed to parse new ThumbgenBaseUrl: {e}")),
-                };
-                {
-                    let Ok(mut path) = url.path_segments_mut() else {
-                        return error!(format!("Failed to append API endpoint to new ThumbgenBaseUrl: {api_base_url} cannot be a base"))
-                    };
-                    path.extend(&["api", "v1", "getThumbnail"]);
-                };
-                r#gen.set_api_url(url);
-                let errors_removed = r#gen.clear_errors();
-                log!(format!("Cleared {errors_removed} error entries after updating thumbgen API URL"));
+            thumbgen_url: settings.settings().thumbgen_api_base_url.clone(),
+
+            _worker_context: worker_context,
+            _settings_context: settings_context,
+        };
+        if let Some(thumbgen) = &this.thumbgen {
+            thumbgen.update_url(&this.thumbgen_url);
+        }
+        this
+    }
+
+    fn view(&self, ctx: &Context<Self>) -> Html {
+        html! {
+            <ContextProvider<ThumbgenContext> context={self.thumbgen.clone()}>
+            <ContextProvider<ThumbgenRefreshContext> context={self.refresh_ctx.clone()}>
+                { ctx.props().children.clone() }
+            </ContextProvider<ThumbgenRefreshContext>>
+            </ContextProvider<ThumbgenContext>>
+        }
+    }
+
+    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
+        match msg {
+            ThumbgenProviderMessage::BumpRefreshIdx => {
+                self.refresh_ctx.value = self.refresh_ctx.value.wrapping_add(1);
+                true
+            },
+            ThumbgenProviderMessage::WorkerStateUpdate(new_state) => {
+                self.thumbgen = Thumbgen::from_worker_state(new_state);
+                if let Some(thumbgen) = &self.thumbgen {
+                    thumbgen.update_url(&self.thumbgen_url);
+                }
+                self.refresh_ctx.value = self.refresh_ctx.value.wrapping_add(1);
+                true
+            },
+            ThumbgenProviderMessage::ThumbgenUrlUpdate(new_url) => {
+                if self.thumbgen_url == new_url {
+                    return false;
+                }
+                self.thumbgen_url = new_url;
+                if let Some(thumbgen) = &self.thumbgen {
+                    thumbgen.update_url(&self.thumbgen_url);
+                }
+                self.refresh_ctx.value = self.refresh_ctx.value.wrapping_add(1);
+                true
             }
         }
-        refresh_state.trigger_refresh();
-    });
-
-    html! {
-        <ContextProvider<ThumbgenContext> context={thumgen_state.data.clone()}>
-        <ContextProvider<ThumbgenRefreshContext> context={refresh_state.clone()}>
-            { props.children.clone() }
-        </ContextProvider<ThumbgenRefreshContext>>
-        </ContextProvider<ThumbgenContext>>
     }
 }
 

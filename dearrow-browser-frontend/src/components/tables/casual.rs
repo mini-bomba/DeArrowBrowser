@@ -23,7 +23,7 @@ use yew::{function_component, html, Html};
 use crate::{
     components::{icon::{Icon, IconType}, tables::r#trait::{RowProps, TableRender}, youtube::{OriginalTitle, YoutubeVideoLink}},
     settings::Settings,
-    utils::render_datetime,
+    utils_app::render_datetime,
 };
 
 #[derive(PartialEq, Eq, Clone, Copy, Default)]

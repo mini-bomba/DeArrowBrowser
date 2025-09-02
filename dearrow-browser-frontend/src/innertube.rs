@@ -20,7 +20,7 @@ use cloneable_errors::{ErrorContext, ResContext};
 use reqwest::Url;
 use serde::Deserialize;
 
-use crate::utils::{api_request, ReqwestUrlExt};
+use crate::utils_common::{api_request, ReqwestUrlExt};
 use crate::constants::*;
 
 

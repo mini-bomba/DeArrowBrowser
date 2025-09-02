@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2024 mini_bomba
+*  Copyright (C) 2024-2025 mini_bomba
 *
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -18,16 +18,15 @@
 use std::rc::Rc;
 
 use chrono::DateTime;
-use yew::platform::spawn_local;
 use yew::prelude::*;
 use yew_hooks::{use_async, use_interval};
 
 use crate::{built_info, constants};
 use crate::contexts::{StatusContext, WindowContext};
 use crate::thumbnails::components::{
-    TRExt, Thumbgen, ThumbgenContext, ThumbgenContextExt, ThumbgenRefreshContext,
+    Thumbgen, ThumbgenContext, ThumbgenContextExt, ThumbgenRefreshContext,
 };
-use crate::utils::{render_datetime, RenderNumber};
+use crate::utils_app::{render_datetime, RenderNumber};
 
 macro_rules! number_hoverswitch {
     ($switch_element: tt, $n: expr) => {
@@ -112,7 +111,7 @@ pub fn StatusModal() -> Html {
 
     {
         let thumbgen_stats = thumbgen_stats.clone();
-        use_memo((*update_clock, *thumbgen_refresh), |_| {
+        use_memo((*update_clock, thumbgen_refresh.value), |_| {
             thumbgen_stats.run();
         });
     }
@@ -127,14 +126,10 @@ pub fn StatusModal() -> Html {
     }
 
     let clear_errors = use_callback(thumbgen.clone(), move |_: MouseEvent, thumbgen| {
-        let thumbgen = thumbgen.clone();
-        let thumbgen_refresh = thumbgen_refresh.clone();
-        spawn_local(async move {
-            if let Some(ref thumbgen) = thumbgen {
-                thumbgen.clear_errors().await;
-                thumbgen_refresh.trigger_refresh();
-            }
-        });
+        if let Some(ref thumbgen) = thumbgen {
+            thumbgen.clear_errors();
+            thumbgen_refresh.trigger_refresh();
+        }
     });
 
     html! {

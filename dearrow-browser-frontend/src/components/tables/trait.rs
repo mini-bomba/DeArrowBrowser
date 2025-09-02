@@ -19,7 +19,7 @@
 use serde::de::DeserializeOwned;
 use yew::{BaseComponent, Html, Properties};
 
-use crate::{settings::Settings, utils::RcEq};
+use crate::{settings::Settings, utils_app::RcEq};
 
 #[derive(Properties)]
 pub struct RowProps<T: TableRender> {

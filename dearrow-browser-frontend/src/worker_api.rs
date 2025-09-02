@@ -20,7 +20,7 @@ use std::{error::Error, fmt::Display, rc::Rc};
 
 use bincode::{Decode, Encode};
 
-use super::common::{ThumbgenStats, ThumbnailKey};
+use crate::thumbnails::common::{ThumbgenStats, ThumbnailKey};
 
 pub const BINCODE_CONFIG: bincode::config::Configuration = bincode::config::standard();
 
@@ -55,7 +55,7 @@ impl Display for RemoteThumbnailGenerationError {
 impl Error for RemoteThumbnailGenerationError {}
 
 #[derive(Encode, Decode, Debug)]
-pub enum ThumbnailWorkerRequest {
+pub enum WorkerRequest {
     Version {
         version: String,
         git_hash: Option<String>,
@@ -77,7 +77,7 @@ pub enum ThumbnailWorkerRequest {
 }
 
 #[derive(Encode, Decode, Debug)]
-pub enum ThumbnailWorkerResponse {
+pub enum WorkerResponse {
     Version {
         version: String,
         git_hash: Option<String>,
@@ -107,13 +107,13 @@ pub enum WorkerSetting {
 }
 
 #[derive(Encode, Decode, Debug)]
-pub struct ThumbnailWorkerRequestMessage {
+pub struct WorkerRequestMessage {
     pub id: u16,
-    pub request: ThumbnailWorkerRequest,
+    pub request: WorkerRequest,
 }
 
 #[derive(Encode, Decode, Debug)]
-pub struct ThumbnailWorkerResponseMessage {
+pub struct WorkerResponseMessage {
     pub id: u16,
-    pub response: ThumbnailWorkerResponse,
+    pub response: WorkerResponse,
 }

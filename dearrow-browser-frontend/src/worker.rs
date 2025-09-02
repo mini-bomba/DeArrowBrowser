@@ -15,7 +15,7 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-// NOTE: This file is compiled into the worker wasm binary!
+// NOTE: This file is the entrypoint to the 'worker' binary.
 
 use std::{cell::{Cell, OnceCell, RefCell}, collections::HashMap, rc::Rc};
 
@@ -26,21 +26,17 @@ use wasm_bindgen::{closure::Closure, JsCast};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{js_sys::{self, Array, Reflect, Uint8Array}, MessageEvent, MessagePort, SharedWorkerGlobalScope};
 
-// imports from the root crate
 #[allow(dead_code)]
-#[path = "../constants.rs"]
 mod constants;
 #[allow(dead_code)]
-#[path = "../utils.rs"]
-mod utils;
-
-// this module, imported as if we were in the root src dir
-#[path = "mod_worker.rs"]
+mod utils_common;
+#[path = "thumbnails/mod_worker.rs"]
 pub mod thumbnails;
+pub mod worker_api;
 
 use thumbnails::common::{ThumbgenStats, WorkerStats};
 use thumbnails::local::{LocalBlobLink, LocalThumbGenerator};
-use thumbnails::worker_api::{self, RawRemoteRef, ThumbnailWorkerRequest, ThumbnailWorkerRequestMessage, ThumbnailWorkerResponse, ThumbnailWorkerResponseMessage, BINCODE_CONFIG};
+use worker_api::{RawRemoteRef, WorkerRequest, WorkerRequestMessage, WorkerResponse, WorkerResponseMessage, BINCODE_CONFIG};
 
 const PING_CHECK_INTERVAL: i32 = 30_000;
 const MAX_PING_FAILS: u8 = 3;
@@ -179,19 +175,19 @@ impl WorkerContext {
         let port: MessagePort = event.target().expect("target should be set").unchecked_into();
 
         let data = data.to_vec();
-        let message: ThumbnailWorkerRequestMessage = match bincode::decode_from_slice(&data, BINCODE_CONFIG) {
+        let message: WorkerRequestMessage = match bincode::decode_from_slice(&data, BINCODE_CONFIG) {
             Ok((msg, ..)) => msg,
             Err(err) => {
                 error!(format!("Failed to deserialize a message: {err:?}"));
                 // this will be missing data, but at least the caller should get notified of the error
-                port.reply(ThumbnailWorkerResponseMessage {
+                port.reply(WorkerResponseMessage {
                     id: 0,
-                    response: ThumbnailWorkerResponse::DeserializationError { received_data: data }
+                    response: WorkerResponse::DeserializationError { received_data: data }
                 });
                 return;
             }
         };
-        let ThumbnailWorkerRequestMessage { id, request } = message;
+        let WorkerRequestMessage { id, request } = message;
 
         // Get client, mark it as alive
         let client = self.get_client(&port);
@@ -200,7 +196,7 @@ impl WorkerContext {
 
         spawn_local(async move {
             let response = self.process_message(client, request).await;
-            port.reply(ThumbnailWorkerResponseMessage { id, response });
+            port.reply(WorkerResponseMessage { id, response });
         });
     }
 
@@ -252,24 +248,24 @@ impl WorkerContext {
         client
     }
 
-    async fn process_message(&'static self, client: Rc<RemoteClient>, request: ThumbnailWorkerRequest) -> ThumbnailWorkerResponse {
+    async fn process_message(&'static self, client: Rc<RemoteClient>, request: WorkerRequest) -> WorkerResponse {
         match request {
-            ThumbnailWorkerRequest::Version { version, git_hash, git_dirty } => {
+            WorkerRequest::Version { version, git_hash, git_dirty } => {
                 if version != built_info::PKG_VERSION || git_hash.as_deref() != built_info::GIT_COMMIT_HASH || git_dirty != built_info::GIT_DIRTY {
                     warn!(format!("Version mismatch detected! Message (de)serialization errors may occur!\nNew client's version: {version}, git hash: {git_hash:?}, git dirty: {git_dirty:?}\nWorker version: {}, git hash: {:?}, git dirty: {:?}\nClose all DeArrow Browser windows to resolve this issue.", built_info::PKG_VERSION, built_info::GIT_COMMIT_HASH, built_info::GIT_DIRTY));
                 }
 
-                ThumbnailWorkerResponse::Version { 
+                WorkerResponse::Version { 
                     version: built_info::PKG_VERSION.to_owned(), 
                     git_hash: built_info::GIT_COMMIT_HASH.map(ToOwned::to_owned),
                     git_dirty: built_info::GIT_DIRTY
                 }
             },
-            ThumbnailWorkerRequest::BlobLinkDropped { ref_id } => {
+            WorkerRequest::BlobLinkDropped { ref_id } => {
                 client.drop_ref(ref_id);
-                ThumbnailWorkerResponse::Ok
+                WorkerResponse::Ok
             },
-            ThumbnailWorkerRequest::GetThumbnail { key } => {
+            WorkerRequest::GetThumbnail { key } => {
                 let result = self.thumbgen.get_thumb(&key).await
                     .map(|thumb_url| {
                         RawRemoteRef {
@@ -279,22 +275,22 @@ impl WorkerContext {
                     })
                     .map_err(Into::into);
 
-                ThumbnailWorkerResponse::Thumbnail { r#ref: result }
+                WorkerResponse::Thumbnail { r#ref: result }
             },
-            ThumbnailWorkerRequest::SettingUpdated { setting } => {
+            WorkerRequest::SettingUpdated { setting } => {
                 match setting {
                     worker_api::WorkerSetting::ThumbgenBaseUrl(base_url) => {
                         let mut url = match Url::parse(&base_url) {
                             Ok(url) => url,
                             Err(e) => {
                                 error!(format!("Failed to parse new ThumbgenBaseUrl: {e}"));
-                                return ThumbnailWorkerResponse::Ok;
+                                return WorkerResponse::Ok;
                             },
                         };
                         {
                             let Ok(mut path) = url.path_segments_mut() else {
                                 error!(format!("Failed to append API endpoint to new ThumbgenBaseUrl: {base_url} cannot be a base"));
-                                return ThumbnailWorkerResponse::Ok;
+                                return WorkerResponse::Ok;
                             };
                             path.extend(&["api", "v1", "getThumbnail"]);
                         };
@@ -305,14 +301,14 @@ impl WorkerContext {
                     }
                 }
 
-                ThumbnailWorkerResponse::Ok
+                WorkerResponse::Ok
             },
-            ThumbnailWorkerRequest::ClearErrors => {
+            WorkerRequest::ClearErrors => {
                 self.thumbgen.clear_errors();
-                ThumbnailWorkerResponse::Ok
+                WorkerResponse::Ok
             },
-            ThumbnailWorkerRequest::GetStats => {
-                ThumbnailWorkerResponse::Stats { 
+            WorkerRequest::GetStats => {
+                WorkerResponse::Stats { 
                     stats: ThumbgenStats { 
                         cache_stats: self.thumbgen.get_stats(),
                         worker_stats: Some(WorkerStats { 
@@ -322,10 +318,10 @@ impl WorkerContext {
                     }
                 }
             },
-            ThumbnailWorkerRequest::Ping => {
-                ThumbnailWorkerResponse::Ok
+            WorkerRequest::Ping => {
+                WorkerResponse::Ok
             },
-            ThumbnailWorkerRequest::Disconnecting => {
+            WorkerRequest::Disconnecting => {
                 // Find and drop the client
                 let mut clients = self.clients.borrow_mut();
                 if let Some((key, _)) = clients.iter().find(|(_, v)| Rc::ptr_eq(v, &client)) {
@@ -335,18 +331,18 @@ impl WorkerContext {
                     error!("Failed to find & remove a client that sent a Disconnecting request!");
                 }
 
-                ThumbnailWorkerResponse::Ok
+                WorkerResponse::Ok
             }
         }
     }
 }
 
 trait MessagePortExt {
-    fn reply(&self, message: ThumbnailWorkerResponseMessage);
+    fn reply(&self, message: WorkerResponseMessage);
 }
 
 impl MessagePortExt for MessagePort {
-    fn reply(&self, message: ThumbnailWorkerResponseMessage) {
+    fn reply(&self, message: WorkerResponseMessage) {
         let message = match bincode::encode_to_vec(&message, BINCODE_CONFIG) {
             Ok(m) => m,
             Err(err) => {

@@ -37,7 +37,8 @@ use crate::contexts::WindowContext;
 use crate::hooks::ScopeExt;
 use crate::innertube::youtu_be_link;
 use crate::thumbnails::components::{Thumbnail, ThumbnailCaption};
-use crate::utils::{api_request, sbb_video_link, RcEq, ReqwestUrlExt, SimpleLoadState};
+use crate::utils_app::{sbb_video_link, RcEq, SimpleLoadState};
+use crate::utils_common::{api_request, ReqwestUrlExt};
 
 #[derive(Properties, PartialEq)]
 struct VideoDetailsTableProps {

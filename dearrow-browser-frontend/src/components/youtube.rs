@@ -28,7 +28,7 @@ use crate::components::links::videoid_link;
 use crate::constants::YOUTUBE_EMBED_URL;
 use crate::innertube::{self, youtu_be_link};
 use crate::pages::MainRoute;
-use crate::utils::ReqwestUrlExt;
+use crate::utils_common::ReqwestUrlExt;
 
 #[derive(Properties, PartialEq, Clone)]
 pub struct YoutubeProps {
@@ -68,7 +68,7 @@ pub fn YoutubeVideoLink(props: &VideoLinkProps) -> Html {
     }
 }
 
-type SimpleLoadState = crate::utils::SimpleLoadState<AttrValue>;
+type SimpleLoadState = crate::utils_app::SimpleLoadState<AttrValue>;
 
 pub struct OriginalTitle {
     title: SimpleLoadState,

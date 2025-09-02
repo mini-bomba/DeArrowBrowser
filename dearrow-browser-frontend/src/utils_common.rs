@@ -18,11 +18,15 @@
 
 use std::cell::OnceCell;
 
+use cloneable_errors::{bail, ErrContext, ErrorContext, ResContext, SerializableError};
 use gloo_console::error;
+use reqwest::Url;
 use web_sys::{window, AbortController, AddEventListenerOptions, EventTarget, Response, Window, WorkerGlobalScope};
 use web_sys::js_sys::{global, Function, JsString, Promise};
 use wasm_bindgen::{closure::Closure, prelude::wasm_bindgen, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
+
+use crate::constants::REQWEST_CLIENT;
 
 // stringifying js values
 #[wasm_bindgen]
@@ -176,4 +180,70 @@ impl<F: ?Sized> EventCellsExt for OnceCell<EventListener<F>> {
 
 thread_local! {
     pub static GLOBAL: Global = Global::get().unwrap();
+}
+
+pub trait ReqwestUrlExt {
+    #[allow(clippy::result_unit_err)]
+    fn extend_segments<I>(&mut self, segments: I) -> Result<&mut Self, ()>
+    where I: IntoIterator,
+    I::Item: AsRef<str>;
+    #[allow(clippy::result_unit_err)]
+    fn join_segments<I>(&self, segments: I) -> Result<Self, ()>
+    where I: IntoIterator,
+    I::Item: AsRef<str>,
+    Self: Sized;
+}
+
+impl ReqwestUrlExt for Url {
+    fn extend_segments<I>(&mut self, segments: I) -> Result<&mut Self, ()>
+        where I: IntoIterator,
+        I::Item: AsRef<str>,
+    {
+        {
+            let mut path = self.path_segments_mut()?;
+            path.extend(segments);
+        }
+        Ok(self)
+    }
+    fn join_segments<I>(&self, segments: I) -> Result<Self, ()>
+        where I: IntoIterator,
+        I::Item: AsRef<str>,
+    {
+        let mut url = self.clone();
+        url.extend_segments(segments)?;
+        Ok(url)
+    }
+}
+
+pub trait ReqwestResponseExt: Sized {
+    #[allow(async_fn_in_trait)]  // this is for local use
+    async fn check_status(self) -> Result<Self, ErrorContext>;
+}
+
+impl ReqwestResponseExt for reqwest::Response {
+    async fn check_status(self) -> Result<Self, ErrorContext> {
+        let status = self.status();
+        if status.is_success() {
+            Ok(self)
+        } else {
+            let body = self.text().await.with_context(|| format!("The server returned a '{status}' status code"))?;
+            match serde_json::from_str::<SerializableError>(&body) {
+                Err(..) => bail!("The server returned a '{status}' status code with the following body:\n{body}",),
+                Ok(err) => Err(err.context("--- SERVER ERROR STACK FOLLOWS ---").context(format!("The server returned a '{status}' status code")))
+            }
+        }
+    }
+}
+
+pub async fn api_request<U,R>(url: U) -> Result<R, ErrorContext>
+where 
+    U: reqwest::IntoUrl,
+    R: serde::de::DeserializeOwned,
+{
+    REQWEST_CLIENT
+        .get(url)
+        .header("Accept", "application/json")
+        .send().await.context("Failed to send the request")?
+        .check_status().await?
+        .json().await.context("Failed to deserialize response")
 }

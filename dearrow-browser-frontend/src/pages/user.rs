@@ -32,7 +32,8 @@ use crate::components::tables::titles::TitleTableSettings;
 use crate::components::tables::warnings::WarningTableSettings;
 use crate::contexts::{StatusContext, WindowContext};
 use crate::hooks::{use_async_suspension, use_location_state};
-use crate::utils::{api_request, sbb_userid_link, ReqwestUrlExt};
+use crate::utils_app::sbb_userid_link;
+use crate::utils_common::{api_request, ReqwestUrlExt};
 
 #[derive(Properties, PartialEq)]
 struct UserDetailsProps {

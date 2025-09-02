@@ -15,6 +15,8 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
+// NOTE: This file is the entrypoint to the 'app' binary.
+
 use std::rc::Rc;
 use components::async_task_manager::AsyncTaskManager;
 use dearrow_browser_api::unsync::StatusResponse;
@@ -22,7 +24,7 @@ use cloneable_errors::ErrorContext;
 use gloo_console::error;
 use reqwest::Url;
 use thumbnails::components::ThumbgenProvider;
-use utils::api_request;
+use utils_common::api_request;
 use yew::prelude::*;
 use yew_hooks::{use_async_with_options, use_interval, UseAsyncOptions};
 use yew_router::prelude::*;
@@ -34,13 +36,18 @@ pub mod contexts;
 pub mod hooks;
 pub mod innertube;
 pub mod settings;
-pub mod utils;
+pub mod utils_app;
+pub mod utils_common;
 pub mod pages;
-#[path = "thumbnails/mod_main.rs"]
+#[path = "thumbnails/mod_app.rs"]
 pub mod thumbnails;
 pub mod sbserver;
+pub mod worker_api;
+pub mod worker_client;
 use contexts::*;
 use pages::*;
+
+use crate::worker_client::WorkerProvider;
 
 #[function_component]
 fn App() -> Html {
@@ -75,6 +82,7 @@ fn App() -> Html {
         <ContextProvider<Rc<WindowContext>> context={window_context}>
         <ContextProvider<StatusContext> context={status.data.clone()}>
         <SettingsProvider>
+        <WorkerProvider>
         <ThumbgenProvider>
         <ContextProvider<UpdateClock> context={*update_clock}>
         <AsyncTaskManager>
@@ -84,6 +92,7 @@ fn App() -> Html {
         </AsyncTaskManager>
         </ContextProvider<UpdateClock>>
         </ThumbgenProvider>
+        </WorkerProvider>
         </SettingsProvider>
         </ContextProvider<StatusContext>>
         </ContextProvider<Rc<WindowContext>>>

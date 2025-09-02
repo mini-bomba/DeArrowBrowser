@@ -102,5 +102,5 @@ The DeArrow Browser source code is licensed under the [GNU Affero General Public
 Images located in the [`/dearrow-browser-frontend/icon/`](https://github.com/mini-bomba/DeArrowBrowser/tree/master/dearrow-browser-frontend/icon) directory are licensed under various licenses and may contain trademarks.
 See the README.md files in the respective directories for more details.
 
-© mini_bomba & [contributors](https://github.com/mini-bomba/DeArrowBrowser/graphs/contributors) 2023-2024
+© mini_bomba & [contributors](https://github.com/mini-bomba/DeArrowBrowser/graphs/contributors) 2023-2025
 

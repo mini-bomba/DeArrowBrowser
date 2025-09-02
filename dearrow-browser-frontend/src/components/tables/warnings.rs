@@ -28,7 +28,7 @@ use crate::{
         tables::r#trait::{RowProps, TableRender},
     },
     settings::Settings,
-    utils::render_datetime,
+    utils_app::render_datetime,
 };
 
 #[derive(PartialEq, Eq, Clone, Copy, Default)]

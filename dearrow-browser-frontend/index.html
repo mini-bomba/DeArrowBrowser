@@ -2,7 +2,7 @@
 <!--
   This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 
-  Copyright (C) 2023-2024 mini_bomba
+  Copyright (C) 2023-2025 mini_bomba
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU Affero General Public License as published by
@@ -24,8 +24,8 @@
         <link rel="icon" href="/icon/twemoji/logo.svg">
         <link data-trunk rel="scss" href="index.scss">
         <link data-trunk rel="rust" data-bin="app" data-type="main" data-reference-types="true" data-wasm-opt-params="--enable-bulk-memory --enable-nontrapping-float-to-int" data-initializer="initializer.mjs" data-bindgen-target="web">
-        <link data-trunk rel="rust" data-bin="thumbnails_worker" data-type="worker" data-reference-types="true" data-wasm-opt-params="--enable-bulk-memory --enable-nontrapping-float-to-int" data-bindgen-target="web">
-        <link data-trunk rel="copy-file" href="src/thumbnails/worker_loader.mjs" data-target-path="thumbnails">
+        <link data-trunk rel="rust" data-bin="worker" data-type="worker" data-reference-types="true" data-wasm-opt-params="--enable-bulk-memory --enable-nontrapping-float-to-int" data-bindgen-target="web">
+        <link data-trunk rel="copy-dir" href="js">
         <link data-trunk rel="copy-dir" href="icon">
     </head>
     <body>

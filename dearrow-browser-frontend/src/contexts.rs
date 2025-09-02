@@ -26,7 +26,7 @@ use yew_hooks::{use_local_storage, UseLocalStorageHandle};
 
 pub use crate::components::modals::{ModalRendererControls, ModalMessage};
 pub use crate::components::async_task_manager::{AsyncTaskControl, AsyncTaskList};
-use crate::{settings::Settings, utils::{api_request, sponsorblock_hash, ReqwestUrlExt}};
+use crate::{settings::Settings, utils_app::sponsorblock_hash, utils_common::{api_request, ReqwestUrlExt}};
 
 #[derive(Clone, PartialEq)]
 pub struct WindowContext {

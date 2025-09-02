@@ -33,7 +33,8 @@ use crate::contexts::WindowContext;
 use crate::hooks::
     use_location_state
 ;
-use crate::utils::{CancelHandle, CancelWatcher, ReqwestResponseExt, ReqwestUrlExt, SimpleLoadState};
+use crate::utils_app::{CancelHandle, CancelWatcher, SimpleLoadState};
+use crate::utils_common::{ReqwestResponseExt, ReqwestUrlExt};
 
 
 struct ChannelDetails {

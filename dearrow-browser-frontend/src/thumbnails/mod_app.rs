@@ -15,12 +15,8 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-import wasm_loader from '/thumbnails_worker.js';
 
-// this will store missed 'connect' events until the wasm binary boots up
-// so we don't have to do the weird "ping the worker first" hack on the page
-globalThis.events = [];
-globalThis.onconnect = e => globalThis.events.push(e);
-
-// worker.rs takes over here
-wasm_loader();
+pub mod local;
+pub mod remote;
+pub mod components;
+pub mod common;

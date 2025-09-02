@@ -16,19 +16,29 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::{cell::{Cell, OnceCell, RefCell}, collections::HashMap, rc::Rc};
+use std::{
+    cell::{Cell, OnceCell, RefCell},
+    collections::HashMap,
+    rc::Rc,
+};
 
-use futures::{future::{LocalBoxFuture, Shared}, FutureExt};
+use futures::{
+    future::{LocalBoxFuture, Shared},
+    FutureExt,
+};
 use gloo_console::{debug, error, log};
 use reqwest::Url;
 use wasm_bindgen::{closure::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{js_sys::{Error, Object, Reflect}, Blob};
+use web_sys::{
+    js_sys::{Error, Object, Reflect},
+    Blob,
+};
 
 use super::common::{CacheStats, ThumbnailKey};
-use super::utils::*;
-use super::worker_api::RemoteThumbnailGenerationError;
-use crate::{constants::THUMBNAIL_URL, utils::ReqwestUrlExt};
+use crate::{
+    constants::THUMBNAIL_URL, utils_common::*, worker_api::RemoteThumbnailGenerationError,
+};
 
 const SWEEP_INTERVAL: i32 = 30_000;
 const ASYNCGEN_ERROR_MSG: &str = "Thumbnail not generated yet";

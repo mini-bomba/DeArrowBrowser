@@ -30,7 +30,7 @@ use crate::constants::{REQWEST_CLIENT, SBS_BRANDING_ENDPOINT, USER_AGENT};
 use crate::contexts::{AsyncTaskControl, ModalRendererControls, ModalMessage, SettingsContext, UserContext};
 use crate::sbserver::{PostBrandingBody, SBServerThumbnail, SBServerTitle};
 use crate::thumbnails::components::{Thumbnail, ThumbnailCaption};
-use crate::utils::ReqwestUrlExt;
+use crate::utils_common::ReqwestUrlExt;
 
 
 #[derive(Clone, PartialEq, Properties)]

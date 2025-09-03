@@ -68,7 +68,7 @@ pub fn YoutubeVideoLink(props: &VideoLinkProps) -> Html {
     }
 }
 
-type SimpleLoadState = crate::utils_app::SimpleLoadState<AttrValue>;
+type SimpleLoadState = crate::utils_app::SimpleLoadState<AttrValue, ()>;
 
 pub struct OriginalTitle {
     title: SimpleLoadState,
@@ -86,14 +86,10 @@ impl OriginalTitle {
                 let result = innertube::get_oembed_info(&video_id).await.context("Failed to fetch oembed info")?;
                 Ok(AttrValue::Rc(Rc::from(result.title)))
             }.await;
-            let result = match result {
-                Ok(handle) => SimpleLoadState::Ready(handle),
-                Err(err) => {
-                    error!(format!("Failed to fetch original title for video {video_id}: {err:?}"));
-                    SimpleLoadState::Failed
-                }
-            };
-            OembedMessage::Fetched { result, version }
+            OembedMessage::Fetched {
+                result: result.inspect_err(|e| error!(format!("Failed to fetch original title for video {video_id}: {e:?}"))).ok().into(),
+                version,
+            }
         });
     }
 }
@@ -121,14 +117,10 @@ impl ChannelLink {
                     .context("Failed to extract channel handle from URL: URL has no segments")?;
                 Ok(AttrValue::Rc(Rc::from(handle)))
             }.await;
-            let result = match result {
-                Ok(handle) => SimpleLoadState::Ready(handle),
-                Err(err) => {
-                    error!(format!("Failed to fetch channel handle for video {video_id}: {err:?}"));
-                    SimpleLoadState::Failed
-                }
-            };
-            OembedMessage::Fetched { result, version }
+            OembedMessage::Fetched {
+                result: result.inspect_err(|e| error!(format!("Failed to fetch channel handle for video {video_id}: {e:?}"))).ok().into(),
+                version,
+            }
         });
     }
 }
@@ -153,7 +145,7 @@ impl Component for OriginalTitle {
     fn view(&self, _ctx: &Context<Self>) -> Html {
         match &self.title {
             SimpleLoadState::Loading => html! {<em>{"Loading..."}</em>},
-            SimpleLoadState::Failed => html! {<em>{"Unknown"}</em>},
+            SimpleLoadState::Failed(()) => html! {<em>{"Unknown"}</em>},
             SimpleLoadState::Ready(title) => html! {<span>{title}</span>}
         }
     }
@@ -197,7 +189,7 @@ impl Component for ChannelLink {
     fn view(&self, _ctx: &Context<Self>) -> Html {
         match &self.handle {
             SimpleLoadState::Loading => html! {<em>{"Loading..."}</em>},
-            SimpleLoadState::Failed => html! {<em>{"Unknown"}</em>},
+            SimpleLoadState::Failed(()) => html! {<em>{"Unknown"}</em>},
             SimpleLoadState::Ready(handle) => {
                 let route = MainRoute::Channel {
                     id: handle.clone(),

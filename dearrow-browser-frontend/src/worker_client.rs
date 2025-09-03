@@ -26,7 +26,7 @@ use web_sys::{js_sys::{Array, Function, Object, Uint8Array}, window, MessageEven
 use yew::{html::{ChildrenProps}, Callback, Component, ContextProvider};
 use yew::html;
 
-use crate::{built_info, contexts::SettingsContext, utils_app::RcEq, utils_common::{make_jsstring, sleep, EventCellsExt, EventListener, Interval}, worker_api::*};
+use crate::{built_info, contexts::SettingsContext, utils_app::{RcEq, SimpleLoadState}, utils_common::{make_jsstring, sleep, EventCellsExt, EventListener, Interval}, worker_api::*};
 
 const WORKER_INIT_TIMEOUT: u32 = 30_000; // 0.5 min
 const WORKER_KEEPALIVE_INTERVAL: i32 = 20_000;
@@ -253,6 +253,20 @@ impl WorkerClient {
     pub fn is_protocol_mismatched(&self) -> bool {
         self.inner.protocol_mismatch.get()
     }
+
+    /// Retrieves shared worker stats from the worker
+    pub async fn get_stats(&self) -> Result<WorkerStats, Error> {
+        let WorkerResponse::WorkerStats { stats } = self
+            .inner
+            .request(WorkerRequest::GetStats {
+                r#type: StatsType::Worker,
+            })
+            .await?
+        else {
+            return Err(Error::ProtocolError);
+        };
+        Ok(stats)
+    }
 }
 
 impl InnerWC {
@@ -369,12 +383,7 @@ impl Drop for InnerWC {
     }
 }
 
-#[derive(Clone, PartialEq)]
-pub enum WorkerState {
-    Initializing,
-    Failed(Error),
-    Ready(WorkerClient),
-}
+pub type WorkerState = SimpleLoadState<WorkerClient, Error>;
 
 pub struct WorkerProvider {
     state: WorkerState,
@@ -393,14 +402,9 @@ impl Component for WorkerProvider {
                 state: WorkerState::Failed(Error::ConfigDisabled),
             }
         } else {
-            scope.send_future(async {
-                match WorkerClient::new().await {
-                    Ok(client) => WorkerState::Ready(client),
-                    Err(e) => WorkerState::Failed(e),
-                }
-            });
+            scope.send_future(async { WorkerState::from(WorkerClient::new().await) });
             Self {
-                state: WorkerState::Initializing,
+                state: WorkerState::Loading,
             }
         }
     }

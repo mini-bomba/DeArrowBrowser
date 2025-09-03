@@ -87,7 +87,7 @@ impl ChannelDetails {
                 Ok(None) => (),
                 Err(err) => {
                     error!(format!("Failed to load channel data for channel {channel}: {err:?}"));
-                    scope.send_message(ChannelDetailsMessage::DataFetched { data: SimpleLoadState::Failed, watcher });
+                    scope.send_message(ChannelDetailsMessage::DataFetched { data: SimpleLoadState::Failed(()), watcher });
                 },
                 Ok(Some(d)) => scope.send_message(ChannelDetailsMessage::DataFetched { data: SimpleLoadState::Ready(d), watcher }),
             }
@@ -128,7 +128,7 @@ impl Component for ChannelDetails {
     fn view(&self, _: &Context<Self>) -> Html {
         match &self.data {
             SimpleLoadState::Loading => html! {<em>{"Loading..."}</em>},
-            SimpleLoadState::Failed => html! {<em>{"Failed to fetch channel data (see console)"}</em>},
+            SimpleLoadState::Failed(()) => html! {<em>{"Failed to fetch channel data (see console)"}</em>},
             SimpleLoadState::Ready(channel) => html! {<>
                 <div>
                     {"Channel name: "}

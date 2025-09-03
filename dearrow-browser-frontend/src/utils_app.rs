@@ -284,9 +284,27 @@ impl CancelWatcher {
     }
 }
 
-#[derive(PartialEq, Eq, Clone)]
-pub enum SimpleLoadState<T> {
+#[derive(PartialEq, Clone)]
+pub enum SimpleLoadState<T, E = ()> {
     Loading,
-    Failed,
+    Failed(E),
     Ready(T),
+}
+
+impl<T, E> From<Result<T, E>> for SimpleLoadState<T, E> {
+    fn from(value: Result<T, E>) -> Self {
+        match value {
+            Ok(v) => SimpleLoadState::Ready(v),
+            Err(e) => SimpleLoadState::Failed(e),
+        }
+    }
+}
+
+impl<T> From<Option<T>> for SimpleLoadState<T, ()> {
+    fn from(value: Option<T>) -> Self {
+        match value {
+            Some(v) => SimpleLoadState::Ready(v),
+            None => SimpleLoadState::Failed(()),
+        }
+    }
 }

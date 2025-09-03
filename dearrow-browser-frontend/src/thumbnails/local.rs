@@ -35,7 +35,7 @@ use web_sys::{
     Blob,
 };
 
-use super::common::{CacheStats, ThumbnailKey};
+use super::common::{ThumbgenStats, ThumbnailKey};
 use crate::{
     constants::THUMBNAIL_URL, utils_common::*, worker_api::RemoteThumbnailGenerationError,
 };
@@ -378,9 +378,9 @@ impl LocalThumbGenerator {
     }
 
     /// Aggregates statistics about this thumbnail generator
-    pub fn get_stats(&self) -> CacheStats {
+    pub fn get_stats(&self) -> ThumbgenStats {
         let thumbs = self.inner.thumbs.borrow();
-        let mut res = CacheStats { 
+        let mut res = ThumbgenStats { 
             total: thumbs.len(),
             thumbs: 0,
             in_use: 0, 

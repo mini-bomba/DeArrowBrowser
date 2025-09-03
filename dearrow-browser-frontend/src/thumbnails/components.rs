@@ -62,7 +62,7 @@ impl ThumbnailUrl {
 impl Thumbgen {
     fn from_worker_state(worker_state: WorkerState) -> Option<Self> {
         match worker_state {
-            WorkerState::Initializing => None,
+            WorkerState::Loading => None,
             WorkerState::Ready(client) => Some(Self::Remote(RemoteThumbnailGenerator { client })),
             WorkerState::Failed(error) => Some(Self::Local {
                 error: error.into(),
@@ -108,7 +108,7 @@ impl Thumbgen {
     pub async fn get_stats(&self) -> Result<ThumbgenStats, Error> {
         match self {
             Self::Remote(worker) => worker.get_stats().await,
-            Self::Local { gen, .. } => Ok(ThumbgenStats { cache_stats: gen.get_stats(), worker_stats: None }),
+            Self::Local { gen, .. } => Ok(gen.get_stats()),
         }
     }
 

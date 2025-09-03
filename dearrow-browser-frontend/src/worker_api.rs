@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2024 mini_bomba
+*  Copyright (C) 2024-2025 mini_bomba
 *  
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -54,6 +54,12 @@ impl Display for RemoteThumbnailGenerationError {
 
 impl Error for RemoteThumbnailGenerationError {}
 
+#[derive(Encode, Decode, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StatsType {
+    Worker,
+    Thumbgen,
+}
+
 #[derive(Encode, Decode, Debug)]
 pub enum WorkerRequest {
     Version {
@@ -71,7 +77,9 @@ pub enum WorkerRequest {
         setting: WorkerSetting,
     },
     ClearErrors,
-    GetStats,
+    GetStats {
+        r#type: StatsType,
+    },
     Ping,
     Disconnecting,
 }
@@ -89,10 +97,19 @@ pub enum WorkerResponse {
     Thumbnail {
         r#ref: Result<RawRemoteRef, RemoteThumbnailGenerationError>,
     },
-    Stats {
+    WorkerStats {
+        stats: WorkerStats,
+    },
+    ThumbgenStats {
         stats: ThumbgenStats,
     },
     Ok,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode)]
+pub struct WorkerStats {
+    pub clients: usize,
+    pub this_client_refs: usize,
 }
 
 #[derive(Encode, Decode, Debug)]

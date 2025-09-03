@@ -22,7 +22,7 @@ use gloo_console::warn;
 
 use super::common::{ThumbgenStats, ThumbnailKey};
 use crate::{
-    worker_api::{WorkerRequest, WorkerResponse},
+    worker_api::{StatsType, WorkerRequest, WorkerResponse},
     worker_client::{Error, WorkerClient},
 };
 
@@ -88,8 +88,15 @@ impl RemoteThumbnailGenerator {
         })
     }
 
+    /// Retrieves thumbgen statistics from the worker
     pub async fn get_stats(&self) -> Result<ThumbgenStats, Error> {
-        let WorkerResponse::Stats { stats } = self.client.request(WorkerRequest::GetStats).await? else {
+        let WorkerResponse::ThumbgenStats { stats } = self
+            .client
+            .request(WorkerRequest::GetStats {
+                r#type: StatsType::Thumbgen,
+            })
+            .await?
+        else {
             return Err(Error::ProtocolError);
         };
         Ok(stats)

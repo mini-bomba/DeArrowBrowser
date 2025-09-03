@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2024 mini_bomba
+*  Copyright (C) 2024-2025 mini_bomba
 *  
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -17,26 +17,32 @@
 */
 // NOTE: This file is the entrypoint to the 'worker' binary.
 
-use std::{cell::{Cell, OnceCell, RefCell}, collections::HashMap, rc::Rc};
+use std::{
+    cell::{Cell, OnceCell, RefCell},
+    collections::HashMap,
+    rc::Rc,
+};
 
 use gloo_console::{error, log, warn};
 use reqwest::Url;
 use slab::Slab;
 use wasm_bindgen::{closure::Closure, JsCast};
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{js_sys::{self, Array, Reflect, Uint8Array}, MessageEvent, MessagePort, SharedWorkerGlobalScope};
+use web_sys::{
+    js_sys::{self, Array, Reflect, Uint8Array},
+    MessageEvent, MessagePort, SharedWorkerGlobalScope,
+};
+
+use thumbnails::local::{LocalBlobLink, LocalThumbGenerator};
+use worker_api::*;
 
 #[allow(dead_code)]
 mod constants;
-#[allow(dead_code)]
-mod utils_common;
 #[path = "thumbnails/mod_worker.rs"]
 pub mod thumbnails;
+#[allow(dead_code)]
+mod utils_common;
 pub mod worker_api;
-
-use thumbnails::common::{ThumbgenStats, WorkerStats};
-use thumbnails::local::{LocalBlobLink, LocalThumbGenerator};
-use worker_api::{RawRemoteRef, WorkerRequest, WorkerRequestMessage, WorkerResponse, WorkerResponseMessage, BINCODE_CONFIG};
 
 const PING_CHECK_INTERVAL: i32 = 30_000;
 const MAX_PING_FAILS: u8 = 3;
@@ -252,7 +258,12 @@ impl WorkerContext {
         match request {
             WorkerRequest::Version { version, git_hash, git_dirty } => {
                 if version != built_info::PKG_VERSION || git_hash.as_deref() != built_info::GIT_COMMIT_HASH || git_dirty != built_info::GIT_DIRTY {
-                    warn!(format!("Version mismatch detected! Message (de)serialization errors may occur!\nNew client's version: {version}, git hash: {git_hash:?}, git dirty: {git_dirty:?}\nWorker version: {}, git hash: {:?}, git dirty: {:?}\nClose all DeArrow Browser windows to resolve this issue.", built_info::PKG_VERSION, built_info::GIT_COMMIT_HASH, built_info::GIT_DIRTY));
+                    warn!(format!("\
+                        Version mismatch detected! Message (de)serialization errors may occur!\n\
+                        New client's version: {version}, git hash: {git_hash:?}, git dirty: {git_dirty:?}\n\
+                        Worker version: {}, git hash: {:?}, git dirty: {:?}\n\
+                        Close all DeArrow Browser windows to resolve this issue.\
+                        ", built_info::PKG_VERSION, built_info::GIT_COMMIT_HASH, built_info::GIT_DIRTY));
                 }
 
                 WorkerResponse::Version { 
@@ -307,17 +318,17 @@ impl WorkerContext {
                 self.thumbgen.clear_errors();
                 WorkerResponse::Ok
             },
-            WorkerRequest::GetStats => {
-                WorkerResponse::Stats { 
-                    stats: ThumbgenStats { 
-                        cache_stats: self.thumbgen.get_stats(),
-                        worker_stats: Some(WorkerStats { 
-                            clients: self.clients.borrow().len(),
-                            this_client_refs: client.held_refs.borrow().len(),
-                        }),
-                    }
+            WorkerRequest::GetStats { r#type: StatsType::Worker } => {
+                WorkerResponse::WorkerStats {
+                    stats: WorkerStats {
+                        clients: self.clients.borrow().len(),
+                        this_client_refs: client.held_refs.borrow().len(),
+                    },
                 }
             },
+            WorkerRequest::GetStats { r#type: StatsType::Thumbgen } => {
+                WorkerResponse::ThumbgenStats { stats: self.thumbgen.get_stats() }
+            }
             WorkerRequest::Ping => {
                 WorkerResponse::Ok
             },

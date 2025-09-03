@@ -68,7 +68,7 @@ fn VideoDetailsTable(props: &VideoDetailsTableProps) -> Html {
             </div>
             {match &props.metadata {
                 MetadataState::Loading => html! {<div><em>{"Loading extra metadata..."}</em></div>},
-                MetadataState::Failed => html! {<div><em>{"Failed to fetch extra metadata."}</em></div>},
+                MetadataState::Failed(()) => html! {<div><em>{"Failed to fetch extra metadata."}</em></div>},
                 MetadataState::Ready(data) => html! {<>
                     if let Some(duration) = data.duration {
                         if props.tab == VideoPageTab::Thumbnails {
@@ -217,17 +217,15 @@ impl VideoPage {
                 Ok(RcEq::from(video))
             }
             .await;
-            let result = match result {
-                Ok(meta) => MetadataState::Ready(meta),
-                Err(err) => {
-                    error!(format!(
-                        "Failed to fetch extra metadata for video {video_id}: {err:?}"
-                    ));
-                    MetadataState::Failed
-                }
-            };
             VideoPageMessage::MetadataFetched {
-                data: result,
+                data: result
+                    .inspect_err(|e| {
+                        error!(format!(
+                            "Failed to fetch extra metadata for video {video_id}: {e:?}"
+                        ));
+                    })
+                    .ok()
+                    .into(),
                 version,
             }
         });

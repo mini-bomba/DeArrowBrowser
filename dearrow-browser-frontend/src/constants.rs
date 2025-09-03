@@ -30,6 +30,7 @@ pub const ASYNC_TASK_AUTO_DISMISS_DELAY: Duration = Duration::from_secs(15);
 
 pub static VERSION_STRING: LazyLock<&'static str>                  = LazyLock::new(create_version_string);
 pub static USER_AGENT:     LazyLock<&'static str>                  = LazyLock::new(create_useragent_string);
+pub static COMMIT_LINK:    LazyLock<&'static str>                  = LazyLock::new(create_commit_link);
 pub static BUILD_TIME:     LazyLock<Option<DateTime<FixedOffset>>> = LazyLock::new(|| DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC).ok());
 pub static COMMIT_TIME:    LazyLock<Option<DateTime<FixedOffset>>> = LazyLock::new(|| built_info::GIT_COMMIT_TIMESTAMP.and_then(|t| DateTime::parse_from_rfc3339(t).ok()));
 
@@ -60,4 +61,8 @@ fn create_version_string() -> &'static str {
 
 fn create_useragent_string() -> &'static str {
     format!("DeArrowBrowser/{}", *VERSION_STRING).leak()
+}
+
+fn create_commit_link() -> &'static str {
+    format!("https://github.com/mini-bomba/DeArrowBrowser/commit/{}", built_info::GIT_COMMIT_HASH.unwrap_or("")).leak()
 }

@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2024 mini_bomba
+*  Copyright (C) 2024-2025 mini_bomba
 *  
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -28,22 +28,10 @@ pub struct ThumbnailKey {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode)]
-pub struct CacheStats {
+pub struct ThumbgenStats {
     pub total: usize,
     pub thumbs: usize,
     pub in_use: usize,
     pub errors: usize,
     pub pending: usize,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode)]
-pub struct WorkerStats {
-    pub clients: usize,
-    pub this_client_refs: usize,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode)]
-pub struct ThumbgenStats {
-    pub cache_stats: CacheStats,
-    pub worker_stats: Option<WorkerStats>,
 }

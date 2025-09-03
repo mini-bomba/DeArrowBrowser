@@ -53,6 +53,9 @@ async fn disabled_route() -> HttpResponse {
 // https://github.com/ajayyy/DeArrow/blob/c4e1375380bc3b0cb202af283f0e7b4e5e6e30f1/src/thumbnails/thumbnailData.ts#L230
 #[get("/video/{video_id}")]
 async fn get_innertube_video(path: web::Path<String>, client: web::ThinData<Client>, config: web::Data<AppConfig>) -> JsonResult<InnertubeVideo> {
+    if !config.innertube.enable_video_endpoint {
+        return Err(anyhow!("Proxying the player endpoint is disabled on this DeArrow Browser instance (it was broken anyway)", extend: extensions::status::NOT_FOUND.clone()).into());
+    }
     let vid = path.as_str();
     let url = IT_PLAYER_URL.clone();
     let input = {

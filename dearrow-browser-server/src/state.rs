@@ -92,6 +92,7 @@ impl Default for AppConfig {
 #[serde(default)]
 pub struct InnertubeConfig {
     pub enable: bool,
+    pub enable_video_endpoint: bool,
     pub visitor_data: Option<String>,
     pub po_token: Option<String>,
 }
@@ -100,6 +101,7 @@ impl Default for InnertubeConfig {
     fn default() -> Self {
         Self {
             enable: true,
+            enable_video_endpoint: false,
             visitor_data: None,
             po_token: None,
         }

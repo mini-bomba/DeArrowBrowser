@@ -16,17 +16,33 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::{cell::{Cell, OnceCell, RefCell}, collections::HashMap, fmt::{Debug, Display}, future::Future, rc::Rc};
+use std::{
+    cell::{Cell, OnceCell, RefCell},
+    collections::HashMap,
+    fmt::{Debug, Display},
+    future::Future,
+    rc::Rc,
+};
 
-use cloneable_errors::ResContext;
+use cloneable_errors::{ErrorContext, ResContext, SerializableError};
 use futures::{channel::oneshot::*, select_biased, FutureExt};
 use gloo_console::{error, warn};
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
-use web_sys::{js_sys::{Array, Function, Object, Uint8Array}, window, MessageEvent, PageTransitionEvent, SharedWorker, WorkerOptions};
-use yew::{html::{ChildrenProps}, Callback, Component, ContextProvider};
+use web_sys::{
+    js_sys::{Array, Function, Object, Uint8Array},
+    window, MessageEvent, PageTransitionEvent, SharedWorker, WorkerOptions,
+};
 use yew::html;
+use yew::{html::ChildrenProps, Callback, Component, ContextProvider};
 
-use crate::{built_info, contexts::SettingsContext, utils_app::{RcEq, SimpleLoadState}, utils_common::{make_jsstring, sleep, EventCellsExt, EventListener, Interval}, worker_api::*};
+use crate::{
+    built_info,
+    contexts::SettingsContext,
+    utils_app::SimpleLoadState,
+    utils_common::RcEq,
+    utils_common::{make_jsstring, sleep, EventCellsExt, EventListener, Interval},
+    worker_api::*,
+};
 
 const WORKER_INIT_TIMEOUT: u32 = 30_000; // 0.5 min
 const WORKER_KEEPALIVE_INTERVAL: i32 = 20_000;
@@ -66,7 +82,11 @@ pub enum Error {
     /// shared worker impl disabled via settings
     ConfigDisabled,
     /// error from the thumbnail worker
-    Remote(RemoteThumbnailGenerationError),
+    Thumbgen(RemoteThumbnailGenerationError),
+    /// serialized error from the worker
+    Serializable(SerializableError),
+    /// local error stack
+    ErrorContext(ErrorContext),
 }
 
 impl Error {
@@ -78,7 +98,7 @@ impl Error {
     }
 }
 
-impl Display for Error {
+impl Debug for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::BincodeS(RcEq(err)) => write!(f, "Message serialization failed: {err:?}"),
@@ -87,7 +107,7 @@ impl Display for Error {
             Self::ProtocolError => write!(f, "Window-worker protocol mismatch"),
             Self::WorkerInitializationTimeout => write!(f, "Timed out waiting for the worker to initialize"),
             Self::ConfigDisabled => write!(f, "SW impl disabled in settings"),
-            Self::Remote(err) => write!(f, "Thumbnail generation failed: {err}"),
+            Self::Thumbgen(err) => write!(f, "Thumbnail generation failed: {err}"),
             Self::JS(err) => {
                 if let Some(err) = err.dyn_ref::<web_sys::js_sys::Error>() {
                     write!(f, "JS error: {}: {}", err.name(), err.message())
@@ -97,17 +117,50 @@ impl Display for Error {
                     write!(f, "JS pseudo-error: {}", make_jsstring(err))
                 }
             },
+            Self::Serializable(err) => write!(f, "Error from worker: {err:?}"),
+            Self::ErrorContext(err) => write!(f, "Local error: {err:?}"),
         }
     }
 }
 
-impl Debug for Error {
+impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self}")
+        match self {
+            Self::BincodeS(..) => write!(f, "Message serialization failed"),
+            Self::BincodeD(..) => write!(f, "Message deserialization failed"),
+            Self::Cancelled(..) => write!(f, "Waiting for response got cancelled"),
+            Self::ProtocolError => write!(f, "Window-worker protocol mismatch"),
+            Self::WorkerInitializationTimeout => write!(f, "Timed out waiting for the worker to initialize"),
+            Self::ConfigDisabled => write!(f, "SW impl disabled in settings"),
+            Self::Thumbgen(..) => write!(f, "Thumbnail generation failed"),
+            Self::JS(err) => {
+                if let Some(err) = err.dyn_ref::<web_sys::js_sys::Error>() {
+                    write!(f, "JS error: {}: {}", err.name(), err.message())
+                } else if let Some(obj) = err.dyn_ref::<Object>() {
+                    write!(f, "JS pseudo-error: {}", obj.to_string())
+                } else {
+                    write!(f, "JS pseudo-error: {}", make_jsstring(err))
+                }
+            },
+            Self::Serializable(..) => write!(f, "Error from worker"),
+            Self::ErrorContext(..) => write!(f, "Local error"),
+        }
     }
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::BincodeS(err) => Some(&**err),
+            Self::BincodeD(err) => Some(&**err),
+            Self::Cancelled(err) => Some(err),
+            Self::Thumbgen(err) => Some(err),
+            Self::Serializable(err) => Some(err),
+            Self::ErrorContext(err) => Some(err),
+            _ => None,
+        }
+    }
+}
 
 fn on_worker_error(event: web_sys::Event) {
     error!("Got error event from shared worker!", event);

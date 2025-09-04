@@ -80,7 +80,7 @@ impl RemoteThumbnailGenerator {
         let WorkerResponse::Thumbnail { r#ref } = self.client.request(WorkerRequest::GetThumbnail { key }).await? else {
             return Err(Error::ProtocolError);
         };
-        let r#ref = r#ref.map_err(Error::Remote)?;
+        let r#ref = r#ref.map_err(Error::Thumbgen)?;
         Ok(RemoteBlobLink {
             client: self.client.clone(),
             ref_id: r#ref.ref_id,
@@ -103,8 +103,8 @@ impl RemoteThumbnailGenerator {
     }
 
     pub fn clear_errors(&self) {
-        if let Err(e) = self.client.post_request(WorkerRequest::ClearErrors) {
-            warn!(format!("Failed to request worker to clear errors: {e}"));
+        if let Err(e) = self.client.post_request(WorkerRequest::ClearThumbgenErrors) {
+            warn!(format!("Failed to request worker to clear errors: {e:?}"));
         }
     }
 }

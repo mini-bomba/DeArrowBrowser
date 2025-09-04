@@ -15,7 +15,7 @@ workspace = true
 [dependencies]
 bincode = "2.0.1"
 chrono = { workspace = true, features = ["wasmbind", "alloc", "clock"] }
-cloneable_errors.workspace = true
+cloneable_errors = { workspace = true, features = ["bincode"] }
 dearrow-browser-api = { path = "../dearrow-browser-api", default-features = false, features = ["unsync"] }
 enumflags2.workspace = true
 futures.workspace = true

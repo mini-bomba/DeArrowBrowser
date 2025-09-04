@@ -19,8 +19,9 @@
 use std::{error::Error, fmt::Display, rc::Rc};
 
 use bincode::{Decode, Encode};
+use cloneable_errors::SerializableError;
 
-use crate::thumbnails::common::{ThumbgenStats, ThumbnailKey};
+use crate::{thumbnails::common::{ThumbgenStats, ThumbnailKey}, yt_metadata::common::{MetadataCacheStats, VideoMetadata}};
 
 pub const BINCODE_CONFIG: bincode::config::Configuration = bincode::config::standard();
 
@@ -58,6 +59,7 @@ impl Error for RemoteThumbnailGenerationError {}
 pub enum StatsType {
     Worker,
     Thumbgen,
+    Metadata,
 }
 
 #[derive(Encode, Decode, Debug)]
@@ -73,10 +75,15 @@ pub enum WorkerRequest {
     GetThumbnail {
         key: ThumbnailKey,
     },
+    GetMetadata {
+        video_id: Rc<str>,
+    },
     SettingUpdated {
         setting: WorkerSetting,
     },
-    ClearErrors,
+    ClearThumbgenErrors,
+    ClearMetadataErrors,
+    ClearMetadataCache,
     GetStats {
         r#type: StatsType,
     },
@@ -97,11 +104,17 @@ pub enum WorkerResponse {
     Thumbnail {
         r#ref: Result<RawRemoteRef, RemoteThumbnailGenerationError>,
     },
+    Metadata {
+        data: Result<VideoMetadata, SerializableError>,
+    },
     WorkerStats {
         stats: WorkerStats,
     },
     ThumbgenStats {
         stats: ThumbgenStats,
+    },
+    MetadataStats {
+        stats: MetadataCacheStats,
     },
     Ok,
 }

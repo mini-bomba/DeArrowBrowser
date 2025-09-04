@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2023-2024 mini_bomba
+*  Copyright (C) 2025 mini_bomba
 *  
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -16,26 +16,26 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use cloneable_errors::{ErrorContext, ResContext};
+use std::rc::Rc;
+
+use bincode::{Decode, Encode};
 use reqwest::Url;
-use serde::Deserialize;
 
-use crate::utils_common::{api_request, ReqwestUrlExt};
-use crate::constants::*;
+use crate::{constants::YOUTU_BE_URL, utils_common::ReqwestUrlExt};
 
 
-#[derive(Deserialize)]
-pub struct OEmbedResponse {
-    pub title: String,
-    pub author_url: String,
+#[derive(Debug, Decode, Encode, Clone)]
+pub struct VideoMetadata {
+    pub title: Rc<str>,
+    pub channel: Rc<str>,
 }
 
-pub async fn get_oembed_info(vid: &str) -> Result<OEmbedResponse, ErrorContext> {
-    let mut url = YOUTUBE_OEMBED_URL.clone();
-    url.query_pairs_mut()
-        .clear()
-        .append_pair("url", youtu_be_link(vid).as_str());
-    api_request(url).await.context("oembed request failed")
+#[derive(Debug, Decode, Encode, Clone, Default)]
+pub struct MetadataCacheStats {
+    pub total: usize,
+    pub pending: usize,
+    pub cached: usize,
+    pub failed: usize,
 }
 
 pub fn youtu_be_link(vid: &str) -> Url {

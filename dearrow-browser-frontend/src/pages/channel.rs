@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2023-2024 mini_bomba
+*  Copyright (C) 2023-2025 mini_bomba
 *
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -17,8 +17,10 @@
 */
 use std::rc::Rc;
 
-use dearrow_browser_api::unsync::{ApiCasualTitle, ApiThumbnail, ApiTitle, ChannelFetchProgress, InnertubeChannel};
 use cloneable_errors::ResContext;
+use dearrow_browser_api::unsync::{
+    ApiCasualTitle, ApiThumbnail, ApiTitle, ChannelFetchProgress, InnertubeChannel,
+};
 use gloo_console::error;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -26,16 +28,17 @@ use strum::{IntoStaticStr, VariantArray};
 use yew::platform::spawn_local;
 use yew::prelude::*;
 
-use crate::components::tables::remote::{Endpoint, RemotePaginatedTable};
-use crate::components::tables::switch::*;
-use crate::constants::REQWEST_CLIENT;
-use crate::contexts::WindowContext;
-use crate::hooks::
-    use_location_state
-;
-use crate::utils_app::{CancelHandle, CancelWatcher, SimpleLoadState};
-use crate::utils_common::{ReqwestResponseExt, ReqwestUrlExt};
-
+use crate::{
+    components::tables::{
+        remote::{Endpoint, RemotePaginatedTable},
+        switch::*,
+    },
+    constants::REQWEST_CLIENT,
+    contexts::WindowContext,
+    hooks::use_location_state,
+    utils_app::{CancelHandle, CancelWatcher, SimpleLoadState},
+    utils_common::{ReqwestResponseExt, ReqwestUrlExt},
+};
 
 struct ChannelDetails {
     origin: Url,

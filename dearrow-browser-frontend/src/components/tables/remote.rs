@@ -29,11 +29,14 @@ use yew::{
 
 use crate::{
     components::tables::{
-        renderer::{PaginatedTableRenderer, TableRenderer}, switch::Tabs, r#trait::TableRender
+        r#trait::TableRender,
+        renderer::{PaginatedTableRenderer, TableRenderer},
+        switch::Tabs,
     },
     constants::REQWEST_CLIENT,
     contexts::WindowContext,
-    utils_app::{CancelHandle, CancelWatcher, RcEq}, utils_common::ReqwestResponseExt
+    utils_app::{CancelHandle, CancelWatcher},
+    utils_common::{RcEq, ReqwestResponseExt},
 };
 
 pub trait Endpoint: Sized + Eq + 'static {

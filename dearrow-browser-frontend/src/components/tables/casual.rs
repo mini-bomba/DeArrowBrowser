@@ -21,9 +21,14 @@ use dearrow_browser_api::unsync::ApiCasualTitle;
 use yew::{function_component, html, Html};
 
 use crate::{
-    components::{icon::{Icon, IconType}, tables::r#trait::{RowProps, TableRender}, youtube::{OriginalTitle, YoutubeVideoLink}},
+    components::{
+        icon::{Icon, IconType},
+        tables::r#trait::{RowProps, TableRender},
+        youtube::YoutubeVideoLink,
+    },
     settings::Settings,
     utils_app::render_datetime,
+    yt_metadata::components::OriginalTitle,
 };
 
 #[derive(PartialEq, Eq, Clone, Copy, Default)]
@@ -67,7 +72,7 @@ pub fn CasualRow(props: &RowProps<ApiCasualTitle>) -> Html {
                     r#type={IconType::NullTitle}
                     tooltip={"There's no title saved in the database, DeArrow Browser is showing the current original title instead."}
                 />
-                <span class="null-title"><OriginalTitle videoid={title.video_id.clone()} /></span>
+                <span class="null-title"><OriginalTitle video_id={title.video_id.clone()} /></span>
             }
         </td>
         <td class="casual-votes-col monospaced">

@@ -23,17 +23,19 @@ use wasm_bindgen::prelude::Closure;
 use yew::platform::spawn_local;
 use yew::prelude::*;
 
-use crate::constants::COMMIT_LINK;
-use crate::thumbnails::common::ThumbgenStats;
-use crate::utils_common::Interval;
-use crate::worker_api::WorkerStats;
-use crate::worker_client::WorkerState;
-use crate::{built_info, constants, worker_client};
-use crate::contexts::{StatusContext, WindowContext};
-use crate::thumbnails::components::{
-    Thumbgen, ThumbgenContext, ThumbgenRefreshContext,
+use crate::{
+    built_info,
+    constants::{self, COMMIT_LINK},
+    contexts::{StatusContext, WindowContext},
+    thumbnails::{
+        common::ThumbgenStats,
+        components::{Thumbgen, ThumbgenContext, ThumbgenRefreshContext},
+    },
+    utils_app::{render_datetime, RenderNumber, SimpleLoadState},
+    utils_common::Interval,
+    worker_api::WorkerStats,
+    worker_client::{self, WorkerState}, yt_metadata::{common::MetadataCacheStats, components::{MetadataCache, MetadataCacheContext}},
 };
-use crate::utils_app::{render_datetime, RenderNumber, SimpleLoadState};
 
 macro_rules! number_hoverswitch {
     ($switch_element: tt, $n: expr) => {
@@ -65,14 +67,19 @@ enum WorkerStatus {
 pub struct ClientStatus {
     worker: WorkerState,
     thumbgen: ThumbgenContext,
+    metadata_cache: MetadataCacheContext,
 
     worker_status: WorkerStatus,
     thumbgen_stats: SimpleLoadState<ThumbgenStats>,
+    metadata_stats: SimpleLoadState<MetadataCacheStats>,
     version: u8,
     clear_thumb_errors: Callback<MouseEvent>,
+    clear_meta_errors: Callback<MouseEvent>,
+    clear_meta_entries: Callback<MouseEvent>,
 
     _worker_handle: ContextHandle<WorkerState>,
     _thumbgen_handle: ContextHandle<ThumbgenContext>,
+    _metadata_handle: ContextHandle<MetadataCacheContext>,
     _refresh_interval: Interval<dyn Fn()>,
 }
 
@@ -121,7 +128,7 @@ impl ClientStatus {
 
         match &self.thumbgen {
             None => (),
-            Some(Thumbgen::Local { gen, .. }) => {
+            Some(Thumbgen::Local(gen)) => {
                 self.thumbgen_stats = SimpleLoadState::Ready(gen.get_stats());
                 should_refresh = true;
             },
@@ -137,6 +144,24 @@ impl ClientStatus {
             }
         }
 
+        match &self.metadata_cache {
+            None => (),
+            Some(MetadataCache::Local(cache)) => {
+                self.metadata_stats = SimpleLoadState::Ready(cache.get_stats());
+                should_refresh = true;
+            },
+            Some(MetadataCache::Remote(cache)) => {
+                let cache = cache.clone();
+                let scope = scope.clone();
+                spawn_local(async move {
+                    scope.send_message(ClientStatusMessage::MetadataStatsUpdated {
+                        stats: cache.get_stats().await,
+                        version,
+                    });
+                });
+            }
+        }
+
         should_refresh
     }
 }
@@ -144,11 +169,15 @@ impl ClientStatus {
 pub enum ClientStatusMessage {
     WorkerUpdated(WorkerState),
     ThumbgenUpdated(ThumbgenContext),
+    MetadataUpdated(MetadataCacheContext),
     RefreshStats,
     ClearThumbgenErrors,
+    ClearMetadataErrors,
+    ClearMetadataCache,
 
     WorkerStatsUpdated { stats: Result<WorkerStats, worker_client::Error>, version: u8 },
     ThumbgenStatsUpdated { stats: Result<ThumbgenStats, worker_client::Error>, version: u8 },
+    MetadataStatsUpdated { stats: Result<MetadataCacheStats, worker_client::Error>, version: u8 },
 }
 
 impl Component for ClientStatus{
@@ -160,18 +189,24 @@ impl Component for ClientStatus{
 
         let (worker, worker_handle) = scope.context(scope.callback(ClientStatusMessage::WorkerUpdated)).expect("Worker should be available");
         let (thumbgen, thumbgen_handle) = scope.context(scope.callback(ClientStatusMessage::ThumbgenUpdated)).expect("Thumbgen should be available");
+        let (metadata_cache, metadata_handle) = scope.context(scope.callback(ClientStatusMessage::MetadataUpdated)).expect("Metadata cache should be available");
 
         let mut this = Self {
             worker,
             thumbgen,
+            metadata_cache,
 
             worker_status: WorkerStatus::Initializing,
             thumbgen_stats: SimpleLoadState::Loading,
+            metadata_stats: SimpleLoadState::Loading,
             version: 0,
             clear_thumb_errors: scope.callback(|_| ClientStatusMessage::ClearThumbgenErrors),
+            clear_meta_errors: scope.callback(|_| ClientStatusMessage::ClearMetadataErrors),
+            clear_meta_entries: scope.callback(|_| ClientStatusMessage::ClearMetadataCache),
 
             _worker_handle: worker_handle,
             _thumbgen_handle: thumbgen_handle,
+            _metadata_handle: metadata_handle,
             _refresh_interval: {
                 let scope = scope.clone();
                 Interval::new(Closure::new(move || scope.send_message(ClientStatusMessage::RefreshStats)), 5*1000)
@@ -191,6 +226,10 @@ impl Component for ClientStatus{
                 self.thumbgen = new_thumbgen;
                 self.refresh(ctx)
             },
+            ClientStatusMessage::MetadataUpdated(new_meta) => {
+                self.metadata_cache = new_meta;
+                self.refresh(ctx)
+            },
             ClientStatusMessage::RefreshStats => {
                 self.refresh(ctx)
             },
@@ -202,6 +241,22 @@ impl Component for ClientStatus{
                         .unwrap()
                         .0
                         .trigger_refresh();
+                    self.refresh(ctx)
+                } else {
+                    false
+                }
+            }
+            ClientStatusMessage::ClearMetadataErrors => {
+                if let Some(cache) = &self.metadata_cache {
+                    cache.clear_errors();
+                    self.refresh(ctx)
+                } else {
+                    false
+                }
+            }
+            ClientStatusMessage::ClearMetadataCache => {
+                if let Some(cache) = &self.metadata_cache {
+                    cache.clear_cache();
                     self.refresh(ctx)
                 } else {
                     false
@@ -230,7 +285,17 @@ impl Component for ClientStatus{
                     .ok()
                     .into();
                 true
-            }
+            },
+            ClientStatusMessage::MetadataStatsUpdated { stats, version } => {
+                if self.version != version {
+                    return false;
+                }
+                self.metadata_stats = stats
+                    .inspect_err(|e| warn!(format!("Failed to fetch metadata stats: {e:?}")))
+                    .ok()
+                    .into();
+                true
+            },
         }
     }
 
@@ -328,6 +393,35 @@ impl Component for ClientStatus{
                         <tr>
                             <th>{"Cached errors "}<button onclick={&self.clear_thumb_errors}>{"Clear"}</button></th>
                             <td>{stats.errors}</td>
+                        </tr>
+                    </table>
+                },
+            }}
+            <h4>{"Metadata cache"}</h4>
+            {match &self.metadata_stats {
+                SimpleLoadState::Loading => html! {
+                    <em>{"Loading..."}</em>
+                },
+                SimpleLoadState::Failed(..) => html! {
+                    <em>{"Failed to load metadata cache stats (check console)"}</em>
+                },
+                SimpleLoadState::Ready(stats) => html! {
+                    <table>
+                        <tr>
+                            <th>{"Total entries"}</th>
+                            <td>{stats.total}</td>
+                        </tr>
+                        <tr>
+                            <th>{"Pending requests"}</th>
+                            <td>{stats.pending}</td>
+                        </tr>
+                        <tr>
+                            <th>{"Cached entries "}<button onclick={&self.clear_meta_entries}>{"Clear"}</button></th>
+                            <td>{stats.cached}</td>
+                        </tr>
+                        <tr>
+                            <th>{"Cached errors "}<button onclick={&self.clear_meta_errors}>{"Clear"}</button></th>
+                            <td>{stats.failed}</td>
                         </tr>
                     </table>
                 },

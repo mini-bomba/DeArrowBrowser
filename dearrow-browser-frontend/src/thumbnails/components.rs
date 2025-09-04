@@ -25,7 +25,6 @@ use yew::prelude::*;
 
 use crate::components::modals::{thumbnail::ThumbnailModal, ModalMessage};
 use crate::hooks::use_async_suspension;
-use crate::utils_app::RcEq;
 use crate::worker_api::{WorkerRequest, WorkerSetting};
 use crate::worker_client::{Error, WorkerState};
 use crate::{ModalRendererControls, SettingsContext};
@@ -37,11 +36,7 @@ use super::remote::{RemoteBlobLink, RemoteThumbnailGenerator};
 #[derive(Clone, Eq, PartialEq)]
 pub enum Thumbgen {
     Remote(RemoteThumbnailGenerator),
-    Local{
-        gen: LocalThumbGenerator,
-        /// Error from the attempt to initialize the remote thumbnail worker
-        error: RcEq<Error>,
-    },
+    Local(LocalThumbGenerator),
 }
 
 #[derive(Clone, Eq, PartialEq)]
@@ -64,10 +59,7 @@ impl Thumbgen {
         match worker_state {
             WorkerState::Loading => None,
             WorkerState::Ready(client) => Some(Self::Remote(RemoteThumbnailGenerator { client })),
-            WorkerState::Failed(error) => Some(Self::Local {
-                error: error.into(),
-                gen: LocalThumbGenerator::new(),
-            }),
+            WorkerState::Failed(..) => Some(Self::Local(LocalThumbGenerator::new())),
         }
     }
 
@@ -80,7 +72,7 @@ impl Thumbgen {
                     error!(format!("Failed to notify Thumbgen::Remote about a thumbgen API base URL change: {e}"));
                 }
             },
-            Thumbgen::Local { r#gen, .. } => {
+            Thumbgen::Local(gen) => {
                 let mut url = match Url::parse(new_url) {
                     Ok(url) => url,
                     Err(e) => return error!(format!("Failed to parse new ThumbgenBaseUrl: {e}")),
@@ -91,8 +83,8 @@ impl Thumbgen {
                     };
                     path.extend(&["api", "v1", "getThumbnail"]);
                 };
-                r#gen.set_api_url(url);
-                let errors_removed = r#gen.clear_errors();
+                gen.set_api_url(url);
+                let errors_removed = gen.clear_errors();
                 log!(format!("Cleared {errors_removed} error entries after updating thumbgen API URL"));
             }
         }
@@ -101,21 +93,21 @@ impl Thumbgen {
     pub async fn get_thumbnail(&self, key: &ThumbnailKey) -> Result<ThumbnailUrl, Error> {
         match self {
             Self::Remote(worker) => worker.get_thumbnail(key.clone()).await.map(|t| ThumbnailUrl::Remote(Rc::new(t))),
-            Self::Local { gen, .. } => gen.get_thumb(key).await.map(ThumbnailUrl::Local).map_err(|e| Error::Remote(e.into())),
+            Self::Local(gen) => gen.get_thumb(key).await.map(ThumbnailUrl::Local).map_err(|e| Error::Thumbgen(e.into())),
         }
     }
 
     pub async fn get_stats(&self) -> Result<ThumbgenStats, Error> {
         match self {
             Self::Remote(worker) => worker.get_stats().await,
-            Self::Local { gen, .. } => Ok(gen.get_stats()),
+            Self::Local(gen) => Ok(gen.get_stats()),
         }
     }
 
     pub fn clear_errors(&self) {
         match self {
             Self::Remote(worker) => worker.clear_errors(),
-            Self::Local { gen, .. } => drop(gen.clear_errors()),
+            Self::Local(gen) => drop(gen.clear_errors()),
         }
     }
 }

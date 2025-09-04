@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2024 mini_bomba
+*  Copyright (C) 2024-2025 mini_bomba
 *  
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -19,19 +19,24 @@
 use std::rc::Rc;
 
 use chrono::DateTime;
-use dearrow_browser_api::unsync::{ApiThumbnail, ApiTitle};
 use cloneable_errors::{ErrorContext, ResContext};
+use dearrow_browser_api::unsync::{ApiThumbnail, ApiTitle};
 use reqwest::{StatusCode, Url};
 use yew::prelude::*;
 
-use crate::components::icon::*;
-use crate::components::links::userid_link;
-use crate::components::youtube::{OriginalTitle, YoutubeIframe, YoutubeVideoLink};
-use crate::constants::REQWEST_CLIENT;
-use crate::thumbnails::components::{Thumbnail, ThumbnailCaption};
-use crate::utils_app::{html_length, render_datetime, RcEq};
-use crate::utils_common::{ReqwestResponseExt, ReqwestUrlExt};
-use crate::WindowContext;
+use crate::{
+    components::{
+        icon::*,
+        links::userid_link,
+        youtube::{YoutubeIframe, YoutubeVideoLink},
+    },
+    constants::REQWEST_CLIENT,
+    thumbnails::components::{Thumbnail, ThumbnailCaption},
+    utils_app::{html_length, render_datetime},
+    utils_common::{RcEq, ReqwestResponseExt, ReqwestUrlExt},
+    yt_metadata::components::OriginalTitle,
+    WindowContext,
+};
 
 #[derive(Properties, PartialEq, Clone)]
 pub struct UUIDPageProps {
@@ -270,7 +275,7 @@ fn UUIDTitle(props: &UUIDTitleProps) -> Html {
             <div class="info-table">
                 <div>{"Video ID: "}<YoutubeVideoLink videoid={title.video_id.clone()} multiline={false} /></div>
                 <div>{"Title: "}{title.title.clone()}</div>
-                <div>{"Original title: "}<OriginalTitle videoid={title.video_id.clone()} /></div>
+                <div>{"Original title: "}<OriginalTitle video_id={title.video_id.clone()} /></div>
                 <div>
                     if title.votes_missing {
                         {"Score: No data"}
@@ -374,7 +379,7 @@ fn UUIDThumbnail(props: &UUIDThumbnailProps) -> Html {
                         {"Original thumbnail"}
                     }
                 </div>
-                <div>{"Original title: "}<OriginalTitle videoid={thumbnail.video_id.clone()} /></div>
+                <div>{"Original title: "}<OriginalTitle video_id={thumbnail.video_id.clone()} /></div>
                 <div>
                     if thumbnail.votes_missing {
                         {"Score: No data"}

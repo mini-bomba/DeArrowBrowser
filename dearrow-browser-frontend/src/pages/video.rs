@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2023-2024 mini_bomba
+*  Copyright (C) 2023-2025 mini_bomba
 *
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -27,22 +27,31 @@ use strum::{IntoStaticStr, VariantArray};
 use yew::prelude::*;
 use yew_router::prelude::{LocationHandle, RouterScopeExt};
 
-use crate::components::tables::casual::CasualTableSettings;
-use crate::components::tables::remote::{Endpoint, RemotePaginatedTable};
-use crate::components::tables::switch::TableModeSwitch;
-use crate::components::tables::thumbs::ThumbTableSettings;
-use crate::components::tables::titles::TitleTableSettings;
-use crate::components::youtube::{ChannelLink, OriginalTitle, YoutubeIframe};
-use crate::contexts::WindowContext;
-use crate::hooks::ScopeExt;
-use crate::innertube::youtu_be_link;
-use crate::thumbnails::components::{Thumbnail, ThumbnailCaption};
-use crate::utils_app::{sbb_video_link, RcEq, SimpleLoadState};
-use crate::utils_common::{api_request, ReqwestUrlExt};
+use crate::{
+    components::{
+        tables::{
+            casual::CasualTableSettings,
+            remote::{Endpoint, RemotePaginatedTable},
+            switch::TableModeSwitch,
+            thumbs::ThumbTableSettings,
+            titles::TitleTableSettings,
+        },
+        youtube::YoutubeIframe,
+    },
+    contexts::WindowContext,
+    hooks::ScopeExt,
+    thumbnails::components::{Thumbnail, ThumbnailCaption},
+    utils_app::{sbb_video_link, SimpleLoadState},
+    utils_common::{api_request, RcEq, ReqwestUrlExt},
+    yt_metadata::{
+        common::youtu_be_link,
+        components::{ChannelLink, OriginalTitle},
+    },
+};
 
 #[derive(Properties, PartialEq)]
 struct VideoDetailsTableProps {
-    videoid: AttrValue,
+    videoid: Rc<str>,
     tab: VideoPageTab,
     metadata: MetadataState,
 }
@@ -60,11 +69,11 @@ fn VideoDetailsTable(props: &VideoDetailsTableProps) -> Html {
             <div>{format!("Video ID: {}", props.videoid)}</div>
             <div>
                 {"Channel: "}
-                <ChannelLink videoid={props.videoid.clone()} />
+                <ChannelLink video_id={props.videoid.clone()} />
             </div>
             <div hidden={props.tab == VideoPageTab::Thumbnails}>
                 {"Original title: "}
-                <OriginalTitle videoid={props.videoid.clone()} />
+                <OriginalTitle video_id={props.videoid.clone()} />
             </div>
             {match &props.metadata {
                 MetadataState::Loading => html! {<div><em>{"Loading extra metadata..."}</em></div>},
@@ -309,7 +318,7 @@ impl Component for VideoPage {
                         }
                     }
                 }
-                <VideoDetailsTable videoid={props.videoid.clone()} tab={self.tab} metadata={self.metadata.clone()} />
+                <VideoDetailsTable videoid={self.rc_videoid.clone()} tab={self.tab} metadata={self.metadata.clone()} />
             </div>
             <TableModeSwitch<VideoPageTab> entry_count={self.entry_count} />
             {match self.tab {

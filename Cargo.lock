@@ -502,10 +502,11 @@ dependencies = [
 
 [[package]]
 name = "cloneable_errors"
-version = "2.1.0"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ddd0e5207afeb2872ce0835f6c9707c7638a82a7aa0b6d0ddbb2c4fc11725eeb"
+checksum = "75bb0b20f657b2c489290523745183b9e277183d53492b9ae8ffbdab427171cb"
 dependencies = [
+ "bincode 2.0.1",
  "serde",
 ]
 

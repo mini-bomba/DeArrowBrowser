@@ -15,14 +15,17 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use std::{cell::Cell, fmt::Write, ops::Deref, rc::Rc};
+use std::{cell::Cell, rc::Rc, fmt::Write};
 
-use chrono::{DateTime, Utc, NaiveDateTime};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use reqwest::Url;
 use sha2::{digest::array::Array, Digest, Sha256};
 use yew::{html::ImplicitClone, Html};
 
-use crate::{constants::SBB_BASE, utils_common::ReqwestUrlExt};
+use crate::{
+    constants::SBB_BASE,
+    utils_common::{RcEq, ReqwestUrlExt},
+};
 
 const TIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
@@ -158,51 +161,7 @@ define_big_render_number!(signed, i64);
 define_big_render_number!(signed, i128);
 define_big_render_number!(signed, isize);
 
-/// Wrapper type for comparing Rc's via their addresses
-pub struct RcEq<T: ?Sized>(pub Rc<T>);
-
-impl<T: ?Sized> PartialEq for RcEq<T> {
-    fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.0, &other.0)
-    }
-}
-impl<T: ?Sized> Eq for RcEq<T> {}
-
-impl<T: ?Sized> Deref for RcEq<T> {
-    type Target = T;
-
-    #[inline(always)]
-    fn deref(&self) -> &T {
-        &self.0
-    }
-}
-
-impl<T: ?Sized> Clone for RcEq<T> {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
 impl<T: ?Sized> ImplicitClone for RcEq<T> {}
-
-impl<T> From<T> for RcEq<T> {
-    fn from(value: T) -> Self {
-        Self::new(value)
-    }
-}
-
-impl<I> From<&[I]> for RcEq<[I]> 
-where I: Clone,
-{
-    fn from(value: &[I]) -> Self {
-        Self(Rc::from(value))
-    }
-}
-
-impl<T> RcEq<T> {
-    pub fn new(val: T) -> Self {
-        Self(Rc::new(val))
-    }
-}
 
 pub fn sbb_video_link(vid: &str) -> Url {
     let mut url = SBB_BASE.clone();

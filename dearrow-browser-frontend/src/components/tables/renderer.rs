@@ -19,10 +19,13 @@
 use yew::{classes, function_component, html, use_context, AttrValue, Html, Properties};
 
 use crate::{
-    components::tables::{switch::{PageSelect, Tabs}, r#trait::TableRender},
+    components::tables::{
+        r#trait::TableRender,
+        switch::{PageSelect, Tabs},
+    },
     contexts::SettingsContext,
     hooks::use_location_state,
-    utils_app::RcEq,
+    utils_common::RcEq,
 };
 
 #[derive(Properties)]

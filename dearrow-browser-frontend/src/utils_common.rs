@@ -17,14 +17,19 @@
 */
 
 use std::cell::OnceCell;
+use std::ops::Deref;
+use std::rc::Rc;
 
 use cloneable_errors::{bail, ErrContext, ErrorContext, ResContext, SerializableError};
 use gloo_console::error;
 use reqwest::Url;
-use web_sys::{window, AbortController, AddEventListenerOptions, EventTarget, Response, Window, WorkerGlobalScope};
-use web_sys::js_sys::{global, Function, JsString, Promise};
 use wasm_bindgen::{closure::Closure, prelude::wasm_bindgen, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
+use web_sys::js_sys::{global, Function, JsString, Promise};
+use web_sys::{
+    window, AbortController, AddEventListenerOptions, EventTarget, Response, Window,
+    WorkerGlobalScope,
+};
 
 use crate::constants::REQWEST_CLIENT;
 
@@ -246,4 +251,49 @@ where
         .send().await.context("Failed to send the request")?
         .check_status().await?
         .json().await.context("Failed to deserialize response")
+}
+
+/// Wrapper type for comparing Rc's via their addresses
+pub struct RcEq<T: ?Sized>(pub Rc<T>);
+
+impl<T: ?Sized> PartialEq for RcEq<T> {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+impl<T: ?Sized> Eq for RcEq<T> {}
+
+impl<T: ?Sized> Deref for RcEq<T> {
+    type Target = T;
+
+    #[inline(always)]
+    fn deref(&self) -> &T {
+        &self.0
+    }
+}
+
+impl<T: ?Sized> Clone for RcEq<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<T> From<T> for RcEq<T> {
+    fn from(value: T) -> Self {
+        Self::new(value)
+    }
+}
+
+impl<I> From<&[I]> for RcEq<[I]> 
+where I: Clone,
+{
+    fn from(value: &[I]) -> Self {
+        Self(Rc::from(value))
+    }
+}
+
+impl<T> RcEq<T> {
+    pub fn new(val: T) -> Self {
+        Self(Rc::new(val))
+    }
 }

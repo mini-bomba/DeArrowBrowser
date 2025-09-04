@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2023-2024 mini_bomba
+*  Copyright (C) 2023-2025 mini_bomba
 *  
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -17,24 +17,28 @@
 */
 // NOTE: This file is the entrypoint to the 'app' binary.
 
-use std::rc::Rc;
+use cloneable_errors::ErrorContext;
 use components::async_task_manager::AsyncTaskManager;
 use dearrow_browser_api::unsync::StatusResponse;
-use cloneable_errors::ErrorContext;
 use gloo_console::error;
 use reqwest::Url;
+use std::rc::Rc;
 use thumbnails::components::ThumbgenProvider;
 use utils_common::api_request;
+use web_sys::window;
 use yew::prelude::*;
 use yew_hooks::{use_async_with_options, use_interval, UseAsyncOptions};
 use yew_router::prelude::*;
-use web_sys::window;
+
+use contexts::*;
+use pages::*;
+use worker_client::WorkerProvider;
+use yt_metadata::components::MetadataCacheProvider;
 
 pub mod components;
 pub mod constants;
 pub mod contexts;
 pub mod hooks;
-pub mod innertube;
 pub mod settings;
 pub mod utils_app;
 pub mod utils_common;
@@ -44,10 +48,8 @@ pub mod thumbnails;
 pub mod sbserver;
 pub mod worker_api;
 pub mod worker_client;
-use contexts::*;
-use pages::*;
-
-use crate::worker_client::WorkerProvider;
+#[path = "yt_metadata/mod_app.rs"]
+pub mod yt_metadata;
 
 #[function_component]
 fn App() -> Html {
@@ -84,6 +86,7 @@ fn App() -> Html {
         <SettingsProvider>
         <WorkerProvider>
         <ThumbgenProvider>
+        <MetadataCacheProvider>
         <ContextProvider<UpdateClock> context={*update_clock}>
         <AsyncTaskManager>
             <BrowserRouter>
@@ -91,6 +94,7 @@ fn App() -> Html {
             </BrowserRouter>
         </AsyncTaskManager>
         </ContextProvider<UpdateClock>>
+        </MetadataCacheProvider>
         </ThumbgenProvider>
         </WorkerProvider>
         </SettingsProvider>

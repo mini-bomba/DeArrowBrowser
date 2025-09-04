@@ -23,6 +23,7 @@ use std::{
     rc::Rc,
 };
 
+use cloneable_errors::IntoErrorIterator;
 use gloo_console::{error, log, warn};
 use reqwest::Url;
 use slab::Slab;
@@ -35,13 +36,14 @@ use web_sys::{
 
 use thumbnails::local::{LocalBlobLink, LocalThumbGenerator};
 use worker_api::*;
+use yt_metadata::local::LocalMetadataCache;
 
-#[allow(dead_code)]
-mod constants;
+pub mod constants;
 #[path = "thumbnails/mod_worker.rs"]
 pub mod thumbnails;
-#[allow(dead_code)]
-mod utils_common;
+#[path = "yt_metadata/mod_worker.rs"]
+pub mod yt_metadata;
+pub mod utils_common;
 pub mod worker_api;
 
 const PING_CHECK_INTERVAL: i32 = 30_000;
@@ -51,6 +53,7 @@ struct WorkerContext {
     global: SharedWorkerGlobalScope,
     clients: RefCell<Slab<Rc<RemoteClient>>>,
     thumbgen: LocalThumbGenerator,
+    metadata: LocalMetadataCache,
     connect_event_closure: OnceCell<Closure<dyn FnMut(MessageEvent)>>,
     message_event_closure: OnceCell<Closure<dyn FnMut(MessageEvent)>>,
     message_error_event_closure: OnceCell<Closure<dyn FnMut(MessageEvent)>>,
@@ -112,6 +115,7 @@ impl WorkerContext {
             global: js_sys::global().unchecked_into(),
             clients: RefCell::new(Slab::with_capacity(8)),
             thumbgen: LocalThumbGenerator::new(),
+            metadata: LocalMetadataCache::new(),
             connect_event_closure: OnceCell::new(),
             message_event_closure: OnceCell::new(),
             message_error_event_closure: OnceCell::new(),
@@ -288,6 +292,15 @@ impl WorkerContext {
 
                 WorkerResponse::Thumbnail { r#ref: result }
             },
+            WorkerRequest::GetMetadata { video_id } => {
+                let data = self
+                    .metadata
+                    .get_metadata(video_id)
+                    .await
+                    .map_err(|e| e.serializable_copy());
+
+                WorkerResponse::Metadata { data }
+            }
             WorkerRequest::SettingUpdated { setting } => {
                 match setting {
                     worker_api::WorkerSetting::ThumbgenBaseUrl(base_url) => {
@@ -314,8 +327,16 @@ impl WorkerContext {
 
                 WorkerResponse::Ok
             },
-            WorkerRequest::ClearErrors => {
+            WorkerRequest::ClearThumbgenErrors => {
                 self.thumbgen.clear_errors();
+                WorkerResponse::Ok
+            },
+            WorkerRequest::ClearMetadataErrors => {
+                self.metadata.clear_errors();
+                WorkerResponse::Ok
+            },
+            WorkerRequest::ClearMetadataCache => {
+                self.metadata.clear_cache();
                 WorkerResponse::Ok
             },
             WorkerRequest::GetStats { r#type: StatsType::Worker } => {
@@ -328,6 +349,9 @@ impl WorkerContext {
             },
             WorkerRequest::GetStats { r#type: StatsType::Thumbgen } => {
                 WorkerResponse::ThumbgenStats { stats: self.thumbgen.get_stats() }
+            }
+            WorkerRequest::GetStats { r#type: StatsType::Metadata } => {
+                WorkerResponse::MetadataStats { stats: self.metadata.get_stats() }
             }
             WorkerRequest::Ping => {
                 WorkerResponse::Ok

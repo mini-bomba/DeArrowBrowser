@@ -60,6 +60,7 @@ pub fn configure(app_config: web::Data<AppConfig>) -> impl FnOnce(&mut web::Serv
             .service(get_thumbnail_by_uuid)
             .service(get_casual_titles_by_video_id)
             .service(get_user_by_userid)
+            .service(get_warnings)
             .service(get_user_warnings)
             .service(get_issued_warnings)
             .service(get_video)
@@ -660,6 +661,33 @@ async fn get_user_by_userid(
             }
         }
     }))
+}
+
+#[get("/warnings", wrap = "ETagCache")]
+async fn get_warnings(db_lock: DBLock,
+
+    query: web::Query<MainEndpointURLParams>,
+) -> JsonResult<Vec<ApiWarning>> {
+    if query.count > 1024 {
+        return Err(
+            anyhow!(
+                ("Too many requested titles. You requested {} titles, but the configured max is 1024.", query.count),
+                extend: extensions::status::BAD_REQUEST.clone()
+            ).into()
+        );
+    }
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
+
+    Ok(web::Json(
+        db.db
+            .warnings
+            .iter()
+            .rev()
+            .skip(query.offset)
+            .take(query.count)
+            .map(|w| w.into_with_db(&db.db))
+            .collect(),
+    ))
 }
 
 #[get("/warnings/user_id/{user_id}/received", wrap = "ETagCache")]

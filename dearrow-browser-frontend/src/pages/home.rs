@@ -16,7 +16,7 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use dearrow_browser_api::unsync::{ApiCasualTitle, ApiThumbnail, ApiTitle};
+use dearrow_browser_api::unsync::{ApiCasualTitle, ApiThumbnail, ApiTitle, ApiWarning};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
@@ -37,6 +37,7 @@ enum HomePageTab {
     Thumbnails,
     #[strum(serialize="Casual titles")]
     CasualTitles,
+    Warnings,
 }
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -51,6 +52,11 @@ struct HomePageThumbnails {
 }
 #[derive(PartialEq, Eq, Clone, Copy)]
 struct HomePageCasualTitles {
+    offset: usize,
+    count: usize,
+}
+#[derive(PartialEq, Eq, Clone, Copy)]
+struct HomePageWarnings {
     offset: usize,
     count: usize,
 }
@@ -90,6 +96,20 @@ impl Endpoint for HomePageCasualTitles {
     fn create_url(&self, base_url: &Url) -> Url {
         let mut url = base_url
             .join_segments(&["api", "casual_titles"])
+            .expect("origin should be a valid base");
+        url.query_pairs_mut()
+            .append_pair("offset", &self.offset.to_string())
+            .append_pair("count", &self.count.to_string());
+        url
+    }
+}
+impl Endpoint for HomePageWarnings {
+    type Item = ApiWarning;
+    type LoadProgress = ();
+
+    fn create_url(&self, base_url: &Url) -> Url {
+        let mut url = base_url
+            .join_segments(&["api", "warnings"])
             .expect("origin should be a valid base");
         url.query_pairs_mut()
             .append_pair("offset", &self.offset.to_string())
@@ -143,6 +163,19 @@ pub fn HomePage() -> Html {
                 count: entries_per_page,
             }} />
             if let Some(page_count) = status.as_ref().and_then(|s| s.casual_titles.map(|c| c.div_ceil(entries_per_page))) {
+                <PageSelect<HomePageTab> {page_count} />
+            }
+        </>},
+        HomePageTab::Warnings => html! {<>
+            <div class="page-details">
+                <Searchbar />
+            </div>
+            <TableModeSwitch<HomePageTab> entry_count={status.as_ref().and_then(|s| s.warnings)} />
+            <RemoteUnpaginatedTable<HomePageWarnings> endpoint={HomePageWarnings {
+                offset: state.page * entries_per_page,
+                count: entries_per_page,
+            }} />
+            if let Some(page_count) = status.as_ref().and_then(|s| s.warnings.map(|c| c.div_ceil(entries_per_page))) {
                 <PageSelect<HomePageTab> {page_count} />
             }
         </>},

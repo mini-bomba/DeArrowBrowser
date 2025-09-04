@@ -269,6 +269,7 @@ pub fn SettingsModal() -> Html {
     let title_table_layout_save           = use_callback(settings_context.clone(), save_callback!(title_table_layout, fromstr_verify));
     let thumbnail_table_layout_save       = use_callback(settings_context.clone(), save_callback!(thumbnail_table_layout, fromstr_verify));
     let render_thumbnails_in_tables_save  = use_callback(settings_context.clone(), save_callback!(render_thumbnails_in_tables, checkbox_verify));
+    let show_original_titles_save         = use_callback(settings_context.clone(), save_callback!(show_original_titles, checkbox_verify));
     let sticky_headers_save               = use_callback(settings_context.clone(), save_callback!(sticky_headers, checkbox_verify));
     let enable_autosearch_save            = use_callback(settings_context.clone(), save_callback!(enable_autosearch, checkbox_verify));
     let disable_sharedworker_save         = use_callback(settings_context.clone(), save_callback!(disable_sharedworker, checkbox_verify));
@@ -280,6 +281,7 @@ pub fn SettingsModal() -> Html {
     let title_table_layout_undo           = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(title_table_layout));
     let thumbnail_table_layout_undo       = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(thumbnail_table_layout));
     let render_thumbnails_in_tables_undo  = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(render_thumbnails_in_tables));
+    let show_original_titles_undo         = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(show_original_titles));
     let sticky_headers_undo               = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(sticky_headers));
     let enable_autosearch_undo            = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(enable_autosearch));
     let disable_sharedworker_undo         = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(disable_sharedworker));
@@ -291,6 +293,7 @@ pub fn SettingsModal() -> Html {
     let title_table_layout_reset          = use_callback(settings_context.clone(), reset_callback!(title_table_layout));
     let thumbnail_table_layout_reset      = use_callback(settings_context.clone(), reset_callback!(thumbnail_table_layout));
     let render_thumbnails_in_tables_reset = use_callback(settings_context.clone(), reset_callback!(render_thumbnails_in_tables));
+    let show_original_titles_reset        = use_callback(settings_context.clone(), reset_callback!(show_original_titles));
     let sticky_headers_reset              = use_callback(settings_context.clone(), reset_callback!(sticky_headers));
     let enable_autosearch_reset           = use_callback(settings_context.clone(), reset_callback!(enable_autosearch));
     let disable_sharedworker_reset        = use_callback(settings_context.clone(), reset_callback!(disable_sharedworker));
@@ -354,6 +357,30 @@ pub fn SettingsModal() -> Html {
                         >{"🔄"}</span>
                     }
                 </div>
+                if current_settings.title_table_layout == TableLayout::Expanded {
+                    <label for="show_original_titles">{"Show original titles in tables: "}</label>
+                    <input 
+                        class={setting_class!(initial_settings, current_settings, show_original_titles)}
+                        id="show_original_titles" 
+                        type="checkbox"
+                        onchange={show_original_titles_save} 
+                        ~checked={current_settings.show_original_titles} 
+                    />
+                    <div class="setting-actions">
+                        if should_show_undo!(show_original_titles, current_settings, initial_settings) {
+                            <span 
+                                class="clickable" title="Undo"
+                                onclick={show_original_titles_undo}
+                            >{"↩️"}</span>
+                        }
+                        if should_show_reset!(show_original_titles, current_settings, settings_context) {
+                            <span 
+                                class="clickable" title="Reset to default"
+                                onclick={show_original_titles_reset}
+                            >{"🔄"}</span>
+                        }
+                    </div>
+                }
                 <label for="thumbnail_table_layout">{"Thumbnail table layout: "}</label>
                 <select 
                     id="thumbnail_table_layout"

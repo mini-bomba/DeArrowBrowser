@@ -290,6 +290,7 @@ impl Component for VideoPage {
             hide_videoid: true,
             hide_userid: false,
             hide_username: false,
+            hide_original_title: true,
         };
         const THUMB_SETTINGS: ThumbTableSettings = ThumbTableSettings {
             hide_videoid: true,

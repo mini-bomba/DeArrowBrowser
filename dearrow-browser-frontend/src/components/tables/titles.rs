@@ -33,6 +33,7 @@ use crate::{
     userid_cell, username_cell,
     utils_app::render_datetime,
     uuid_cell,
+    yt_metadata::components::OriginalTitle,
 };
 
 #[derive(PartialEq, Eq, Clone, Copy, Default)]
@@ -40,6 +41,7 @@ pub struct TitleTableSettings {
     pub hide_videoid: bool,
     pub hide_username: bool,
     pub hide_userid: bool,
+    pub hide_original_title: bool,
 }
 
 impl TableRender for ApiTitle {
@@ -138,10 +140,17 @@ pub fn TitleRowRenderer(props: &RowProps<ApiTitle>) -> Html {
                 <td class="monospaced"><YoutubeVideoLink videoid={t.video_id.clone()} multiline={expanded_layout} /></td>
             }
             <td class={title_column_classes}>
-                {t.title.clone()}
                 if t.original {
-                    if expanded_layout { <br /> } else {{""}}
-                    <Icon r#type={IconType::Original} tooltip="This is the original video title" />
+                    <Icon r#type={IconType::Original} tooltip="This is the original video title" /> {" "}
+                }
+                <span>{t.title.clone()}</span>
+                if !props.settings.hide_original_title && expanded_layout && settings.show_original_titles {
+                    <br />
+                    <span class="original-title">
+                        <Icon r#type={IconType::NullTitle} tooltip="This is the current original video title" />
+                        {" "}
+                        <OriginalTitle video_id={&t.video_id} />
+                    </span>
                 }
             </td>
             <td class={score_col_class} onclick={voting_modal_trigger}>

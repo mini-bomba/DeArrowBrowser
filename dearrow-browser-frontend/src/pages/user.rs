@@ -192,6 +192,7 @@ pub fn UserPage(props: &UserPageProps) -> Html {
                         hide_username: true,
                         hide_userid: true,
                         hide_videoid: false,
+                        hide_original_title: false,
                     };
                     html! {
                         <RemotePaginatedTable<UserTitles, UserPageTab>

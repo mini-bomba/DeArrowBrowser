@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2024 mini_bomba
+*  Copyright (C) 2024-2025 mini_bomba
 *
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -15,8 +15,6 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-
-use std::rc::Rc;
 
 use chrono::DateTime;
 use dearrow_browser_api::unsync::{ApiWarning, Extension};
@@ -54,17 +52,6 @@ impl TableRender for ApiWarning {
             }
         </>}
     }
-}
-
-#[derive(Properties, PartialEq, Clone)]
-struct WarningRowProps {
-    pub warnings: Rc<[ApiWarning]>,
-    pub index: usize,
-
-    #[prop_or_default]
-    pub hide_issuer: bool,
-    #[prop_or_default]
-    pub hide_receiver: bool,
 }
 
 #[function_component]

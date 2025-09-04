@@ -785,7 +785,7 @@ fieldset {
   background-position: center;
 }
 
-.detail-table[data-layout="Expanded"] td > .icon:only-child {
+.detail-table[data-layout="Expanded"]:not(.user) td > .icon:only-child {
   font-size: 2rem;
 }
 

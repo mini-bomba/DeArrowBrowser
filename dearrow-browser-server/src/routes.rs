@@ -60,6 +60,7 @@ pub fn configure(app_config: web::Data<AppConfig>) -> impl FnOnce(&mut web::Serv
             .service(get_thumbnail_by_uuid)
             .service(get_casual_titles_by_video_id)
             .service(get_user_by_userid)
+            .service(get_users_by_username)
             .service(get_warnings)
             .service(get_user_warnings)
             .service(get_issued_warnings)
@@ -627,40 +628,40 @@ async fn get_user_by_userid(
             thumbnail_count: 0,
             warning_count: 0,
             active_warning_count: 0,
+            last_submission: None,
         },
         Some(user_id) => {
             let username = db.db.get_username(&user_id);
-            let (warning_count, active_warnings) = db.db.warnings.iter().fold((0, 0), |acc, w| {
-                if w.warned_user_id != user_id {
-                    acc
-                } else if w.active {
-                    (acc.0 + 1, acc.1 + 1)
-                } else {
-                    (acc.0 + 1, acc.1)
-                }
-            });
-            User {
-                user_id: user_id.clone(),
-                username: username.map(|u| u.username.clone()),
-                username_locked: username.is_some_and(|u| u.locked),
-                vip: db.db.vip_users.contains(&user_id),
-                title_count: db
-                    .db
-                    .titles
-                    .iter()
-                    .filter(|t| Arc::ptr_eq(&t.user_id, &user_id))
-                    .count() as u64,
-                thumbnail_count: db
-                    .db
-                    .thumbnails
-                    .iter()
-                    .filter(|t| Arc::ptr_eq(&t.user_id, &user_id))
-                    .count() as u64,
-                warning_count,
-                active_warning_count: active_warnings,
-            }
+            User::from_db(&db.db, &user_id, username)
         }
     }))
+}
+
+#[get("/users/username/{username}", wrap = "ETagCache")]
+async fn get_users_by_username(
+    db_lock: DBLock,
+    string_set: StringSetLock,
+    path: web::Path<String>,
+) -> JsonResult<Vec<User>> {
+    let username = string_set
+        .read()
+        .map_err(|_| SS_READ_ERR.clone())?
+        .set
+        .get(path.into_inner().as_str())
+        .cloned();
+    let Some(username) = username else {
+        return Ok(web::Json(vec![]));
+    };
+
+    let db = db_lock.read().map_err(|_| DB_READ_ERR.clone())?;
+    Ok(web::Json(
+        db.db
+            .usernames
+            .iter()
+            .filter(|u| Arc::ptr_eq(&u.username, &username))
+            .map(|u| User::from_db(&db.db, &u.user_id, Some(u)))
+            .collect(),
+    ))
 }
 
 #[get("/warnings", wrap = "ETagCache")]

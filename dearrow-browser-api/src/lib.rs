@@ -31,7 +31,7 @@ pub mod sync {
 
         use super::*;
         use dearrow_parser::db::DearrowDB;
-        use dearrow_parser::types as parser_types;
+        use dearrow_parser::types::{self as parser_types};
         use strum::VariantNames;
 
         static CASUAL_CATEGORY_ARCS: LazyLock<&'static [Arc<str>]> = LazyLock::new(||
@@ -149,6 +149,50 @@ pub mod sync {
                         .filter_map(|(c, v)| Some(c).zip(v))
                         .map(|(category, count)| (CASUAL_CATEGORY_ARCS[category as usize].clone(), count))
                         .collect(),
+                }
+            }
+        }
+
+        impl User {
+            pub fn from_db(db: &DearrowDB, user_id: &Arc<str>, username: Option<&parser_types::Username>) -> User {
+                let (warning_count, active_warnings) = db.warnings.iter().fold((0, 0), |acc, w| {
+                    if !Arc::ptr_eq(&w.warned_user_id, user_id) {
+                        acc
+                    } else if w.active {
+                        (acc.0 + 1, acc.1 + 1)
+                    } else {
+                        (acc.0 + 1, acc.1)
+                    }
+                });
+                let mut last_submission = None;
+                User {
+                    user_id: user_id.clone(),
+                    username: username.map(|u| u.username.clone()),
+                    username_locked: username.is_some_and(|u| u.locked),
+                    vip: db.vip_users.contains(user_id),
+                    title_count: db
+                        .titles
+                        .iter()
+                        .filter(|t| Arc::ptr_eq(&t.user_id, user_id))
+                        .inspect(|t| {
+                            last_submission = Some(t.time_submitted);
+                        })
+                        .count() as u64,
+                    thumbnail_count: db
+                        .thumbnails
+                        .iter()
+                        .filter(|t| Arc::ptr_eq(&t.user_id, user_id))
+                        .inspect(|t| {
+                            if let Some(last) = last_submission {
+                                last_submission = Some(last.max(t.time_submitted));
+                            } else {
+                                last_submission = Some(t.time_submitted);
+                            }
+                        })
+                        .count() as u64,
+                    warning_count,
+                    active_warning_count: active_warnings,
+                    last_submission,
                 }
             }
         }

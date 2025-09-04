@@ -24,4 +24,5 @@ pub mod switch;
 pub mod thumbs;
 pub mod titles;
 pub mod r#trait;
+pub mod users;
 pub mod warnings;

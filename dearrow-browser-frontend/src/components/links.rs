@@ -37,6 +37,14 @@ pub fn userid_link(user_id: AttrValue) -> Html {
     }
 }
 
+pub fn username_link(username: AttrValue) -> Html {
+    html! {
+        <Link<MainRoute> to={MainRoute::Username { username }}>
+            <Icon r#type={IconType::DABLogo} tooltip="View this username in DeArrow Browser"/>
+        </Link<MainRoute>>
+    }
+}
+
 pub fn uuid_link(uuid: AttrValue) -> Html {
     html! {
         <Link<MainRoute> to={MainRoute::UUID { id: uuid }}>

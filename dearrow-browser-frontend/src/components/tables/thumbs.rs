@@ -163,7 +163,7 @@ pub fn ThumbRowRenderer(props: &RowProps<ApiThumbnail>) -> Html {
         </td>
         <td class="monospaced">{uuid_cell!(t.uuid, expanded_layout)}</td>
         if !props.settings.hide_username {
-            <td>{username_cell!(t.username, rows)}</td>
+            <td>{username_cell!(t.username, rows, expanded_layout)}</td>
         }
         if !props.settings.hide_userid {
             <td>{userid_cell!(t.user_id, rows, expanded_layout)}</td>

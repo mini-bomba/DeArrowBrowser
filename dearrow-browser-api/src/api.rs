@@ -110,6 +110,7 @@ pub struct User {
     pub thumbnail_count: u64,
     pub warning_count: u64,
     pub active_warning_count: u64,
+    pub last_submission: Option<i64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq)]

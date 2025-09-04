@@ -100,9 +100,13 @@ macro_rules! userid_cell {
 
 #[macro_export]
 macro_rules! username_cell {
-    ($username:expr, $rows:expr) => {
+    ($username:expr, $rows:expr, $multiline:expr) => {
         if let Some(ref name) = $username {
-            html! {<textarea readonly=true cols=16 rows={$rows} ~value={name.to_string()} />}
+            html! {<>
+                <textarea readonly=true cols=16 rows={$rows} ~value={name.to_string()} />
+                if $multiline { <br /> } else {{" "}}
+                {$crate::components::links::username_link(name.clone().into())}
+            </>}
         } else {
             html! {{"-"}}
         }

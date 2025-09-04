@@ -31,6 +31,7 @@ mod channel;
 mod home;
 mod unverified;
 mod user;
+mod username;
 mod uuid;
 mod video;
 
@@ -40,6 +41,7 @@ use home::HomePage;
 use unverified::UnverifiedPage;
 use user::UserPage;
 use uuid::UUIDPage;
+use username::UsernamePage;
 use video::VideoPage;
 
 #[derive(Clone, Routable, PartialEq, IntoStaticStr)]
@@ -56,6 +58,8 @@ pub enum MainRoute {
     Channel { id: AttrValue },
     #[at("/user_id/:id")]
     User { id: AttrValue },
+    #[at("/username/:username")]
+    Username { username: AttrValue },
     #[at("/uuid/:id")]
     UUID { id: AttrValue },
     #[at("/wip")]
@@ -96,6 +100,7 @@ pub fn render_main_route(route: MainRoute) -> Html {
             MainRoute::Video { ref id } => format!("VideoID {id} - DeArrow Browser"),
             MainRoute::Channel { ref id } => format!("Channel {id} - DeArrow Browser"),
             MainRoute::User { ref id } => format!("UserID {id} - Dearrow Browser"),
+            MainRoute::Username { ref username } => format!("Username {username} - Dearrow Browser"),
             MainRoute::UUID { ref id } => format!("UUID {id} - Dearrow Browser"),
         }
         .as_str(),
@@ -104,10 +109,11 @@ pub fn render_main_route(route: MainRoute) -> Html {
         MainRoute::Home => html! {<HomePage/>},
         MainRoute::Unverified => html! {<UnverifiedPage/>},
         MainRoute::Broken => html! {<BrokenPage/>},
-        MainRoute::Video { ref id } => html! {<VideoPage videoid={id.clone()} />},
-        MainRoute::Channel { ref id } => html! {<ChannelPage channel={id.clone()} />},
-        MainRoute::User { ref id } => html! {<UserPage userid={id.clone()} />},
-        MainRoute::UUID { ref id } => html! {<UUIDPage uuid={id.clone()} />},
+        MainRoute::Video { ref id } => html! {<VideoPage videoid={id} />},
+        MainRoute::Channel { ref id } => html! {<ChannelPage channel={id} />},
+        MainRoute::User { ref id } => html! {<UserPage userid={id} />},
+        MainRoute::Username { ref username } => html! {<UsernamePage {username} />},
+        MainRoute::UUID { ref id } => html! {<UUIDPage uuid={id} />},
         MainRoute::NotFound => html! {
             <>
                 <h2>{"404 - Not found"}</h2>

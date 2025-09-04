@@ -25,6 +25,7 @@ use strum::{IntoStaticStr, VariantArray};
 use yew::prelude::*;
 
 use crate::components::icon::*;
+use crate::components::links::username_link;
 use crate::components::tables::remote::{Endpoint, RemotePaginatedTable};
 use crate::components::tables::switch::TableModeSwitch;
 use crate::components::tables::thumbs::ThumbTableSettings;
@@ -68,7 +69,8 @@ fn UserDetails(props: &UserDetailsProps) -> HtmlResult {
                 </div>
                 <div>
                 if let Some(username) = &user.username {
-                    {format!("Username: {username}")}
+                    {"Username: "}{username}
+                    {username_link(AttrValue::Rc(username.clone()))}
                 } else {
                     {"Username: "}<em>{"No username set"}</em>
                 }

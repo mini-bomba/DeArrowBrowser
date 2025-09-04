@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2023-2024 mini_bomba
+*  Copyright (C) 2023-2025 mini_bomba
 *  
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -165,6 +165,7 @@ pub fn Searchbar() -> Html {
         })
     };
     let channel_paste = {
+        let navigator = navigator.clone();
         use_callback(autosearch, move |e: InputEvent, autosearch| {
             if !autosearch { return; }
             if e.input_type() != "insertFromPaste" { return; }
@@ -178,6 +179,34 @@ pub fn Searchbar() -> Html {
             }
         })
     };
+    let username_search = { 
+        let navigator = navigator.clone();
+        use_callback((), move |e: KeyboardEvent, ()| {
+            if e.key() != "Enter" { return; }
+            let input: HtmlInputElement = e.target_unchecked_into();
+            let value = input.value();
+            let value = value.trim();
+            let value = last_url_segment(value).unwrap_or_else(|| value.to_owned());
+
+            navigator.push(&MainRoute::Username {
+                username: value.into()
+            });
+        })
+    };
+    let username_paste = {
+        use_callback(autosearch, move |e: InputEvent, autosearch| {
+            if !autosearch { return; }
+            if e.input_type() != "insertFromPaste" { return; }
+            let Some(data) = e.data() else { return; };
+
+            let data = data.trim();
+            let data = last_url_segment(data).unwrap_or_else(|| data.to_owned());
+
+            if HANDLE_REGEX.is_match(&data) || UCID_REGEX.is_match(&data) {
+                navigator.push(&MainRoute::Username { username: data.into() });
+            }
+        })
+    };
 
     html! {
         <div id="searchbar">
@@ -185,6 +214,7 @@ pub fn Searchbar() -> Html {
             {search_block!("vid_search", "Video ID", vid_search, vid_paste)}
             {search_block!("uid_search", "User ID", uid_search, uid_paste)}
             {search_block!("channel_search", "Channel", channel_search, channel_paste)}
+            {search_block!("username_search", "Username", username_search, username_paste)}
             <fieldset>
                 <legend>{"Filtered views"}</legend>
                 <ul>

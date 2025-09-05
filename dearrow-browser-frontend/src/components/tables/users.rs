@@ -25,7 +25,7 @@ use crate::{
     components::{
         icon::{Icon, IconType},
         tables::r#trait::{RowProps, TableRender},
-    }, pages::MainRoute, settings::Settings, utils_app::render_datetime
+    }, pages::MainRoute, settings::Settings, utils_app::{render_datetime, render_ms_delta}
 };
 
 impl TableRender for User {
@@ -40,6 +40,8 @@ impl TableRender for User {
             <th>{"Titles"}</th>
             <th>{"Thumbnails"}</th>
             <th>{"Last submission"}</th>
+            <th title="Median title submission interval">{"Title rate"}</th>
+            <th title="Median thumbnail submission interval">{"Thumbnail rate"}</th>
         </>}
     }
 }
@@ -49,9 +51,11 @@ pub fn UserRow(props: &RowProps<User>) -> Html {
     let user = props.item();
     let timestamp = user
         .last_submission
-        .map_or("No submissions".to_string(), |ts| {
+        .map_or("N/A".to_string(), |ts| {
             DateTime::from_timestamp_millis(ts).map_or_else(|| ts.to_string(), render_datetime)
         });
+    let title_rate = user.title_submission_rate.map_or("N/A".to_string(), |s| render_ms_delta(s.median));
+    let thumb_rate = user.thumbnail_submission_rate.map_or("N/A".to_string(), |s| render_ms_delta(s.median));
     html! {<>
         <td>
             <Link<MainRoute> to={MainRoute::User { id: AttrValue::Rc(user.user_id.clone()) }}>
@@ -75,5 +79,7 @@ pub fn UserRow(props: &RowProps<User>) -> Html {
         <td>{user.title_count}</td>
         <td>{user.thumbnail_count}</td>
         <td>{timestamp}</td>
+        <td>{title_rate}</td>
+        <td>{thumb_rate}</td>
     </>}
 }

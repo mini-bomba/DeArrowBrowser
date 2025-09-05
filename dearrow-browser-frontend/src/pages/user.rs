@@ -33,7 +33,7 @@ use crate::components::tables::titles::TitleTableSettings;
 use crate::components::tables::warnings::WarningTableSettings;
 use crate::contexts::{StatusContext, WindowContext};
 use crate::hooks::{use_async_suspension, use_location_state};
-use crate::utils_app::sbb_userid_link;
+use crate::utils_app::{render_ms_delta, sbb_userid_link};
 use crate::utils_common::{api_request, ReqwestUrlExt};
 
 #[derive(Properties, PartialEq)]
@@ -55,8 +55,8 @@ fn UserDetails(props: &UserDetailsProps) -> HtmlResult {
     });
 
     Ok(match *result {
-        Ok(ref user) => html! {
-            <>
+        Ok(ref user) => html! {<>
+            <div class="info-table">
                 <div>{format!("UserID: {}", props.userid.clone())}
                 if user.vip {
                     <Icon r#type={IconType::VIP} tooltip="This user is a VIP" />
@@ -81,13 +81,51 @@ fn UserDetails(props: &UserDetailsProps) -> HtmlResult {
                 <div>{format!("Titles: {}", user.title_count)}</div>
                 <div>{format!("Thumbnails: {}", user.thumbnail_count)}</div>
                 <div><a href={&*sbb_url}>{"View on SB Browser"}</a></div>
-            </>
-        },
+            </div>
+            <table>
+                <caption>{"Detail submission intervals"}</caption>
+                <tr>
+                    <th />
+                    <th>{"min"}</th>
+                    <th>{"max"}</th>
+                    <th>{"average"}</th>
+                    <th>{"median"}</th>
+                </tr>
+                <tr>
+                    <th>{"Titles"}</th>
+                    if let Some(summary) = user.title_submission_rate {
+                        <td>{render_ms_delta(summary.min)}</td>
+                        <td>{render_ms_delta(summary.max)}</td>
+                        <td>{render_ms_delta(summary.average)}</td>
+                        <td>{render_ms_delta(summary.median)}</td>
+                    } else {
+                        <td>{"N/A"}</td>
+                        <td>{"N/A"}</td>
+                        <td>{"N/A"}</td>
+                        <td>{"N/A"}</td>
+                    }
+                </tr>
+                <tr>
+                    <th>{"Thumbnails"}</th>
+                    if let Some(summary) = user.thumbnail_submission_rate {
+                        <td>{render_ms_delta(summary.min)}</td>
+                        <td>{render_ms_delta(summary.max)}</td>
+                        <td>{render_ms_delta(summary.average)}</td>
+                        <td>{render_ms_delta(summary.median)}</td>
+                    } else {
+                        <td>{"N/A"}</td>
+                        <td>{"N/A"}</td>
+                        <td>{"N/A"}</td>
+                        <td>{"N/A"}</td>
+                    }
+                </tr>
+            </table>
+        </>},
         Err(ref e) => html! {
-            <>
+            <div class="info-table">
                 <div>{"Failed to fetch user data"}<br/><pre>{format!("{e:?}")}</pre></div>
                 <div><a href={&*sbb_url}>{"View on SB Browser"}</a></div>
-            </>
+            </div>
         },
     })
 }
@@ -177,15 +215,13 @@ pub fn UserPage(props: &UserPageProps) -> Html {
     };
 
     let details_fallback = html! {
-        <div><b>{"Loading..."}</b></div>
+        <b>{"Details loading..."}</b>
     };
 
     html! {
         <>
             <div class="page-details">
-                <div class="info-table">
-                    <Suspense fallback={details_fallback}><UserDetails userid={props.userid.clone()} /></Suspense>
-                </div>
+                <Suspense fallback={details_fallback}><UserDetails userid={props.userid.clone()} /></Suspense>
             </div>
             <TableModeSwitch<UserPageTab> entry_count={*entry_count} />
             {match state.tab {

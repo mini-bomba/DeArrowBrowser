@@ -629,6 +629,8 @@ async fn get_user_by_userid(
             warning_count: 0,
             active_warning_count: 0,
             last_submission: None,
+            title_submission_rate: None,
+            thumbnail_submission_rate: None,
         },
         Some(user_id) => {
             let username = db.db.get_username(&user_id);

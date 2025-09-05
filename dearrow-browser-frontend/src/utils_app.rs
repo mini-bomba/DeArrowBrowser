@@ -15,7 +15,7 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use std::{cell::Cell, rc::Rc, fmt::Write};
+use std::{cell::Cell, fmt::Write, ops::{Div, Rem}, rc::Rc};
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 use reqwest::Url;
@@ -40,6 +40,37 @@ pub fn render_naive_datetime(dt: NaiveDateTime) -> String
 pub fn render_datetime_with_delta(dt: DateTime<Utc>) -> String
 {
     format!("{} UTC ({} minutes ago)", dt.format(TIME_FORMAT), (Utc::now()-dt).num_minutes())
+}
+pub fn render_ms_delta(delta: f64) -> String {
+    const SECOND: f64 = 1000.;
+    const TEN_SEC: f64 = 10_000.;
+    const MINUTE: f64 = 60_000.;
+    const HOUR: f64 = 3_600_000.;
+    const DAY: f64 = 86_400_000.;
+    const WEEK: f64 = 604_800_000.;
+
+    if delta < SECOND {
+        format!("{delta:.0}ms")
+    } else if delta < TEN_SEC {
+        format!("{:.2}s", delta / SECOND)
+    } else if delta < MINUTE {
+        format!("{:.1}s", delta / SECOND)
+    } else if delta < HOUR {
+        let mins = delta.div(MINUTE).floor();
+        let sec = delta.rem(MINUTE).div(SECOND);
+        format!("{mins:.0}m {sec:.0}s")
+    } else if delta < DAY {
+        let hours = delta.div(HOUR).floor();
+        let mins = delta.rem(HOUR).div(MINUTE);
+        format!("{hours:.0}h {mins:.0}m")
+    } else if delta < WEEK {
+        let days = delta.div(DAY).floor();
+        let hours = delta.rem(DAY).div(HOUR);
+        format!("{days:.0}d {hours:.0}h")
+    } else {
+        let days = delta.div(DAY);
+        format!("{days:.0}d")
+    }
 }
 
 pub trait RenderNumber {

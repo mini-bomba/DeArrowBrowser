@@ -100,7 +100,7 @@ pub struct ApiThumbnail {
     pub username: Option<RcStr>,
     pub vip: bool,
 }
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct User {
     pub user_id: RcStr,
     pub username: Option<RcStr>,
@@ -111,6 +111,37 @@ pub struct User {
     pub warning_count: u64,
     pub active_warning_count: u64,
     pub last_submission: Option<i64>,
+    pub title_submission_rate: Option<StatisticalSummary>,
+    pub thumbnail_submission_rate: Option<StatisticalSummary>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq)]
+pub struct StatisticalSummary {
+    pub min: f64,
+    pub max: f64,
+    pub average: f64,
+    pub median: f64,
+}
+
+impl StatisticalSummary {
+    #[allow(clippy::cast_precision_loss)]
+    pub fn from_measurements(measurements: &mut [f64]) -> Option<Self> {
+        if measurements.is_empty() {
+            return None;
+        }
+        measurements.sort_unstable_by(f64::total_cmp);
+        Some(Self {
+            min: measurements.iter().copied().reduce(f64::min).unwrap(),
+            max: measurements.iter().copied().reduce(f64::max).unwrap(),
+            average: measurements.iter().sum::<f64>() / (measurements.len() as f64),
+            median: if measurements.len() % 2 == 0 {
+                let mid = measurements.len() / 2;
+                f64::midpoint(measurements[mid-1], measurements[mid])
+            } else {
+                measurements[(measurements.len()/2)-1]
+            }
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq)]

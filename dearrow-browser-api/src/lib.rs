@@ -164,7 +164,10 @@ pub mod sync {
                         (acc.0 + 1, acc.1)
                     }
                 });
-                let mut last_submission = None;
+                let mut last_title_submission = None;
+                let mut last_thumb_submission = None;
+                let mut title_submission_intervals = vec![];
+                let mut thumb_submission_intervals = vec![];
                 User {
                     user_id: user_id.clone(),
                     username: username.map(|u| u.username.clone()),
@@ -175,7 +178,11 @@ pub mod sync {
                         .iter()
                         .filter(|t| Arc::ptr_eq(&t.user_id, user_id))
                         .inspect(|t| {
-                            last_submission = Some(t.time_submitted);
+                            if let Some(prev_time) = last_title_submission {
+                                #[allow(clippy::cast_precision_loss)]
+                                title_submission_intervals.push((t.time_submitted - prev_time) as f64);
+                            }
+                            last_title_submission = Some(t.time_submitted);
                         })
                         .count() as u64,
                     thumbnail_count: db
@@ -183,16 +190,21 @@ pub mod sync {
                         .iter()
                         .filter(|t| Arc::ptr_eq(&t.user_id, user_id))
                         .inspect(|t| {
-                            if let Some(last) = last_submission {
-                                last_submission = Some(last.max(t.time_submitted));
-                            } else {
-                                last_submission = Some(t.time_submitted);
+                            if let Some(prev_time) = last_thumb_submission {
+                                #[allow(clippy::cast_precision_loss)]
+                                thumb_submission_intervals.push((t.time_submitted - prev_time) as f64);
                             }
+                            last_thumb_submission = Some(t.time_submitted);
                         })
                         .count() as u64,
                     warning_count,
                     active_warning_count: active_warnings,
-                    last_submission,
+                    last_submission: last_title_submission
+                        .zip(last_thumb_submission)
+                        .map(|(t1, t2)| t1.max(t2))
+                        .or_else(|| last_title_submission.or(last_thumb_submission)),
+                    title_submission_rate: StatisticalSummary::from_measurements(&mut title_submission_intervals),
+                    thumbnail_submission_rate: StatisticalSummary::from_measurements(&mut thumb_submission_intervals),
                 }
             }
         }

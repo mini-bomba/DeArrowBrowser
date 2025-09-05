@@ -171,6 +171,10 @@ body {
   }
 }
 
+table caption {
+  font-weight: bold;
+}
+
 #content {
   flex-grow: 1;
 
@@ -204,6 +208,11 @@ body {
     table {
       border-collapse: collapse;
       border: 1px solid $gray;
+    }
+
+    .page-details table {
+      border-collapse: separate;
+      border-spacing: 1em 0;
     }
 
     td {
@@ -690,10 +699,10 @@ fieldset {
   .setting-actions {
     grid-column: 3 / span 1;
   }
+}
 
-  label[title] {
-    text-decoration: underline dotted;
-  }
+:is(label,th)[title] {
+  text-decoration: underline dotted;
 }
 
 #loading {

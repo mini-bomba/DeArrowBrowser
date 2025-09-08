@@ -138,7 +138,7 @@ impl StatisticalSummary {
                 let mid = measurements.len() / 2;
                 f64::midpoint(measurements[mid-1], measurements[mid])
             } else {
-                measurements[(measurements.len()/2)-1]
+                measurements[measurements.len()/2]
             }
         })
     }

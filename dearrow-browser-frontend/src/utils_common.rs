@@ -1,6 +1,6 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2024 mini_bomba
+*  Copyright (C) 2024-2025 mini_bomba
 *  
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
@@ -16,11 +16,14 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use std::cell::OnceCell;
+use std::cell::{OnceCell, RefCell};
+use std::collections::VecDeque;
+use std::future::Future;
 use std::ops::Deref;
 use std::rc::Rc;
 
 use cloneable_errors::{bail, ErrContext, ErrorContext, ResContext, SerializableError};
+use futures::channel::oneshot;
 use gloo_console::error;
 use reqwest::Url;
 use wasm_bindgen::{closure::Closure, prelude::wasm_bindgen, JsCast, JsValue};
@@ -81,6 +84,13 @@ impl Global {
             Self::Worker(worker) => worker.fetch_with_str(url),
         }.into();
         fetch.await.map(JsCast::unchecked_into)
+    }
+
+    pub fn set_timeout(&self, callback: &Function, timeout: i32) -> i32 {
+        match self {
+            Self::Window(window) => window.set_timeout_with_callback_and_timeout_and_arguments_0(callback, timeout),
+            Self::Worker(worker) => worker.set_timeout_with_callback_and_timeout_and_arguments_0(callback, timeout),
+        }.unwrap()
     }
 
     pub fn set_interval(&self, callback: &Function, interval: i32) -> i32 {
@@ -183,8 +193,89 @@ impl<F: ?Sized> EventCellsExt for OnceCell<EventListener<F>> {
     }
 }
 
+pub struct RateLimiter {
+    inner: RefCell<InnerRL>,
+}
+
+struct InnerRL {
+    current_timeout_id: Option<i32>,
+    capacity_used: u8,
+    max_capacity: u8,
+    queue: VecDeque<oneshot::Sender<()>>,
+}
+
+impl InnerRL {
+    fn schedule_reset(&mut self) {
+        self.current_timeout_id = Some(RESET_LIMITER_FN.with(|rf| GLOBAL.with(|g| g.set_timeout(rf, 100))));
+    }
+}
+
+impl RateLimiter {
+    fn new() -> RateLimiter {
+        Self {
+            inner: RefCell::new(InnerRL {
+                current_timeout_id: None,
+                capacity_used: 0,
+                max_capacity: 10,
+                queue: VecDeque::new(),
+            }),
+        }
+    }
+
+    /// Waits for the next available rate limiter slot
+    /// 
+    /// The returned future does not borrow self
+    pub fn wait(&self) -> impl Future<Output = ()> {
+        let mut inner = self.inner.borrow_mut();
+
+        // try to get a slot now
+        let queue_signal = if inner.capacity_used < inner.max_capacity {
+            // no need to wait
+            inner.capacity_used += 1;
+            if inner.current_timeout_id.is_none() {
+                inner.schedule_reset();
+            }
+            None
+        } else {
+            // gotta queue
+            let (sender, receiver) = oneshot::channel();
+            inner.queue.push_back(sender);
+            Some(receiver)
+        };
+
+        async move {
+            if let Some(signal) = queue_signal {
+                signal.await.expect("RateLimiter signal receiver got cancelled");
+            }
+        }
+    }
+}
+
+fn reset_rate_limit() {
+    RATE_LIMITER.with(|rl| {
+        let mut inner = rl.inner.borrow_mut();
+        inner.capacity_used = 0;
+        inner.current_timeout_id = None;
+
+        while let Some(sender) = inner.queue.pop_front() {
+            let _ = sender.send(());
+            inner.capacity_used += 1;
+
+            if inner.capacity_used >= inner.max_capacity {
+                break;
+            }
+        }
+
+        if inner.capacity_used != 0 {
+            inner.schedule_reset();
+        }
+    });
+}
+
 thread_local! {
     pub static GLOBAL: Global = Global::get().unwrap();
+    pub static RATE_LIMITER: RateLimiter = RateLimiter::new();
+    static RESET_LIMITER_FN: Function = Closure::<dyn Fn()>::new(reset_rate_limit).into_js_value().unchecked_into();
 }
 
 pub trait ReqwestUrlExt {

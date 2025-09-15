@@ -150,6 +150,7 @@ async fn generate_thumb(mut api_url: Url, key: &ThumbnailKey) -> Result<LocalBlo
         api_url.query_pairs_mut()
             .append_pair("videoID", &key.video_id)
             .append_pair("time", timestamp);
+        RATE_LIMITER.with(RateLimiter::wait).await;
         let response = GLOBAL.with(Clone::clone).fetch(api_url.as_str()).await.map_err(ThumbnailGenerationError::JSError)?;
 
         match response.status() {

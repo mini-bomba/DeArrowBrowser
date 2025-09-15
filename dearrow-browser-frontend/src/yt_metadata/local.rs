@@ -19,11 +19,16 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use cloneable_errors::{ErrorContext, ResContext};
-use futures::{future::{LocalBoxFuture, Shared}, FutureExt};
+use futures::{
+    future::{LocalBoxFuture, Shared},
+    FutureExt,
+};
 use serde::Deserialize;
 
 use crate::{
-    constants::YOUTUBE_OEMBED_URL, utils_common::RcEq, utils_common::api_request, yt_metadata::common::{youtu_be_link, MetadataCacheStats, VideoMetadata}
+    constants::YOUTUBE_OEMBED_URL,
+    utils_common::{api_request, RateLimiter, RcEq, RATE_LIMITER},
+    yt_metadata::common::{youtu_be_link, MetadataCacheStats, VideoMetadata},
 };
 
 #[derive(Deserialize)]
@@ -55,6 +60,7 @@ async fn fetch_metadata(vid: &str) -> Result<VideoMetadata, ErrorContext> {
     url.query_pairs_mut()
         .clear()
         .append_pair("url", youtu_be_link(vid).as_str());
+    RATE_LIMITER.with(RateLimiter::wait).await;
     let response: OEmbedResponse = api_request(url).await.context("oembed request failed")?;
     let channel = reqwest::Url::parse(&response.author_url)
         .context("Failed to parse channel URL")?

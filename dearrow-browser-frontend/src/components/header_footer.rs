@@ -20,7 +20,6 @@ use std::rc::Rc;
 use chrono::{DateTime, Datelike, Local};
 use yew::prelude::*;
 use yew::virtual_dom::VList;
-use yew_router::hooks::use_navigator;
 use yew_router::prelude::Link;
 
 use crate::components::modals::{async_tasks::AsyncTasksModal, settings::SettingsModal, status::StatusModal, ModalMessage};
@@ -31,7 +30,6 @@ use crate::utils_app::render_datetime_with_delta;
 
 #[function_component]
 pub fn Header() -> Html {
-    let navigator = use_navigator().expect("Header should be placed in a Router");
     let modal_controls: ModalRendererControls = use_context().expect("Header should be placed inside a ModalRenderer");
     let settings_context: SettingsContext = use_context().expect("Header should be placed inside a SettingsProvider");
     let settings = settings_context.settings();
@@ -39,11 +37,6 @@ pub fn Header() -> Html {
     let async_tasks_view: AsyncTaskList = use_context().expect("Header should be placed inside an AsyncTaskList");
     let open_settings_modal = use_callback(modal_controls.clone(), |_, modal_controls| {
         modal_controls.emit(ModalMessage::Open(html! {<SettingsModal />}));
-    });
-    let open_user_page = use_callback(user_context.as_ref().map(|d| d.user_id.clone()), move |_: MouseEvent, public_id| {
-        if let Some(public_id) = public_id {
-            navigator.push(&MainRoute::User { id: AttrValue::Rc(public_id.clone()) });
-        }
     });
     let open_async_tasks_modal = use_callback(modal_controls, |_, modal_controls| {
         modal_controls.emit(ModalMessage::Open(html! {<AsyncTasksModal />}));
@@ -85,14 +78,14 @@ pub fn Header() -> Html {
         <div id="header" class={header_classes}>
             <Link<MainRoute> to={MainRoute::Home}><img src="/icon/twemoji/logo.svg" /></Link<MainRoute>>
             <div>
-                <h1 class="undecorated-link"><Link<MainRoute> to={MainRoute::Home}>{"DeArrow Browser"}</Link<MainRoute>></h1>
+                <h1><Link<MainRoute> to={MainRoute::Home} classes="undecorated-link">{"DeArrow Browser"}</Link<MainRoute>></h1>
                 if !async_tasks_view.tasks.is_empty() {
                     <div id="async-tasks-badge" class="clickable header-badge" onclick={open_async_tasks_modal}>
                         {(*task_badge).clone()}
                     </div>
                 }
                 if let Some(user_data) = user_context {
-                    <div id="current-user-badge" class="clickable header-badge" onclick={open_user_page}>
+                    <Link<MainRoute> classes="current-user-badge header-badge undecorated-link" to={MainRoute::User { id: AttrValue::Rc(user_data.user_id.clone()) }}>
                         <span>
                             if let Some(Ok(user_details)) = user_data.data {
                                 if let Some(username) = user_details.username.clone().filter(|name| *name != user_data.user_id) {
@@ -110,7 +103,7 @@ pub fn Header() -> Html {
                             } 
                         </span>
                         <span id="current-user-id">{user_data.user_id}</span>
-                    </div>
+                    </Link<MainRoute>>
                 }
                 <Icon r#type={IconType::Settings} tooltip={"Open settings"} onclick={open_settings_modal} id="settings-button" />
             </div>

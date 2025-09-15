@@ -105,7 +105,7 @@ body {
     padding: 0.5rem;
   }
 
-  #current-user-badge {
+  .current-user-badge {
     display: flex;
     flex-direction: column;
 
@@ -573,9 +573,9 @@ table caption {
   }
 }
 
-.undecorated-link, .undecorated-link a {
-  text-decoration: none;
-  color: inherit;
+a.undecorated-link {
+  text-decoration: unset;
+  color: unset;
 }
 
 .hoverswitch {

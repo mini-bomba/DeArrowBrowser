@@ -129,6 +129,7 @@ pub mod sync {
                     issuer_user_id: self.issuer_user_id.clone(),
                     issuer_username,
                     time_issued: self.time_issued,
+                    time_acknowledged: self.time_acknowledged,
                     message: self.message.clone(),
                     active: self.active,
                     extension: match self.extension {

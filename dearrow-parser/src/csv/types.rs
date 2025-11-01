@@ -163,6 +163,8 @@ pub struct Warning {
     pub enabled: i8,
     pub reason: Arc<str>,
     pub r#type: i8,
+    #[serde(rename = "disableTime")]
+    pub disable_time: Option<i64>,
 }
 
 pub struct TrimmedSponsorTime {

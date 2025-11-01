@@ -58,10 +58,11 @@ impl TableRender for ApiWarning {
 pub fn WarningRow(props: &RowProps<ApiWarning>) -> Html {
     let warning = props.item();
     let settings = &props.settings;
-    let timestamp = use_memo(warning.time_issued, |timestamp| {
-        DateTime::from_timestamp_millis(*timestamp)
-            .map_or_else(|| timestamp.to_string(), render_datetime)
-    });
+    let time_issued = DateTime::from_timestamp_millis(warning.time_issued)
+        .map_or_else(|| warning.time_issued.to_string(), render_datetime);
+    let time_acknowledged = warning
+        .time_acknowledged
+        .map(|t| DateTime::from_timestamp_millis(t).map_or_else(|| t.to_string(), render_datetime));
     let extension = match warning.extension {
         Extension::DeArrow => "for DeArrow",
         Extension::SponsorBlock => "for SponsorBlock",
@@ -73,9 +74,13 @@ pub fn WarningRow(props: &RowProps<ApiWarning>) -> Html {
     };
     html! {<>
         <td>
-            {timestamp}<br/>
+            {time_issued}<br/>
             {extension}<br/>
             {status}
+            if let Some(t) = time_acknowledged {
+                {" on"}<br/>
+                {t}
+            }
         </td>
         <td class="warning-message-col"><pre>{warning.message.clone()}</pre></td>
         if !settings.hide_issuer {

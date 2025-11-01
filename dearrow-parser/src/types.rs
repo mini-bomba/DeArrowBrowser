@@ -117,6 +117,7 @@ pub struct Warning {
     pub extension: Extension,
     pub message: Arc<str>,
     pub active: bool,
+    pub time_acknowledged: Option<i64>,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Copy, Debug, Enum, VariantNames)]

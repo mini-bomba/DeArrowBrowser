@@ -198,6 +198,7 @@ pub struct ApiWarning {
     pub issuer_user_id: RcStr,
     pub issuer_username: Option<RcStr>,
     pub time_issued: i64,
+    pub time_acknowledged: Option<i64>,
     pub extension: Extension,
     pub message: RcStr,
     pub active: bool,

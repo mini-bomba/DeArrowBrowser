@@ -337,6 +337,8 @@ impl TryFrom<Warning> for types::Warning {
             message: value.reason,
             active,
             extension,
+            // force this to None if the value is 0 or if the warning is still active
+            time_acknowledged: value.disable_time.and_then(|t| (t != 0 && !active).then_some(t))
         })
     }
 }

@@ -27,7 +27,7 @@ use serde::Deserialize;
 
 use crate::{
     constants::YOUTUBE_OEMBED_URL,
-    utils_common::{api_request, RateLimiter, RcEq, RATE_LIMITER},
+    utils_common::{api_request, url_decode, RateLimiter, RcEq, RATE_LIMITER},
     yt_metadata::common::{youtu_be_link, MetadataCacheStats, VideoMetadata},
 };
 
@@ -68,8 +68,12 @@ async fn fetch_metadata(vid: &str) -> Result<VideoMetadata, ErrorContext> {
         .context("Failed to extract channel handle from URL: not a base???")?
         .filter(|s| !s.is_empty())
         .next_back()
-        .map(Rc::from)
-        .context("Failed to extract channel handle from URL: URL has no segments")?;
+        .map(|s| {
+            url_decode(s).map(|s| Rc::from(&*s)).context(
+                "Failed to extract channel handle from URL: decoded segment is invalid UTF8",
+            )
+        })
+        .context("Failed to extract channel handle from URL: URL has no segments")??;
 
     Ok(VideoMetadata {
         title: response.title,

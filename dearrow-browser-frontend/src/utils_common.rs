@@ -16,11 +16,13 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use std::borrow::Cow;
 use std::cell::{OnceCell, RefCell};
 use std::collections::VecDeque;
 use std::future::Future;
 use std::ops::Deref;
 use std::rc::Rc;
+use std::str::Utf8Error;
 
 use cloneable_errors::{bail, ErrContext, ErrorContext, ResContext, SerializableError};
 use futures::channel::oneshot;
@@ -387,4 +389,8 @@ impl<T> RcEq<T> {
     pub fn new(val: T) -> Self {
         Self(Rc::new(val))
     }
+}
+
+pub fn url_decode(input: &str) -> Result<Cow<'_, str>, Utf8Error> {
+    percent_encoding::percent_decode_str(input).decode_utf8()
 }

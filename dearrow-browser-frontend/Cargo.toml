@@ -20,6 +20,7 @@ dearrow-browser-api = { path = "../dearrow-browser-api", default-features = fals
 enumflags2.workspace = true
 futures.workspace = true
 gloo-console = "0.3.0"
+percent-encoding = "2.3.2"
 regex.workspace = true
 reqwest.workspace = true
 serde.workspace = true

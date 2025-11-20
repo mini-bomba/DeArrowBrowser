@@ -28,4 +28,4 @@ dearrow-parser = ["dep:dearrow-parser", "dep:strum"]
 dearrow-parser = { path = "../dearrow-parser", optional = true }
 strum = { workspace = true, optional = true }
 serde.workspace = true
-indexmap = { version = "2.10.0", features = ["serde"] }
+indexmap = { version = "2.12.1", features = ["serde"] }

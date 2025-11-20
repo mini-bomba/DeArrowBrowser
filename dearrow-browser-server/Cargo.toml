@@ -13,7 +13,7 @@ workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-actix-files = "0.6.6"
+actix-files = "0.6.8"
 actix-web = "4.11.0"
 alea-js = "0.1.1"
 base64 = "0.22.1"
@@ -23,18 +23,18 @@ dearrow-parser = { path = "../dearrow-parser" }
 dearrow-browser-api = { path = "../dearrow-browser-api", features = [ "dearrow-parser" ] }
 env_logger = "0.11.8"
 futures.workspace = true
-getrandom = "0.3.3"
+getrandom = "0.3.4"
 log.workspace = true
 regex.workspace = true
 reqwest.workspace = true
 serde.workspace = true
-serde_with = "3.12.0"
+serde_with = "3.16.0"
 serde_json.workspace = true
 sha2.workspace = true
-tokio = { version = "1.45.0", features = ["fs", "io-util"] }
+tokio = { version = "1.48.0", features = ["fs", "io-util"] }
 tokio-stream = { version = "0.1.17", features = ["io-util"], default-features = false }
-toml = "0.8.22"
-libc = "0.2.172"
+toml = "0.9.8"
+libc = "0.2.177"
 
 [build-dependencies]
 built.workspace = true

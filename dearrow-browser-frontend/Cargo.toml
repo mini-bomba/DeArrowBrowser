@@ -26,16 +26,16 @@ reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
-slab = "0.4.9"
+slab = "0.4.11"
 strum.workspace = true
 wasm-bindgen = "= 0.2.104" # current version in alpine repos
-wasm-bindgen-futures = "0.4.50"
+wasm-bindgen-futures = "0.4.54"
 yew = { version = "0.21.0", features = ["csr"] }
 yew-router = "0.18.0"
-yew-hooks = "0.3.3"
+yew-hooks = "0.3.4"
 
 [dependencies.web-sys]
-version = "0.3.66"
+version = "0.3.81"
 features = [
   "AbortController",
   "AbortSignal",

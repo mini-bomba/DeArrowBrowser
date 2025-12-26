@@ -142,18 +142,28 @@ pub async fn handle_to_ucid(client: &Client, handle: &str) -> Result<String, Err
         }
     };
 
-    let resp = client.get(url).send().await.context("Failed to send channel page request")?;
+    let payload = it::resolve::Input {
+        url: url.as_str(),
+        context: it::Context::default(),
+    };
+    let resp = client.post(IT_RESOLVE_URL.clone())
+        .json(&payload)
+        .send()
+        .await
+        .context("Failed to send channel resolve request")?;
     if resp.status() == 404 {
         bail!("Channel does not exist!", extend: extensions::status::NOT_FOUND.clone());
     }
-    let resp = resp.error_for_status().context("Channel page request failed")?;
-    let page = resp.text().await.context("Failed to receive the channel page")?;
+    let resp = resp.error_for_status().context("Channel resolve request failed")?;
+    let res: it::resolve::out::ResolveResult = resp.json().await.context("Failed to receive the channel page")?;
+    let ucid = res.endpoint.browse_endpoint.browse_id;
 
-    let Some(captures) = UCID_EXTRACTION_REGEX.captures(&page) else {
-        bail!("Failed to find the UCID for this channel");
-    };
+    // sanity check
+    if !UCID_REGEX.is_match(&ucid) {
+        bail!("BrowseId received from innertube is not an UCID!");
+    }
 
-    Ok(captures[1].to_owned())
+    Ok(ucid)
 }
 
 
@@ -717,6 +727,37 @@ mod it {
             
         }
         
+    }
+
+    pub mod resolve {
+        use serde::Serialize;
+
+        #[derive(Serialize, Clone)]
+        pub struct Input<'a> {
+            pub context: super::Context<'a>,
+            pub url: &'a str,
+        }
+
+        pub mod out {
+            use serde::Deserialize;
+
+            #[derive(Deserialize)]
+            pub struct ResolveResult {
+                pub endpoint: Endpoint,
+            }
+
+            #[derive(Deserialize)]
+            #[serde(rename_all="camelCase")]
+            pub struct Endpoint {
+                pub browse_endpoint: BrowseEndpoint,
+            }
+
+            #[derive(Deserialize)]
+            #[serde(rename_all="camelCase")]
+            pub struct BrowseEndpoint {
+                pub browse_id: String,
+            }
+        }
     }
 
     pub mod browse {

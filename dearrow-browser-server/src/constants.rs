@@ -41,8 +41,9 @@ pub static DB_READ_ERR:  LazyLock<ErrorContext> = LazyLock::new(|| anyhow!("Fail
 pub static DB_WRITE_ERR: LazyLock<ErrorContext> = LazyLock::new(|| anyhow!("Failed to acquire DatabaseState for writing"));
 
 // Innertube API urls
-pub static IT_PLAYER_URL: LazyLock<reqwest::Url> = LazyLock::new(|| reqwest::Url::parse("https://www.youtube.com/youtubei/v1/player").expect("Should be able to parse the IT_PLAYER_URL"));
-pub static IT_BROWSE_URL: LazyLock<reqwest::Url> = LazyLock::new(|| reqwest::Url::parse("https://www.youtube.com/youtubei/v1/browse").expect("Should be able to parse the IT_BROWSE_URL"));
+pub static IT_PLAYER_URL:  LazyLock<reqwest::Url> = LazyLock::new(|| reqwest::Url::parse("https://www.youtube.com/youtubei/v1/player").expect("Should be able to parse the IT_PLAYER_URL"));
+pub static IT_BROWSE_URL:  LazyLock<reqwest::Url> = LazyLock::new(|| reqwest::Url::parse("https://www.youtube.com/youtubei/v1/browse").expect("Should be able to parse the IT_BROWSE_URL"));
+pub static IT_RESOLVE_URL: LazyLock<reqwest::Url> = LazyLock::new(|| reqwest::Url::parse("https://www.youtube.com/youtubei/v1/navigation/resolve_url").expect("Should be able to parse the IT_RESOLVE_URL"));
 pub static YT_BASE_URL:   LazyLock<reqwest::Url> = LazyLock::new(|| reqwest::Url::parse("https://www.youtube.com/").expect("Should be able to parse the YT_BASE_URL"));
 
 // Innertube API browse modes
@@ -54,8 +55,6 @@ pub const IT_BROWSE_HOME:     BrowseMode = BrowseMode { param: "",              
 pub const IT_RELEASES_SHELF_NAME: &str = "Albums & Singles";
 
 // Youtube channel IDs and handles
-// https://stackoverflow.com/a/16326307
-pub static UCID_EXTRACTION_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"externalId":"([^"]+)""#).expect("Should be able to parse the UCID extraction regex"));
 // https://github.com/yt-dlp/yt-dlp/blob/a065086640e888e8d58c615d52ed2f4f4e4c9d18/yt_dlp/extractor/youtube.py#L518-L519
 pub static UCID_REGEX:        LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^UC(?-u:[\w-]){22}$").expect("Should be able to parse the UCID regex"));
 pub static HANDLE_REGEX:      LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^@[\w.-]{3,30}$").expect("Should be able to parse the @handle regex"));

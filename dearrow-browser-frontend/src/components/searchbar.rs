@@ -38,10 +38,7 @@ macro_rules! search_block {
 
 fn parsed_url_last_segment(url: &Url) -> Option<String> {
     url.path_segments()
-       .and_then(|it| 
-            it.filter(|s| !s.is_empty())
-              .next_back()
-       )
+       .and_then(|mut it| it.rfind(|s| !s.is_empty()))
        .map(ToString::to_string)
 }
 

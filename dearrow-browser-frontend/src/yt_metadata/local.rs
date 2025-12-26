@@ -66,8 +66,7 @@ async fn fetch_metadata(vid: &str) -> Result<VideoMetadata, ErrorContext> {
         .context("Failed to parse channel URL")?
         .path_segments()
         .context("Failed to extract channel handle from URL: not a base???")?
-        .filter(|s| !s.is_empty())
-        .next_back()
+        .rfind(|s| !s.is_empty())
         .map(|s| {
             url_decode(s).map(|s| Rc::from(&*s)).context(
                 "Failed to extract channel handle from URL: decoded segment is invalid UTF8",

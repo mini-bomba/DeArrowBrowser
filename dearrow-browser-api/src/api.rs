@@ -134,7 +134,7 @@ impl StatisticalSummary {
             min: measurements.iter().copied().reduce(f64::min).unwrap(),
             max: measurements.iter().copied().reduce(f64::max).unwrap(),
             average: measurements.iter().sum::<f64>() / (measurements.len() as f64),
-            median: if measurements.len() % 2 == 0 {
+            median: if measurements.len().is_multiple_of(2) {
                 let mid = measurements.len() / 2;
                 f64::midpoint(measurements[mid-1], measurements[mid])
             } else {

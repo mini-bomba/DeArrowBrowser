@@ -21,7 +21,7 @@ use std::{num::NonZeroUsize, rc::Rc};
 use serde::{Deserialize, Serialize};
 use strum::{EnumString, VariantNames, IntoStaticStr};
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct Settings {
     pub thumbgen_api_base_url: Rc<str>,
@@ -35,6 +35,7 @@ pub struct Settings {
     pub sponsorblock_api_base_url: Rc<str>,
     pub enable_autosearch: bool,
     pub sticky_headers: bool,
+    pub theme: Theme,
 }
 
 impl Default for Settings {
@@ -51,6 +52,27 @@ impl Default for Settings {
             sponsorblock_api_base_url: "https://sponsor.ajay.app/".into(),
             enable_autosearch: true,
             sticky_headers: false,
+            theme: Theme::default(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Serialize, Deserialize, Debug)]
+#[serde(default)]
+pub struct Theme {
+    pub enable: bool,
+    pub hue: f64,
+    pub saturation: f64,
+    pub variant: ThemeVariant,
+}
+
+impl Default for Theme {
+    fn default() -> Self {
+        Self {
+            enable: false,
+            hue: 0.,
+            saturation: 0.,
+            variant: ThemeVariant::Dark,
         }
     }
 }
@@ -64,4 +86,12 @@ pub enum TableLayout {
     Compact,
     #[serde(rename="expanded", other)]
     Expanded,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumString, IntoStaticStr, VariantNames, Debug)]
+pub enum ThemeVariant {
+    #[serde(rename="light")]
+    Light,
+    #[serde(rename="dark", other)]
+    Dark,
 }

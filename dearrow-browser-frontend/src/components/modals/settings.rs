@@ -25,7 +25,7 @@ use wasm_bindgen::JsCast;
 use web_sys::{ClipboardEvent, HtmlInputElement, HtmlSelectElement};
 use yew::prelude::*;
 
-use crate::{contexts::settings::SettingsContext, settings::TableLayout};
+use crate::{contexts::settings::SettingsContext, settings::{TableLayout, ThemeVariant}};
 
 const DISABLE_SW_TITLE: &str = "This is meant for debugging only - this disables sharing the thumbnail cache between all open tabs and makes the current tab handle all thumbnail fetching on it's own. Changes require a refresh to apply";
 const AUTOSEARCH_TITLE: &str = "If enabled, pasting valid query data or URLs into search fields will immediately trigger the search";
@@ -35,15 +35,15 @@ const STICKY_HEADERS_TITLE: &str = "This makes all headers sticky (stick to the 
 ///
 /// Takes in the name of the settings field and a function to verify the input field's value
 macro_rules! esc_callback {
-    ($name:ident, $verify_func:expr) => {
+    ($name:ident $(.$subprop:ident)*, $verify_func:expr) => {
         move |e: KeyboardEvent, settings_context| {
             if e.key() == "Escape" {
                 let settings = settings_context.settings();
                 let target: HtmlInputElement = e.target_unchecked_into();
-                target.set_value(&settings.$name.to_string());
+                target.set_value(&settings.$name$(.$subprop)*.to_string());
                 if $verify_func(&target).is_none() {
-                    target.set_value(&settings_context.default.$name.to_string());
-                    assert!($verify_func(&target).is_some(), stringify!(Default value of $name setting was invalid!));
+                    target.set_value(&settings_context.default.$name$(.$subprop)*.to_string());
+                    assert!($verify_func(&target).is_some(), stringify!(Default value of $name$(.$subprop)* setting was invalid!));
                 }
             }
         }
@@ -54,10 +54,10 @@ macro_rules! esc_callback {
 ///
 /// Takes in the name of the settings field
 macro_rules! undo_callback {
-    ($name:ident) => {
+    ($name:ident $(.$subprop:ident)*) => {
         move |_: MouseEvent, (settings_context, initial_settings)| {
             let mut settings = settings_context.settings().clone();
-            settings.$name = initial_settings.$name.clone();
+            settings.$name$(.$subprop)* = initial_settings.$name$(.$subprop)*.clone();
             settings_context.update(settings);
         }
     };
@@ -67,8 +67,11 @@ macro_rules! undo_callback {
 ///
 /// Takes in the name of the settings field, the current and the initial settings
 macro_rules! should_show_undo {
-    ($name: ident, $current_settings:expr, $initial_settings:expr) => {
-        $current_settings.$name != $initial_settings.$name
+    ($name:ident $(.$subprop:ident)*, $current_settings:expr, $initial_settings:expr) => {
+        $current_settings.$name$(.$subprop)* != $initial_settings.$name$(.$subprop)*
+    };
+    ($name:ident $(.$subprop:ident)*, $current_settings:expr, $initial_settings:expr, $epsilon:literal) => {
+        ($initial_settings.$name$(.$subprop)* - $current_settings.$name$(.$subprop)*).abs() >= $epsilon
     };
 }
 
@@ -76,10 +79,10 @@ macro_rules! should_show_undo {
 ///
 /// Takes in the name of the settings field
 macro_rules! reset_callback {
-    ($name:ident) => {
+    ($name:ident $(.$subprop:ident)*) => {
         move |_: MouseEvent, settings_context| {
             let mut settings = settings_context.settings().clone();
-            settings.$name = settings_context.default.$name.clone();
+            settings.$name$(.$subprop)* = settings_context.default.$name$(.$subprop)*.clone();
             settings_context.update(settings);
         }
     };
@@ -90,8 +93,11 @@ macro_rules! reset_callback {
 /// Takes in the name of the settings field, the current and the settings context (for default
 /// settings)
 macro_rules! should_show_reset {
-    ($name: ident, $current_settings:expr, $settings_context:expr) => {
-        $current_settings.$name != $settings_context.default.$name
+    ($name:ident $(.$subprop:ident)*, $current_settings:expr, $settings_context:expr) => {
+        $current_settings.$name$(.$subprop)* != $settings_context.default.$name$(.$subprop)*
+    };
+    ($name:ident $(.$subprop:ident)*, $current_settings:expr, $settings_context:expr, $epsilon:literal) => {
+        ($current_settings.$name$(.$subprop)* - $settings_context.default.$name$(.$subprop)*).abs() >= $epsilon
     };
 }
 
@@ -99,12 +105,12 @@ macro_rules! should_show_reset {
 ///
 /// Takes in the name of the settings field, a function to verify & parse the input field's value
 macro_rules! save_callback {
-    ($name:ident, $verify_func:ident) => {
+    ($name:ident $(.$subprop:ident)*, $verify_func:ident) => {
         move |e: Event, settings_context| {
             let target: HtmlInputElement = e.target_unchecked_into();
             if let Some(v) = $verify_func(&target) {
                 let mut settings = settings_context.settings().clone();
-                settings.$name = v;
+                settings.$name$(.$subprop)* = v;
                 settings_context.update(settings);
             }
         }
@@ -135,8 +141,15 @@ macro_rules! verify_fn {
 }
 
 macro_rules! setting_class {
-    ($initial_settings:expr, $current_settings:expr, $name:ident) => {
-        if $initial_settings.$name != $current_settings.$name {
+    ($initial_settings:expr, $current_settings:expr, $name:ident $(.$subprop:ident)*) => {
+        if should_show_undo!($name$(.$subprop)*, $current_settings, $initial_settings) {
+            classes!("setting-changed")
+        } else {
+            classes!()
+        }
+    };
+    ($initial_settings:expr, $current_settings:expr, $name:ident $(.$subprop:ident)*, $epsilon:literal) => {
+        if should_show_undo!($name$(.$subprop)*, $current_settings, $initial_settings, $epsilon) {
             classes!("setting-changed")
         } else {
             classes!()
@@ -207,6 +220,12 @@ verify_fn!(priv_userid_verify: target -> Option<Rc<str>> => {
         Ok(Some(userid.into()))
     }
 });
+verify_fn!(hue_verify: target -> f64 => {
+    target.value().parse::<f64>().map(|v| v % 360.)
+});
+verify_fn!(saturation_verify: target -> f64 => {
+    target.value().parse::<f64>().map(|v| v.clamp(0., 100.))
+});
 
 fn update_select<T>(input: &(NodeRef, T))
 where T: Into<&'static str> + Clone
@@ -237,6 +256,7 @@ pub fn SettingsModal() -> Html {
 
     let title_table_layout_ref = use_node_ref();
     let thumbnail_table_layout_ref = use_node_ref();
+    let theme_variant_ref = use_node_ref();
 
     let nonzerousize_oninput = use_callback((), move |e: InputEvent, ()| {
         fromstr_verify::<NonZeroUsize>(&e.target_unchecked_into());
@@ -246,6 +266,12 @@ pub fn SettingsModal() -> Html {
     });
     let private_user_id_oninput = use_callback((), move |e: InputEvent, ()| {
         priv_userid_verify(&e.target_unchecked_into());
+    });
+    let hue_oninput = use_callback((), move |e: InputEvent, ()| {
+        hue_verify(&e.target_unchecked_into());
+    });
+    let saturation_oninput = use_callback((), move |e: InputEvent, ()| {
+        saturation_verify(&e.target_unchecked_into());
     });
 
     let password_copy = use_callback((), move |e: Event, ()| {
@@ -263,6 +289,8 @@ pub fn SettingsModal() -> Html {
     let thumbgen_api_base_url_revert      = use_callback(settings_context.clone(), esc_callback!(thumbgen_api_base_url, baseurl_verify));
     let private_user_id_revert            = use_callback(settings_context.clone(), esc_callback!(private_user_id, priv_userid_verify));
     let sponsorblock_api_base_url_revert  = use_callback(settings_context.clone(), esc_callback!(sponsorblock_api_base_url, baseurl_verify));
+    let theme_hue_revert                  = use_callback(settings_context.clone(), esc_callback!(theme.hue, hue_verify));
+    let theme_saturation_revert           = use_callback(settings_context.clone(), esc_callback!(theme.saturation, saturation_verify));
 
     let entries_per_page_save             = use_callback(settings_context.clone(), save_callback!(entries_per_page, fromstr_verify));
     let thumbgen_api_base_url_save        = use_callback(settings_context.clone(), save_callback!(thumbgen_api_base_url, baseurl_verify));
@@ -275,6 +303,10 @@ pub fn SettingsModal() -> Html {
     let disable_sharedworker_save         = use_callback(settings_context.clone(), save_callback!(disable_sharedworker, checkbox_verify));
     let private_user_id_save              = use_callback(settings_context.clone(), save_callback!(private_user_id, priv_userid_verify));
     let sponsorblock_api_base_url_save    = use_callback(settings_context.clone(), save_callback!(sponsorblock_api_base_url, baseurl_verify));
+    let theme_enable_save                 = use_callback(settings_context.clone(), save_callback!(theme.enable, checkbox_verify));
+    let theme_hue_save                    = use_callback(settings_context.clone(), save_callback!(theme.hue, hue_verify));
+    let theme_saturation_save             = use_callback(settings_context.clone(), save_callback!(theme.saturation, saturation_verify));
+    let theme_variant_save                = use_callback(settings_context.clone(), save_callback!(theme.variant, fromstr_verify));
 
     let entries_per_page_undo             = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(entries_per_page));
     let thumbgen_api_base_url_undo        = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(thumbgen_api_base_url));
@@ -287,6 +319,10 @@ pub fn SettingsModal() -> Html {
     let disable_sharedworker_undo         = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(disable_sharedworker));
     let private_user_id_undo              = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(private_user_id));
     let sponsorblock_api_base_url_undo    = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(sponsorblock_api_base_url));
+    let theme_enable_undo                 = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(theme.enable));
+    let theme_hue_undo                    = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(theme.hue));
+    let theme_saturation_undo             = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(theme.saturation));
+    let theme_variant_undo                = use_callback((settings_context.clone(), initial_settings.clone()), undo_callback!(theme.variant));
 
     let entries_per_page_reset            = use_callback(settings_context.clone(), reset_callback!(entries_per_page));
     let thumbgen_api_base_url_reset       = use_callback(settings_context.clone(), reset_callback!(thumbgen_api_base_url));
@@ -299,11 +335,16 @@ pub fn SettingsModal() -> Html {
     let disable_sharedworker_reset        = use_callback(settings_context.clone(), reset_callback!(disable_sharedworker));
     let private_user_id_reset             = use_callback(settings_context.clone(), reset_callback!(private_user_id));
     let sponsorblock_api_base_url_reset   = use_callback(settings_context.clone(), reset_callback!(sponsorblock_api_base_url));
+    let theme_enable_reset                = use_callback(settings_context.clone(), reset_callback!(theme.enable));
+    let theme_hue_reset                   = use_callback(settings_context.clone(), reset_callback!(theme.hue));
+    let theme_saturation_reset            = use_callback(settings_context.clone(), reset_callback!(theme.saturation));
+    let theme_variant_reset               = use_callback(settings_context.clone(), reset_callback!(theme.variant));
 
 
     // ~value doesnt work for <select>
-    use_effect_with((title_table_layout_ref.clone(), current_settings.title_table_layout), update_select);
+    use_effect_with((title_table_layout_ref.clone(),     current_settings.title_table_layout), update_select);
     use_effect_with((thumbnail_table_layout_ref.clone(), current_settings.thumbnail_table_layout), update_select);
+    use_effect_with((theme_variant_ref.clone(),          current_settings.theme.variant), update_select);
 
     html! {
         <div id="settings-modal">
@@ -341,7 +382,9 @@ pub fn SettingsModal() -> Html {
                     onchange={title_table_layout_save}
                     ref={title_table_layout_ref}
                 >
-                    {for TableLayout::VARIANTS.iter().map(|&name| html!{ <option key={name}>{name}</option> })}
+                    for name in TableLayout::VARIANTS {
+                        <option key={*name}>{*name}</option>
+                    }
                 </select>
                 <div class="setting-actions">
                     if should_show_undo!(title_table_layout, current_settings, initial_settings) {
@@ -388,7 +431,9 @@ pub fn SettingsModal() -> Html {
                     onchange={thumbnail_table_layout_save}
                     ref={thumbnail_table_layout_ref}
                 >
-                    {for TableLayout::VARIANTS.iter().map(|&name| html!{ <option key={name}>{name}</option> })}
+                    for name in TableLayout::VARIANTS {
+                        <option key={*name}>{*name}</option>
+                    }
                 </select>
                 <div class="setting-actions">
                     if should_show_undo!(thumbnail_table_layout, current_settings, initial_settings) {
@@ -450,6 +495,136 @@ pub fn SettingsModal() -> Html {
                         >{"🔄"}</span>
                     }
                 </div>
+            </fieldset>
+            <fieldset>
+                <legend>{"Theming"}</legend>
+                <label for="theme_enable">{"Enable custom HSL theming: "}</label>
+                <input 
+                    class={setting_class!(initial_settings, current_settings, theme.enable)} 
+                    id="theme_enable" 
+                    type="checkbox"
+                    onchange={theme_enable_save} 
+                    ~checked={current_settings.theme.enable} 
+                />
+                <div class="setting-actions">
+                    if should_show_undo!(theme.enable, current_settings, initial_settings) {
+                        <span 
+                            class="clickable" title="Undo"
+                            onclick={theme_enable_undo}
+                        >{"↩️"}</span>
+                    }
+                    if should_show_reset!(theme.enable, current_settings, settings_context) {
+                        <span 
+                            class="clickable" title="Reset to default"
+                            onclick={theme_enable_reset}
+                        >{"🔄"}</span>
+                    }
+                </div>
+                if current_settings.theme.enable {
+                    <label for="theme_hue">{"Theme hue: "}</label>
+                    <div class="setting-slider">
+                        <input 
+                            class={setting_class!(initial_settings, current_settings, theme.hue, 0.001)} 
+                            id="theme_hue" 
+                            type="range"
+                            min="0"
+                            max="360"
+                            step="0.001"
+                            onchange={&theme_hue_save} 
+                            ~value={current_settings.theme.hue.to_string()} 
+                        />
+                        <input 
+                            class={setting_class!(initial_settings, current_settings, theme.hue, 0.001)} 
+                            id="theme_hue" 
+                            type="number"
+                            min="0"
+                            max="360"
+                            step="0.001"
+                            oninput={hue_oninput} 
+                            onkeydown={theme_hue_revert} 
+                            onchange={theme_hue_save} 
+                            ~value={current_settings.theme.hue.to_string()} 
+                        />
+                    </div>
+                    <div class="setting-actions">
+                        if should_show_undo!(theme.hue, current_settings, initial_settings, 0.001) {
+                            <span 
+                                class="clickable" title="Undo"
+                                onclick={theme_hue_undo}
+                            >{"↩️"}</span>
+                        }
+                        if should_show_reset!(theme.hue, current_settings, settings_context, 0.001) {
+                            <span 
+                                class="clickable" title="Reset to default"
+                                onclick={theme_hue_reset}
+                            >{"🔄"}</span>
+                        }
+                    </div>
+                    <label for="theme_saturation">{"Theme saturation: "}</label>
+                    <div class="setting-slider">
+                        <input 
+                            class={setting_class!(initial_settings, current_settings, theme.saturation, 0.001)} 
+                            id="theme_saturation" 
+                            type="range"
+                            min="0"
+                            max="100"
+                            step="0.001"
+                            onchange={&theme_saturation_save} 
+                            ~value={current_settings.theme.saturation.to_string()} 
+                        />
+                        <input 
+                            class={setting_class!(initial_settings, current_settings, theme.saturation, 0.001)} 
+                            id="theme_saturation" 
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.001"
+                            oninput={saturation_oninput} 
+                            onkeydown={theme_saturation_revert} 
+                            onchange={theme_saturation_save} 
+                            ~value={current_settings.theme.saturation.to_string()} 
+                        />
+                    </div>
+                    <div class="setting-actions">
+                        if should_show_undo!(theme.saturation, current_settings, initial_settings, 0.001) {
+                            <span 
+                                class="clickable" title="Undo"
+                                onclick={theme_saturation_undo}
+                            >{"↩️"}</span>
+                        }
+                        if should_show_reset!(theme.saturation, current_settings, settings_context, 0.001) {
+                            <span 
+                                class="clickable" title="Reset to default"
+                                onclick={theme_saturation_reset}
+                            >{"🔄"}</span>
+                        }
+                    </div>
+                    <label for="theme_variant">{"Theme variant: "}</label>
+                    <select 
+                        id="theme_variant"
+                        class={setting_class!(initial_settings, current_settings, theme.variant)} 
+                        onchange={theme_variant_save}
+                        ref={theme_variant_ref}
+                    >
+                        for name in ThemeVariant::VARIANTS {
+                            <option key={*name}>{*name}</option>
+                        }
+                    </select>
+                    <div class="setting-actions">
+                        if should_show_undo!(theme.variant, current_settings, initial_settings) {
+                            <span 
+                                class="clickable" title="Undo"
+                                onclick={theme_variant_undo}
+                            >{"↩️"}</span>
+                        }
+                        if should_show_reset!(theme.variant, current_settings, settings_context) {
+                            <span 
+                                class="clickable" title="Reset to default"
+                                onclick={theme_variant_reset}
+                            >{"🔄"}</span>
+                        }
+                    </div>
+                }
             </fieldset>
             <fieldset>
                 <legend>{"Site behaviour"}</legend>

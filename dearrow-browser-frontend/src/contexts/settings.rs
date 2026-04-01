@@ -23,6 +23,7 @@ use wasm_bindgen::prelude::Closure;
 use web_sys::{window, StorageEvent};
 use yew::{html::ChildrenProps, prelude::*};
 
+use super::theme::ThemeRenderer;
 use super::user::UserContextProvider;
 use crate::settings::Settings;
 use crate::utils_common::EventListener;
@@ -128,6 +129,7 @@ impl Component for SettingsProvider {
     fn view(&self, ctx: &Context<Self>) -> Html {
         html! {
             <ContextProvider<SettingsContext> context={self.context.clone()}>
+                <ThemeRenderer />
                 <UserContextProvider>
                     {ctx.props().children.clone()}
                 </UserContextProvider>

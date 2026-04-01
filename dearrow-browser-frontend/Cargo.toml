@@ -63,6 +63,8 @@ features = [
   "Response",
   "SharedWorker",
   "SharedWorkerGlobalScope",
+  "Storage",
+  "StorageEvent",
   "Url",
 ]
 

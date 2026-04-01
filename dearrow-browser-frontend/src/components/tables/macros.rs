@@ -38,7 +38,6 @@ pub fn bar_prepender_if_not_empty(html: Html) -> Html {
     }
 }
 
-#[macro_export]
 macro_rules! score_col {
     ($flags_func:ident, $detail:expr, $expanded:expr) => {
         if $detail.votes_missing {
@@ -71,8 +70,8 @@ macro_rules! score_col {
         }
     };
 }
+pub(super) use score_col;
 
-#[macro_export]
 macro_rules! uuid_cell {
     ($uuid:expr, $multiline:expr) => {
         html! {
@@ -84,8 +83,8 @@ macro_rules! uuid_cell {
         }
     };
 }
+pub(super) use uuid_cell;
 
-#[macro_export]
 macro_rules! userid_cell {
     ($userid:expr, $rows:expr, $multiline:expr) => {
         html! {
@@ -97,8 +96,8 @@ macro_rules! userid_cell {
         }
     };
 }
+pub(super) use userid_cell;
 
-#[macro_export]
 macro_rules! username_cell {
     ($username:expr, $rows:expr, $multiline:expr) => {
         if let Some(ref name) = $username {
@@ -112,3 +111,4 @@ macro_rules! username_cell {
         }
     };
 }
+pub(super) use username_cell;

@@ -25,7 +25,7 @@ use web_sys::HtmlInputElement;
 use yew::prelude::*;
 use yew_router::prelude::*;
 
-use crate::contexts::SettingsContext;
+use crate::contexts::settings::SettingsContext;
 use crate::hooks::use_location_state;
 use crate::hooks::ScopeExt;
 use crate::pages::LocationState;

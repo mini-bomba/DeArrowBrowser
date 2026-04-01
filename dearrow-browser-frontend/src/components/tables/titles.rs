@@ -20,21 +20,20 @@ use chrono::DateTime;
 use dearrow_browser_api::unsync::ApiTitle;
 use yew::{classes, component, html, use_callback, use_context, Html, MouseEvent};
 
-use crate::{
-    components::{
-        icon::{Icon, IconType},
-        modals::voting::{VotingDetail, VotingModal},
-        tables::r#trait::{RowProps, TableRender},
-        youtube::YoutubeVideoLink,
+use super::macros::*;
+use crate::components::{
+    icon::{Icon, IconType},
+    modals::{
+        voting::{VotingDetail, VotingModal},
+        ModalMessage, ModalRendererControls,
     },
-    contexts::{ModalMessage, ModalRendererControls, SettingsContext, UserContext},
-    score_col,
-    settings::{Settings, TableLayout},
-    userid_cell, username_cell,
-    utils_app::render_datetime,
-    uuid_cell,
-    yt_metadata::components::OriginalTitle,
+    tables::r#trait::{RowProps, TableRender},
+    youtube::YoutubeVideoLink,
 };
+use crate::contexts::{settings::SettingsContext, user::UserContext};
+use crate::settings::{Settings, TableLayout};
+use crate::utils_app::render_datetime;
+use crate::yt_metadata::components::OriginalTitle;
 
 #[derive(PartialEq, Eq, Clone, Copy, Default)]
 pub struct TitleTableSettings {

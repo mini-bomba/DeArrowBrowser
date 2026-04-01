@@ -16,12 +16,15 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-$gray: #333;
-$dark-gray: #222;
+$light-gray: #333;
+$gray: #222;
+$dark-gray: #111;
 $white: #eee;
+$semitransparent: #0007;
+$mid: #777;
 
 %headercolors {
-  background-color: #222;
+  background-color: $gray;
 }
 
 %flex-column {
@@ -56,7 +59,7 @@ body {
   min-height: 100vh;
   @extend %flex-column;
   color: $white;
-  background: #111;
+  background: $dark-gray;
   font-family: sans-serif;
 
   > * {
@@ -100,7 +103,7 @@ body {
   }
 
   .header-badge {
-    background-color: $gray;
+    background-color: $light-gray;
     border-radius: 0.5rem;
     padding: 0.5rem;
   }
@@ -207,7 +210,7 @@ table caption {
 
     table {
       border-collapse: collapse;
-      border: 1px solid $gray;
+      border: 1px solid $light-gray;
     }
 
     .page-details table {
@@ -269,19 +272,19 @@ table caption {
     }
 
     tr {
-      border-top: 1px solid $gray;
-      border-bottom: 1px solid $gray;
+      border-top: 1px solid $light-gray;
+      border-bottom: 1px solid $light-gray;
 
       &.header {
-        border-bottom: 2px solid $gray;
+        border-bottom: 2px solid $light-gray;
         border-top: none;
 
         &.sticky {
           position: sticky;
           top: calc(min(10vh, 3rem) + 4.5rem);
-          background: #111;
+          background: $dark-gray;
           border: none;
-          outline: 1px solid $gray;
+          outline: 1px solid $light-gray;
           z-index: 1;
         }
       }
@@ -344,13 +347,13 @@ table caption {
 
     > * {
       padding: 0.25rem;
-      background-color: #0007;
+      background-color: $semitransparent;
     }
   }
 }
 
 .info-table {
-  border: 1px solid $gray;
+  border: 1px solid $light-gray;
   border-radius: 0.25rem;
   display: flex;
   flex-direction: column;
@@ -359,7 +362,7 @@ table caption {
     padding: 0.5rem;
 
     &:not(:first-child) {
-      border-top: 1px solid $gray;
+      border-top: 1px solid $light-gray;
     }
   }
 }
@@ -376,7 +379,7 @@ table caption {
 
   > .modal-background {
     z-index: 0;
-    background-color: #0009;
+    background-color: $semitransparent;
     position: absolute;
     top: 0;
     left: 0;
@@ -389,7 +392,7 @@ table caption {
     position: relative;
     max-width: 60vw;
     max-height: 80vh;
-    background-color: #222;
+    background-color: $gray;
     border-radius: 0.5rem;
     overflow: auto;
     padding: 1.5rem;
@@ -558,7 +561,7 @@ table caption {
   &.sticky {
     position: sticky;
     top: calc(min(10vh, 3rem) + 2rem);
-    background: #111;
+    background: $dark-gray;
     z-index: 1;
   }
   
@@ -566,7 +569,7 @@ table caption {
     padding: 0.5rem;
 
     &.table-mode {
-      border: 1px solid $gray;
+      border: 1px solid $light-gray;
       border-bottom: none;
       border-radius: 0.25rem 0.25rem 0 0;
     }
@@ -598,11 +601,11 @@ a.undecorated-link {
   @extend .clickable;
 
   &:hover {
-    background-color: $dark-gray;
+    background-color: $gray;
   }
 
   &[selected], &:active {
-    background-color: $gray;
+    background-color: $light-gray;
   }
 }
 
@@ -613,7 +616,7 @@ a.undecorated-link {
 
   > * {
     padding: 0.5em 0.75em;
-    border: 1px solid $gray;
+    border: 1px solid $light-gray;
 
     &:first-child {
       border-top-left-radius: 0.5em;
@@ -643,23 +646,23 @@ a {
 
 fieldset {
   color: $white;
-  border-color: #888;
-  border: 1px solid $gray;
+  border-color: $mid;
+  border: 1px solid $light-gray;
   border-radius: .25rem;
 }
 
 input:not([type="checkbox"]), textarea {
   @extend fieldset;
-  background-color: #111;
+  background-color: $dark-gray;
   appearance: none;
 
   &::placeholder {
-    color: #888;
+    color: $mid;
   }
 }
 
 fieldset {
-  border-color: #888;
+  border-color: $mid;
 }
 
 #settings-modal {
@@ -735,10 +738,10 @@ fieldset {
     appearance: none;
     width: 100%;
     height: 1.5rem;
-    background-color: #222;
+    background-color: $gray;
 
     &::-webkit-progress-bar {
-      background-color: #222;
+      background-color: $gray;
     }
 
     // https://css-tricks.com/html5-progress-element/
@@ -750,7 +753,7 @@ fieldset {
     }
 
     &:indeterminate::-webkit-progress-value, &:indeterminate::-moz-progress-bar {
-      background-color: #777
+      background-color: $mid
     }
   }
 }

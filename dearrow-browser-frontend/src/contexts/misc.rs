@@ -1,7 +1,7 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2024-2025 mini_bomba
-*
+*  Copyright (C) 2023-2024 mini_bomba
+*  
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
 *  the Free Software Foundation, either version 3 of the License, or
@@ -16,13 +16,29 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub mod casual;
-mod macros;
-pub mod remote;
-pub mod renderer;
-pub mod switch;
-pub mod thumbs;
-pub mod titles;
-pub mod r#trait;
-pub mod users;
-pub mod warnings;
+use std::rc::Rc;
+
+use dearrow_browser_api::unsync::StatusResponse;
+use reqwest::Url;
+
+use crate::utils_common::ReqwestUrlExt;
+
+#[derive(Clone, PartialEq)]
+pub struct WindowContext {
+    pub origin: Url,
+}
+
+impl WindowContext {
+    #[must_use]
+    pub fn origin_join_segments<I>(&self, segments: I) -> Url
+    where I: IntoIterator,
+    I::Item: AsRef<str>,
+    {
+        self.origin.join_segments(segments).expect("WindowContext.origin should be a valid base")
+    }
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub struct UpdateClock(pub bool);
+
+pub type StatusContext = Option<Rc<StatusResponse>>;

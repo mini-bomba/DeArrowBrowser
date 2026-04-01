@@ -23,18 +23,20 @@ use wasm_bindgen::prelude::Closure;
 use yew::platform::spawn_local;
 use yew::prelude::*;
 
-use crate::{
-    built_info,
-    constants::{self, COMMIT_LINK},
-    contexts::{StatusContext, WindowContext},
-    thumbnails::{
-        common::ThumbgenStats,
-        components::{Thumbgen, ThumbgenContext, ThumbgenRefreshContext},
-    },
-    utils_app::{render_datetime, RenderNumber, SimpleLoadState},
-    utils_common::Interval,
-    worker_api::WorkerStats,
-    worker_client::{self, WorkerState}, yt_metadata::{common::MetadataCacheStats, components::{MetadataCache, MetadataCacheContext}},
+use crate::built_info;
+use crate::constants::{self, COMMIT_LINK};
+use crate::contexts::misc::{StatusContext, WindowContext};
+use crate::thumbnails::{
+    common::ThumbgenStats,
+    components::{Thumbgen, ThumbgenContext, ThumbgenRefreshContext},
+};
+use crate::utils_app::{render_datetime, RenderNumber, SimpleLoadState};
+use crate::utils_common::Interval;
+use crate::worker_api::WorkerStats;
+use crate::worker_client::{self, WorkerState};
+use crate::yt_metadata::{
+    common::MetadataCacheStats,
+    components::{MetadataCache, MetadataCacheContext},
 };
 
 macro_rules! number_hoverswitch {

@@ -23,7 +23,7 @@ use crate::{
         r#trait::TableRender,
         switch::{PageSelect, Tabs},
     },
-    contexts::SettingsContext,
+    contexts::settings::SettingsContext,
     hooks::use_location_state,
     utils_common::RcEq,
 };

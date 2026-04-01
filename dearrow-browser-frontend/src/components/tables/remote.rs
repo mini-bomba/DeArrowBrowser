@@ -27,17 +27,15 @@ use yew::{
     Properties,
 };
 
-use crate::{
-    components::tables::{
-        r#trait::TableRender,
-        renderer::{PaginatedTableRenderer, TableRenderer},
-        switch::Tabs,
-    },
-    constants::REQWEST_CLIENT,
-    contexts::WindowContext,
-    utils_app::{CancelHandle, CancelWatcher},
-    utils_common::{RcEq, ReqwestResponseExt},
+use crate::components::tables::{
+    r#trait::TableRender,
+    renderer::{PaginatedTableRenderer, TableRenderer},
+    switch::Tabs,
 };
+use crate::constants::REQWEST_CLIENT;
+use crate::contexts::misc::WindowContext;
+use crate::utils_app::{CancelHandle, CancelWatcher};
+use crate::utils_common::{RcEq, ReqwestResponseExt};
 
 pub trait Endpoint: Sized + Eq + 'static {
     type Item: TableRender;

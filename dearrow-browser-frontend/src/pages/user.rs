@@ -31,7 +31,7 @@ use crate::components::tables::switch::TableModeSwitch;
 use crate::components::tables::thumbs::ThumbTableSettings;
 use crate::components::tables::titles::TitleTableSettings;
 use crate::components::tables::warnings::WarningTableSettings;
-use crate::contexts::{StatusContext, WindowContext};
+use crate::contexts::misc::{StatusContext, WindowContext};
 use crate::hooks::{use_async_suspension, use_location_state};
 use crate::utils_app::{render_ms_delta, sbb_userid_link};
 use crate::utils_common::{api_request, ReqwestUrlExt};

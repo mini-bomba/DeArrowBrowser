@@ -18,10 +18,25 @@
 
 use chrono::DateTime;
 use dearrow_browser_api::unsync::ApiThumbnail;
-use yew::{classes, component, html, use_callback, use_context, use_memo, Callback, Html, MouseEvent};
+use yew::{
+    classes, component, html, use_callback, use_context, use_memo, Callback, Html, MouseEvent,
+};
 
-use crate::{components::{icon::{Icon, IconType}, modals::{thumbnail::ThumbnailModal, voting::{VotingDetail, VotingModal}}, tables::r#trait::{RowProps, TableRender}, youtube::YoutubeVideoLink}, contexts::{ModalMessage, ModalRendererControls, SettingsContext, UserContext}, score_col, settings::{Settings, TableLayout}, thumbnails::components::{ContainerType, Thumbnail, ThumbnailCaption}, userid_cell, username_cell, utils_app::render_datetime, uuid_cell};
-
+use super::macros::*;
+use crate::components::{
+    icon::{Icon, IconType},
+    modals::{
+        thumbnail::ThumbnailModal,
+        voting::{VotingDetail, VotingModal},
+        ModalMessage, ModalRendererControls,
+    },
+    tables::r#trait::{RowProps, TableRender},
+    youtube::YoutubeVideoLink,
+};
+use crate::contexts::{settings::SettingsContext, user::UserContext};
+use crate::settings::{Settings, TableLayout};
+use crate::thumbnails::components::{ContainerType, Thumbnail, ThumbnailCaption};
+use crate::utils_app::render_datetime;
 
 #[derive(PartialEq, Eq, Clone, Copy, Default)]
 pub struct ThumbTableSettings {

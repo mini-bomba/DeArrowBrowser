@@ -24,10 +24,13 @@ use reqwest::Url;
 use yew::prelude::*;
 use dearrow_browser_api::unsync::{ApiThumbnail, ApiTitle};
 
-use crate::components::async_task_manager::{AsyncTaskFuture, AsyncTaskResult};
-use crate::components::icon::{Icon, IconType};
+use crate::components::{
+    async_task_manager::{AsyncTaskControl, AsyncTaskFuture, AsyncTaskResult},
+    icon::{Icon, IconType},
+    modals::{ModalMessage, ModalRendererControls},
+};
 use crate::constants::{REQWEST_CLIENT, SBS_BRANDING_ENDPOINT, USER_AGENT};
-use crate::contexts::{AsyncTaskControl, ModalRendererControls, ModalMessage, SettingsContext, UserContext};
+use crate::contexts::{settings::SettingsContext, user::UserContext};
 use crate::sbserver::{PostBrandingBody, SBServerThumbnail, SBServerTitle};
 use crate::thumbnails::components::{Thumbnail, ThumbnailCaption};
 use crate::utils_common::ReqwestUrlExt;

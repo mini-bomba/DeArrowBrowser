@@ -25,7 +25,7 @@ use wasm_bindgen::JsCast;
 use web_sys::{ClipboardEvent, HtmlInputElement, HtmlSelectElement};
 use yew::prelude::*;
 
-use crate::{contexts::SettingsContext, settings::TableLayout};
+use crate::{contexts::settings::SettingsContext, settings::TableLayout};
 
 const DISABLE_SW_TITLE: &str = "This is meant for debugging only - this disables sharing the thumbnail cache between all open tabs and makes the current tab handle all thumbnail fetching on it's own. Changes require a refresh to apply";
 const AUTOSEARCH_TITLE: &str = "If enabled, pasting valid query data or URLs into search fields will immediately trigger the search";

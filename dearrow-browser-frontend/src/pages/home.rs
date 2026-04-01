@@ -25,7 +25,7 @@ use yew::prelude::*;
 use crate::components::searchbar::Searchbar;
 use crate::components::tables::remote::{Endpoint, RemoteUnpaginatedTable};
 use crate::components::tables::switch::*;
-use crate::contexts::{SettingsContext, StatusContext};
+use crate::contexts::{misc::StatusContext, settings::SettingsContext};
 use crate::hooks::use_location_state;
 use crate::utils_common::ReqwestUrlExt;
 

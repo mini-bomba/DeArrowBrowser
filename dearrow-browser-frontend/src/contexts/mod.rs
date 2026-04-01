@@ -1,7 +1,7 @@
 /* This file is part of the DeArrow Browser project - https://github.com/mini-bomba/DeArrowBrowser
 *
-*  Copyright (C) 2024-2025 mini_bomba
-*
+*  Copyright (C) 2026 mini_bomba
+*  
 *  This program is free software: you can redistribute it and/or modify
 *  it under the terms of the GNU Affero General Public License as published by
 *  the Free Software Foundation, either version 3 of the License, or
@@ -16,13 +16,6 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-pub mod casual;
-mod macros;
-pub mod remote;
-pub mod renderer;
-pub mod switch;
-pub mod thumbs;
-pub mod titles;
-pub mod r#trait;
-pub mod users;
-pub mod warnings;
+pub mod misc;
+pub mod settings;
+pub mod user;

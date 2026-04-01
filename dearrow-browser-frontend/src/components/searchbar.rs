@@ -22,8 +22,8 @@ use yew::prelude::*;
 use yew_router::{hooks::use_navigator, prelude::Link};
 
 use crate::constants::{HANDLE_REGEX, SHA256_REGEX, UCID_REGEX, UUID_REGEX, VIDEO_ID_REGEX};
+use crate::contexts::settings::SettingsContext;
 use crate::pages::MainRoute;
-use crate::contexts::SettingsContext;
 
 macro_rules! search_block {
     ($id:expr, $name:expr, $keydown_callback:expr, $input_callback:expr) => {

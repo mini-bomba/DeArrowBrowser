@@ -15,10 +15,18 @@
 *  You should have received a copy of the GNU Affero General Public License
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-use yew::prelude::*;
-use crate::{components::{async_task_manager::AsyncTaskState, icon::{Icon, IconType}}, contexts::AsyncTaskControl, AsyncTaskList};
 
-fn create_dismiss_callback(async_task_control: AsyncTaskControl, id: usize) -> Callback<MouseEvent> {
+use yew::prelude::*;
+
+use crate::components::{
+    async_task_manager::{AsyncTaskControl, AsyncTaskList, AsyncTaskState},
+    icon::{Icon, IconType},
+};
+
+fn create_dismiss_callback(
+    async_task_control: AsyncTaskControl,
+    id: usize,
+) -> Callback<MouseEvent> {
     Callback::from(move |_| async_task_control.dismiss_task(id))
 }
 

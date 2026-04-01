@@ -27,26 +27,24 @@ use strum::{IntoStaticStr, VariantArray};
 use yew::prelude::*;
 use yew_router::prelude::{LocationHandle, RouterScopeExt};
 
-use crate::{
-    components::{
-        tables::{
-            casual::CasualTableSettings,
-            remote::{Endpoint, RemotePaginatedTable},
-            switch::TableModeSwitch,
-            thumbs::ThumbTableSettings,
-            titles::TitleTableSettings,
-        },
-        youtube::YoutubeIframe,
+use crate::components::{
+    tables::{
+        casual::CasualTableSettings,
+        remote::{Endpoint, RemotePaginatedTable},
+        switch::TableModeSwitch,
+        thumbs::ThumbTableSettings,
+        titles::TitleTableSettings,
     },
-    contexts::WindowContext,
-    hooks::ScopeExt,
-    thumbnails::components::{Thumbnail, ThumbnailCaption},
-    utils_app::{sbb_video_link, SimpleLoadState},
-    utils_common::{api_request, RcEq, ReqwestUrlExt},
-    yt_metadata::{
-        common::youtu_be_link,
-        components::{ChannelLink, OriginalTitle},
-    },
+    youtube::YoutubeIframe,
+};
+use crate::contexts::misc::WindowContext;
+use crate::hooks::ScopeExt;
+use crate::thumbnails::components::{Thumbnail, ThumbnailCaption};
+use crate::utils_app::{sbb_video_link, SimpleLoadState};
+use crate::utils_common::{api_request, RcEq, ReqwestUrlExt};
+use crate::yt_metadata::{
+    common::youtu_be_link,
+    components::{ChannelLink, OriginalTitle},
 };
 
 #[derive(Properties, PartialEq)]

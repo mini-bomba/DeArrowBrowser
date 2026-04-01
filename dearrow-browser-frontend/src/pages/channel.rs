@@ -34,7 +34,7 @@ use crate::{
         switch::*,
     },
     constants::REQWEST_CLIENT,
-    contexts::WindowContext,
+    contexts::misc::WindowContext,
     hooks::use_location_state,
     utils_app::{CancelHandle, CancelWatcher, SimpleLoadState},
     utils_common::{ReqwestResponseExt, ReqwestUrlExt},

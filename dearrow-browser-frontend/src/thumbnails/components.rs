@@ -23,11 +23,12 @@ use reqwest::Url;
 use yew::html::ChildrenProps;
 use yew::prelude::*;
 
+use crate::components::modals::ModalRendererControls;
 use crate::components::modals::{thumbnail::ThumbnailModal, ModalMessage};
+use crate::contexts::settings::SettingsContext;
 use crate::hooks::use_async_suspension;
 use crate::worker_api::{WorkerRequest, WorkerSetting};
 use crate::worker_client::{Error, WorkerState};
-use crate::{ModalRendererControls, SettingsContext};
 
 use super::common::{ThumbgenStats, ThumbnailKey};
 use super::local::{LocalBlobLink, LocalThumbGenerator};

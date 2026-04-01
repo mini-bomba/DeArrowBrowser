@@ -37,7 +37,7 @@ use yew::{html::ChildrenProps, Callback, Component, ContextProvider};
 
 use crate::{
     built_info,
-    contexts::SettingsContext,
+    contexts::settings::SettingsContext,
     utils_app::SimpleLoadState,
     utils_common::RcEq,
     utils_common::{make_jsstring, sleep, EventCellsExt, EventListener, Interval},

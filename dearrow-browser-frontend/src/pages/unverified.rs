@@ -44,7 +44,7 @@ impl Endpoint for UnverifiedTitles {
     }
 }
 
-#[function_component]
+#[component]
 pub fn UnverifiedPage() -> Html {
     let item_count: UseStateHandle<Option<usize>> = use_state_eq(|| None);
     let callback = {

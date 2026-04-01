@@ -155,7 +155,7 @@ pub struct PageSelectProps {
     pub page_count: usize,
 }
 
-#[function_component]
+#[component]
 pub fn PageSelect<T: Tabs>(props: &PageSelectProps) -> Html {
     let state_handle = use_location_state();
     let mut state = state_handle.get_state::<T>();

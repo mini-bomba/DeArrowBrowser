@@ -16,7 +16,7 @@
 *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use yew::{classes, function_component, html, use_context, AttrValue, Html, Properties};
+use yew::{classes, component, html, use_context, AttrValue, Html, Properties};
 
 use crate::{
     components::tables::{
@@ -50,7 +50,7 @@ impl<T: TableRender> PartialEq for TableRendererProps<T> {
 
 impl<T: TableRender> Eq for TableRendererProps<T> {}
 
-#[function_component]
+#[component]
 pub fn TableRenderer<T: TableRender>(props: &TableRendererProps<T>) -> Html {
     let settings_context: SettingsContext =
         use_context().expect("SettingsContext should be available");
@@ -93,7 +93,7 @@ impl<T: TableRender> PartialEq for PaginatedTableRendererProps<T> {
 
 impl<T: TableRender> Eq for PaginatedTableRendererProps<T> {}
 
-#[function_component]
+#[component]
 pub fn PaginatedTableRenderer<T: TableRender, S: Tabs>(props: &PaginatedTableRendererProps<T>) -> Html {
     let state = use_location_state().get_state::<S>();
     let settings_context: SettingsContext =

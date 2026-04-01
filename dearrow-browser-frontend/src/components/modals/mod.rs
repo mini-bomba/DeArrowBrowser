@@ -56,7 +56,7 @@ pub struct ModalRendererProps {
 
 pub type ModalRendererControls = Callback<ModalMessage, ()>;
 
-#[function_component]
+#[component]
 pub fn ModalRenderer(props: &ModalRendererProps) -> Html {
     let state = use_reducer(ModalState::default);
     let callback = {
@@ -77,7 +77,7 @@ struct ModalContainersProps {
     state: UseReducerHandle<ModalState>,
 }
 
-#[function_component]
+#[component]
 fn ModalContainers(props: &ModalContainersProps) -> Html {
     html! {
         <>
@@ -92,7 +92,7 @@ struct ModalContainerProps {
     index: usize,
 }
 
-#[function_component]
+#[component]
 fn ModalContainer(props: &ModalContainerProps) -> Html {
     let close_top = {
         let state = props.state.clone();

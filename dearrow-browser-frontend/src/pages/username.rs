@@ -20,7 +20,7 @@ use dearrow_browser_api::unsync::User;
 use serde::{Deserialize, Serialize};
 use strum::{IntoStaticStr, VariantArray};
 use yew::{
-    function_component, html, use_callback, use_state_eq, AttrValue, Html, Properties,
+    component, html, use_callback, use_state_eq, AttrValue, Html, Properties,
     UseStateHandle,
 };
 
@@ -59,7 +59,7 @@ pub struct UsernameProps {
     pub username: AttrValue,
 }
 
-#[function_component]
+#[component]
 pub fn UsernamePage(props: &UsernameProps) -> Html {
     let item_count: UseStateHandle<Option<usize>> = use_state_eq(|| None);
     let callback = {

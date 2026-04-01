@@ -65,7 +65,7 @@ pub struct IconProps {
     pub id: Option<AttrValue>,
 }
 
-#[function_component]
+#[component]
 pub fn Icon(props: &IconProps) -> Html {
     let mut class = match props.r#type {
         IconType::DABLogo           => classes!("icon", "icon-dablogo"),

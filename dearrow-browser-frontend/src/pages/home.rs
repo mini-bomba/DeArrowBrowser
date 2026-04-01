@@ -118,7 +118,7 @@ impl Endpoint for HomePageWarnings {
     }
 }
 
-#[function_component]
+#[component]
 pub fn HomePage() -> Html {
     let status: StatusContext = use_context().expect("Status should be available");
     let settings_ctx: SettingsContext = use_context().expect("Settings should be available");

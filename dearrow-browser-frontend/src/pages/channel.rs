@@ -257,7 +257,7 @@ impl Endpoint for ChannelCasualTitles {
     }
 }
 
-#[function_component]
+#[component]
 pub fn ChannelPage(props: &ChannelPageProps) -> Html {
     let state = use_location_state().get_state::<ChannelPageTab>();
     let entry_count: UseStateHandle<Option<usize>> = use_state_eq(|| None);

@@ -266,7 +266,7 @@ struct UUIDTitleProps {
     title: Rc<ApiTitle>,
 }
 
-#[function_component]
+#[component]
 fn UUIDTitle(props: &UUIDTitleProps) -> Html {
     let title = &props.title;
 
@@ -356,7 +356,7 @@ struct UUIDThumbnailProps {
     thumbnail: Rc<ApiThumbnail>,
 }
 
-#[function_component]
+#[component]
 fn UUIDThumbnail(props: &UUIDThumbnailProps) -> Html {
     let thumbnail = &props.thumbnail;
     let caption: Rc<ThumbnailCaption> = use_memo(RcEq(thumbnail.clone()), |thumb| {

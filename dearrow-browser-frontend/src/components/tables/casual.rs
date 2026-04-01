@@ -18,7 +18,7 @@
 
 use chrono::DateTime;
 use dearrow_browser_api::unsync::ApiCasualTitle;
-use yew::{function_component, html, Html};
+use yew::{component, html, Html};
 
 use crate::{
     components::{
@@ -53,7 +53,7 @@ impl TableRender for ApiCasualTitle {
     }
 }
 
-#[function_component]
+#[component]
 pub fn CasualRow(props: &RowProps<ApiCasualTitle>) -> Html {
     let title = props.item();
     let settings = &props.settings;
@@ -77,7 +77,7 @@ pub fn CasualRow(props: &RowProps<ApiCasualTitle>) -> Html {
         </td>
         <td class="casual-votes-col monospaced">
             {for title.votes.iter().map(|(c, v)| html! {<>
-                <span>{c}</span>
+                <span>{c.clone()}</span>
                 <span>{v.to_string()}</span>
             </>})}
         </td>

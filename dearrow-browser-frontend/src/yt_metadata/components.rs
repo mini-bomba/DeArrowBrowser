@@ -224,7 +224,7 @@ impl RenderMetadata for RenderTitle {
         match metadata {
             SimpleLoadState::Loading => html! {<em>{"Loading..."}</em>},
             SimpleLoadState::Failed(()) => html! {<em>{"Unknown"}</em>},
-            SimpleLoadState::Ready(m) => html! {<span>{&m.title}</span>}
+            SimpleLoadState::Ready(m) => html! {<span>{m.title.clone()}</span>}
         }
     }
 }

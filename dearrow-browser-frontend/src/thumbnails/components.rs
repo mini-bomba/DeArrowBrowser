@@ -243,7 +243,7 @@ pub struct BaseThumbnailProps {
     pub thumb_key: ThumbnailKey,
 }
 
-#[function_component]
+#[component]
 pub fn BaseThumbnail(props: &BaseThumbnailProps) -> HtmlResult {
     let generator: ThumbgenContext = use_context().expect("BaseThumbnail must be run under a ThumbnailGeneratorProvider");
     let refresher: ThumbgenRefreshContext = use_context().expect("BaseThumbnail must be run under a ThumbnailGeneratorProvider");
@@ -265,7 +265,7 @@ pub struct UnwrappedThumbnailProps {
     pub timestamp: Option<f64>,
 }
 
-#[function_component]
+#[component]
 pub fn UnwrappedThumbnail(props: &UnwrappedThumbnailProps) -> Html {
     let timestamp: Rc<Option<Rc<str>>> = use_memo(props.clone(), |props| {
         props.timestamp.map(|t| t.to_string().into())
@@ -310,7 +310,7 @@ pub struct WrappedThumbnailProps {
     pub container_type: ContainerType,
 }
 
-#[function_component]
+#[component]
 pub fn Thumbnail(props: &WrappedThumbnailProps) -> Html {
     let modal_controls: ModalRendererControls = use_context().expect("ModalRendererControls should be available");
     let unwrapped_props = UnwrappedThumbnailProps {

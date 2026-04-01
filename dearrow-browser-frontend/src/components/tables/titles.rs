@@ -18,7 +18,7 @@
 
 use chrono::DateTime;
 use dearrow_browser_api::unsync::ApiTitle;
-use yew::{classes, function_component, html, use_callback, use_context, Html, MouseEvent};
+use yew::{classes, component, html, use_callback, use_context, Html, MouseEvent};
 
 use crate::{
     components::{
@@ -102,7 +102,7 @@ fn title_flags(title: &ApiTitle) -> Html {
     </>}
 }
 
-#[function_component]
+#[component]
 pub fn TitleRowRenderer(props: &RowProps<ApiTitle>) -> Html {
     let t = props.item();
     let modal_controls: ModalRendererControls =

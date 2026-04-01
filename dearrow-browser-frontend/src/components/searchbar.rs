@@ -60,7 +60,7 @@ fn url_query_or_last_segment(value: &str, query_key: &str) -> Option<String> {
         )
 }
 
-#[function_component]
+#[component]
 pub fn Searchbar() -> Html {
     let navigator = use_navigator().expect("navigator should exist");
     let settings_ctx: SettingsContext = use_context().expect("settings context should be available");

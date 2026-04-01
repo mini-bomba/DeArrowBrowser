@@ -56,7 +56,7 @@ struct VideoDetailsTableProps {
     metadata: MetadataState,
 }
 
-#[function_component]
+#[component]
 fn VideoDetailsTable(props: &VideoDetailsTableProps) -> Html {
     let youtube_url: Rc<AttrValue> = use_memo(props.videoid.clone(), |vid| {
         AttrValue::Rc(youtu_be_link(vid).as_str().into())

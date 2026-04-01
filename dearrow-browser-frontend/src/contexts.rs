@@ -69,7 +69,7 @@ pub struct ContextProviderProps {
     pub children: Html
 }
 
-#[function_component]
+#[component]
 pub fn SettingsProvider(props: &ContextProviderProps) -> Html {
     let storage = use_local_storage("settings".into());
     let default = use_memo((), |()| Settings::default());

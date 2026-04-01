@@ -30,7 +30,7 @@ pub struct YoutubeProps {
     pub videoid: AttrValue,
 }
 
-#[function_component]
+#[component]
 pub fn YoutubeIframe(props: &YoutubeProps) -> Html {
     let embed_url: Rc<AttrValue> = use_memo(props.videoid.clone(), |vid| {
         let mut url = YOUTUBE_EMBED_URL.clone();
@@ -47,7 +47,7 @@ pub struct VideoLinkProps {
     pub multiline: bool,
 }
 
-#[function_component]
+#[component]
 pub fn YoutubeVideoLink(props: &VideoLinkProps) -> Html {
     let youtube_url: Rc<AttrValue> = use_memo(props.videoid.clone(), |vid| AttrValue::Rc(youtu_be_link(vid).as_str().into()));
     html!{

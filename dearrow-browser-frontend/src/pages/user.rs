@@ -41,7 +41,7 @@ struct UserDetailsProps {
     userid: AttrValue,
 }
 
-#[function_component]
+#[component]
 fn UserDetails(props: &UserDetailsProps) -> HtmlResult {
     let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
     let status: StatusContext = use_context().expect("StatusResponse should be defined");
@@ -205,7 +205,7 @@ pub struct UserPageProps {
     pub userid: AttrValue,
 }
 
-#[function_component]
+#[component]
 pub fn UserPage(props: &UserPageProps) -> Html {
     let state = use_location_state().get_state::<UserPageTab>();
     let entry_count = use_state_eq(|| None);

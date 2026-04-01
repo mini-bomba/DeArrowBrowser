@@ -26,7 +26,7 @@ fn create_retry_callback(async_task_control: AsyncTaskControl, id: usize) -> Cal
     Callback::from(move |_| async_task_control.retry_task(id))
 }
 
-#[function_component]
+#[component]
 pub fn AsyncTasksModal() -> Html {
     let async_task_control = use_context::<AsyncTaskControl>().unwrap();
     let async_task_view = use_context::<AsyncTaskList>().unwrap();

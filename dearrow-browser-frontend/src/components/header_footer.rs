@@ -28,7 +28,7 @@ use crate::{constants, contexts::*};
 use crate::pages::MainRoute;
 use crate::utils_app::render_datetime_with_delta;
 
-#[function_component]
+#[component]
 pub fn Header() -> Html {
     let modal_controls: ModalRendererControls = use_context().expect("Header should be placed inside a ModalRenderer");
     let settings_context: SettingsContext = use_context().expect("Header should be placed inside a SettingsProvider");
@@ -111,7 +111,7 @@ pub fn Header() -> Html {
     }
 }
 
-#[function_component]
+#[component]
 pub fn Footer() -> Html {
     let status: StatusContext = use_context().expect("StatusResponse should be defined");
     let _ = use_context::<UpdateClock>();

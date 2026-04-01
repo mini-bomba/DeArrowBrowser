@@ -58,7 +58,7 @@ impl Endpoint for BrokenThumbnails {
     }
 }
 
-#[function_component]
+#[component]
 pub fn BrokenPage() -> Html {
     let item_count: UseStateHandle<Option<usize>> = use_state_eq(|| None);
     let state = use_location_state().get_state::<BrokenPageTab>();

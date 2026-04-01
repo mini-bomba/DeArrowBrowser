@@ -22,7 +22,7 @@ use std::rc::Rc;
 
 use crate::thumbnails::components::{UnwrappedThumbnail, UnwrappedThumbnailProps};
 
-#[function_component]
+#[component]
 pub fn ThumbnailModal(props: &UnwrappedThumbnailProps) -> Html {
     let header_text: Rc<Rc<str>> = use_memo(props.clone(), |props| {
         match props.timestamp {

@@ -18,7 +18,7 @@
 
 use chrono::DateTime;
 use dearrow_browser_api::unsync::User;
-use yew::{function_component, html, AttrValue, Html};
+use yew::{component, html, AttrValue, Html};
 use yew_router::prelude::Link;
 
 use crate::{
@@ -46,7 +46,7 @@ impl TableRender for User {
     }
 }
 
-#[function_component]
+#[component]
 pub fn UserRow(props: &RowProps<User>) -> Html {
     let user = props.item();
     let timestamp = user
@@ -59,7 +59,7 @@ pub fn UserRow(props: &RowProps<User>) -> Html {
     html! {<>
         <td>
             <Link<MainRoute> to={MainRoute::User { id: AttrValue::Rc(user.user_id.clone()) }}>
-                <span class="monospaced">{&user.user_id}</span>
+                <span class="monospaced">{user.user_id.clone()}</span>
                 <Icon r#type={IconType::DABLogo} />
             </Link<MainRoute>>
         </td>

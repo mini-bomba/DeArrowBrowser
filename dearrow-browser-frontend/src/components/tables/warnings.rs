@@ -54,7 +54,7 @@ impl TableRender for ApiWarning {
     }
 }
 
-#[function_component]
+#[component]
 pub fn WarningRow(props: &RowProps<ApiWarning>) -> Html {
     let warning = props.item();
     let settings = &props.settings;

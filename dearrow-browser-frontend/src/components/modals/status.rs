@@ -430,7 +430,7 @@ impl Component for ClientStatus{
     }
 }
 
-#[function_component]
+#[component]
 fn ServerStatus() -> Html {
     let window_context: Rc<WindowContext> = use_context().expect("WindowContext should be defined");
     let status: StatusContext = use_context().expect("StatusContext should be defined");
@@ -627,7 +627,7 @@ fn ServerStatus() -> Html {
     </>}
 }
 
-#[function_component]
+#[component]
 pub fn StatusModal() -> Html {
     html! {
         <div id="status-modal">

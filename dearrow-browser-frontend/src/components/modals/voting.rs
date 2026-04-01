@@ -157,7 +157,7 @@ fn voting_callback(async_task_control: AsyncTaskControl, modal_control: ModalRen
     }
 }
 
-#[function_component]
+#[component]
 pub fn VotingModal(params: &VotingParams) -> Html {
     let user_context: UserContext = use_context().unwrap();
     let async_task_control: AsyncTaskControl = use_context().unwrap();

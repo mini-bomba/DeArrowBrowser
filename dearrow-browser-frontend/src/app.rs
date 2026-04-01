@@ -51,7 +51,7 @@ pub mod worker_client;
 #[path = "yt_metadata/mod_app.rs"]
 pub mod yt_metadata;
 
-#[function_component]
+#[component]
 fn App() -> Html {
     let window_context = use_memo((), |()| {
         let window = window().expect("window should exist");

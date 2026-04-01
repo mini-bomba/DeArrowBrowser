@@ -229,7 +229,7 @@ impl<T: ToString> ToStringExt for Option<T> {
     }
 }
 
-#[function_component]
+#[component]
 pub fn SettingsModal() -> Html {
     let settings_context: SettingsContext = use_context().expect("SettingsContext should be available");
     let initial_settings = use_memo((), |()| settings_context.settings().clone());

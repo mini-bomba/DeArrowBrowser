@@ -23,6 +23,7 @@ $white: var(--white);
 $semitransparent: var(--semitransparent);
 $mid: var(--mid);
 $linkcolor: var(--link-color);
+$text-gray: var(--text-gray);
 
 %headercolors {
   background-color: $gray;
@@ -59,6 +60,7 @@ html {
   --semitransparent: #0007;
   --mid: hsl(var(--theme-hue), var(--theme-saturation), 50%);
   --link-color: hsl(195, 53.3%, 79%);
+  --text-gray: hsl(var(--theme-hue), var(--theme-saturation), 73.33%);
 }
 
 html[data-theme-light] {
@@ -67,9 +69,10 @@ html[data-theme-light] {
   --gray: hsl(var(--theme-hue), var(--theme-saturation), 86.67%);
   --dark-gray: hsl(var(--theme-hue), var(--theme-saturation), 93.33%);
   --white: hsl(var(--theme-hue), var(--theme-saturation), 6.67%);
-  --semitransparent: #0007;
+  --semitransparent: #fff7;
   --mid: hsl(var(--theme-hue), var(--theme-saturation), 50%);
   --link-color: hsl(195, 53.3%, 21%);
+  --text-gray: hsl(var(--theme-hue), var(--theme-saturation), 26.67%);
 }
 
 [title] {
@@ -264,14 +267,14 @@ table caption {
           max-width: unset;
 
           .null-title {
-            color: #bbb;
+            color: $text-gray;
             margin-left: 0.5em;
           }
         }
 
         .original-title {
           font-size: 0.7rem;
-          color: #bbb;
+          color: $text-gray;
         }
       }
       

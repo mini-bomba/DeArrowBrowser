@@ -139,7 +139,7 @@ impl Component for SettingsProvider {
 
     fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
-            Self::Message::LocalUpdate(new) if self.context.storage.as_ref().is_some_and(|old| **old != new) => {
+            Self::Message::LocalUpdate(new) if self.context.storage.as_ref().is_none_or(|old| **old != new) => {
                 self.context.storage = Some(Rc::new(new));
                 self.save_to_storage();
                 true

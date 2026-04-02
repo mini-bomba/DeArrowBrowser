@@ -57,6 +57,12 @@ $text-gray: var(--text-gray);
   initial-value: transparent;
 }
 
+@property --custom-slider-height {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 15px;
+}
+
 html {
   color-scheme: dark;
   --light-gray: hsl(var(--theme-hue), var(--theme-saturation), 20%);
@@ -68,6 +74,7 @@ html {
   --link-color: hsl(195, 53.3%, 79%);
   --text-gray: hsl(var(--theme-hue), var(--theme-saturation), 73.33%);
   --preview-lightness: 25%;
+  --custom-slider-height: 0.75rem;
 }
 
 html[data-theme-light] {
@@ -713,32 +720,43 @@ fieldset {
   background: transparent;
   appearance: none;
   border-color: $mid;
+  -webkit-appearance: none;
 
-  &::-moz-range-track {
-    width: 100%;
-    height: 75%;
-    background: var(--custom-slider-background);
-    cursor: pointer;
-    border: 1px solid;
-    border-color: inherit;
-    border-radius: 0.25rem;
+  @each $bs in -moz-range-track, -webkit-slider-runnable-track {
+    &::#{$bs} {
+      width: 100%;
+      height: var(--custom-slider-height);
+      background: var(--custom-slider-background);
+      cursor: pointer;
+      border: 1px solid;
+      border-color: inherit;
+      border-radius: 0.25rem;
+    }
   }
 
-  &::-moz-range-thumb {
-    width: 1em;
-    height: 1em;
-    background: $white;
-    border: 1px solid inherit;
-    border-radius: 1em;
-    cursor: pointer;
+  @each $bs in -moz-range-thumb, -webkit-slider-thumb {
+    &::#{$bs} {
+      width: calc(var(--custom-slider-height) * 1.25);
+      height: calc(var(--custom-slider-height) * 1.25);
+      background: $white;
+      border: 1px solid inherit;
+      border-radius: 100%;
+      cursor: pointer;
+      -webkit-appearance: none;
 
-    &:active {
-      cursor: grabbing;
+      &:active {
+        cursor: grabbing;
+      }
     }
   }
 
   &::-moz-range-progress {
     cursor: pointer;
+  }
+
+  &::-webkit-slider-thumb {
+    // stupid chromium can't center a fucking circle without help
+    margin-top: calc(var(--custom-slider-height) * -0.25)
   }
 }
 

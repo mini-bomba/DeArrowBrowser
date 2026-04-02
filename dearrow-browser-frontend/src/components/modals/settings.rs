@@ -524,8 +524,8 @@ pub fn SettingsModal() -> Html {
                     <label for="theme_hue">{"Theme hue: "}</label>
                     <div class="setting-slider">
                         <input 
-                            class={setting_class!(initial_settings, current_settings, theme.hue, 0.001)} 
-                            id="theme_hue" 
+                            class={classes!(setting_class!(initial_settings, current_settings, theme.hue, 0.001), "custom-slider")}
+                            id="theme_hue_slider"
                             type="range"
                             min="0"
                             max="360"
@@ -563,8 +563,8 @@ pub fn SettingsModal() -> Html {
                     <label for="theme_saturation">{"Theme saturation: "}</label>
                     <div class="setting-slider">
                         <input 
-                            class={setting_class!(initial_settings, current_settings, theme.saturation, 0.001)} 
-                            id="theme_saturation" 
+                            class={classes!(setting_class!(initial_settings, current_settings, theme.saturation, 0.001), "custom-slider")}
+                            id="theme_saturation_slider" 
                             type="range"
                             min="0"
                             max="100"

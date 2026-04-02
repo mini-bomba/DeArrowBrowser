@@ -51,6 +51,12 @@ $text-gray: var(--text-gray);
   initial-value: 0%;
 }
 
+@property --custom-slider-background {
+  syntax: "*";
+  inherits: true;
+  initial-value: transparent;
+}
+
 html {
   color-scheme: dark;
   --light-gray: hsl(var(--theme-hue), var(--theme-saturation), 20%);
@@ -61,6 +67,7 @@ html {
   --mid: hsl(var(--theme-hue), var(--theme-saturation), 50%);
   --link-color: hsl(195, 53.3%, 79%);
   --text-gray: hsl(var(--theme-hue), var(--theme-saturation), 73.33%);
+  --preview-lightness: 25%;
 }
 
 html[data-theme-light] {
@@ -73,6 +80,7 @@ html[data-theme-light] {
   --mid: hsl(var(--theme-hue), var(--theme-saturation), 50%);
   --link-color: hsl(195, 53.3%, 21%);
   --text-gray: hsl(var(--theme-hue), var(--theme-saturation), 26.67%);
+  --preview-lightness: 75%;
 }
 
 [title] {
@@ -679,23 +687,59 @@ a {
 
 fieldset {
   color: $white;
-  border-color: $mid;
-  border: 1px solid $light-gray;
+  border: 1px solid $mid;
   border-radius: .25rem;
 }
 
-input:not([type="checkbox"], [type="range"]), textarea {
+select {
   @extend fieldset;
   background-color: $dark-gray;
-  appearance: none;
 
   &::placeholder {
     color: $mid;
   }
 }
 
+input:not([type="checkbox"], [type="range"]), textarea {
+  @extend select;
+  appearance: none;
+}
+
 fieldset {
   border-color: $mid;
+}
+
+.custom-slider {
+  background: transparent;
+  appearance: none;
+  border-color: $mid;
+
+  &::-moz-range-track {
+    width: 100%;
+    height: 75%;
+    background: var(--custom-slider-background);
+    cursor: pointer;
+    border: 1px solid;
+    border-color: inherit;
+    border-radius: 0.25rem;
+  }
+
+  &::-moz-range-thumb {
+    width: 1em;
+    height: 1em;
+    background: $white;
+    border: 1px solid inherit;
+    border-radius: 1em;
+    cursor: pointer;
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+
+  &::-moz-range-progress {
+    cursor: pointer;
+  }
 }
 
 #settings-modal {
@@ -708,6 +752,23 @@ fieldset {
   }
   .setting-changed:not(:invalid) {
     border-color: yellow;
+  }
+
+  #theme_hue_slider {
+    --custom-slider-background: linear-gradient(
+      to right in hsl increasing hue,
+      hsl(0deg,   max(60%, var(--theme-saturation)), var(--preview-lightness)),
+      hsl(180deg, max(60%, var(--theme-saturation)), var(--preview-lightness)) 50%,
+      hsl(360deg, max(60%, var(--theme-saturation)), var(--preview-lightness)) 100%
+    );
+  }
+
+  #theme_saturation_slider {
+    --custom-slider-background: linear-gradient(
+      to right,
+      hsl(var(--theme-hue), 0%,   var(--preview-lightness)),
+      hsl(var(--theme-hue), 100%, var(--preview-lightness))
+    );
   }
 
   fieldset {

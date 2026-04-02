@@ -698,7 +698,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-browser-api"
-version = "1.18.2"
+version = "1.18.3"
 dependencies = [
  "dearrow-parser",
  "indexmap 2.13.0",
@@ -708,7 +708,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-browser-frontend"
-version = "1.18.2"
+version = "1.18.3"
 dependencies = [
  "bincode 2.0.1",
  "built",
@@ -737,7 +737,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-browser-server"
-version = "1.18.2"
+version = "1.18.3"
 dependencies = [
  "actix-files",
  "actix-web",
@@ -767,7 +767,7 @@ dependencies = [
 
 [[package]]
 name = "dearrow-parser"
-version = "1.18.2"
+version = "1.18.3"
 dependencies = [
  "cloneable_errors",
  "csv",

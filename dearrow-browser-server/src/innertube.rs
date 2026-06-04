@@ -267,6 +267,8 @@ pub async fn browse_channel(client: Client, config: Arc<AppConfig>, mode: &Brows
                         it::browse::out::RichItemContent::VideoRenderer { video_id } => video_id,
                         it::browse::out::RichItemContent::ShortsLockupViewModel { on_tap } => on_tap.innertube_command.reel_watch_endpoint.video_id,
                         it::browse::out::RichItemContent::PlaylistRenderer { .. } => bail!("Found a playlist in a video grid"),
+                        it::browse::out::RichItemContent::LockupViewModel { content_id, content_type } if content_type == "LOCKUP_CONTENT_TYPE_VIDEO" => content_id,
+                        it::browse::out::RichItemContent::LockupViewModel { content_type, .. } => bail!("Found item of type '{content_type}' in a video grid",),
                     };
                     if cached_video_ids_set.contains(&*video_id) {
                         progress.videos_fetched.store(new_video_ids.len(), Ordering::Relaxed);
@@ -907,7 +909,11 @@ mod it {
                 PlaylistRenderer {
                     playlist_id: String,
                     video_count: String,
-                }
+                },
+                LockupViewModel {
+                    content_id: String,
+                    content_type: String,
+                },
             }
 
             #[derive(Deserialize, Clone)]

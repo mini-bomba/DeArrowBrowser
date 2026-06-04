@@ -32,7 +32,7 @@ pub const FSCACHE_PLAYLISTS: &str = "playlists";
 
 // Limits
 pub static IT_TIMEOUT: Duration = Duration::from_secs(1);
-pub static FSCACHE_SIZE_CACHE_DURATION: Duration = Duration::from_secs(60);
+pub static FSCACHE_SIZE_CACHE_DURATION: Duration = Duration::from_mins(1);
 
 // Locking errors
 pub static SS_READ_ERR:  LazyLock<ErrorContext> = LazyLock::new(|| anyhow!("Failed to acquire StringSet for reading"));

@@ -439,8 +439,8 @@ impl ChannelCache {
             video_ids: videos
                 .video_ids
                 .into_iter()
-                .chain(vods.video_ids.into_iter())
-                .chain(shorts.video_ids.into_iter())
+                .chain(vods.video_ids)
+                .chain(shorts.video_ids)
                 .chain(releases_tab.into_iter().flat_map(Vec::into_iter))
                 .chain(releases_home.into_iter().flat_map(Vec::into_iter))
                 .filter_map(|vid| string_set.set.get(vid.as_str()).cloned())

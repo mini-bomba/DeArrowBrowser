@@ -335,10 +335,10 @@ pub async fn browse_channel(client: Client, config: Arc<AppConfig>, mode: &Brows
     })
 }
 
-pub async fn browse_playlist(client: Client, config: Arc<AppConfig>, plid: String, count_hint: Option<usize>, progress: Arc<state::BrowseProgress>) -> Result<Vec<String>, ErrorContext> {
+pub async fn browse_playlist(client: Client, config: Arc<AppConfig>, plid: &str, count_hint: Option<usize>, progress: Arc<state::BrowseProgress>) -> Result<Vec<String>, ErrorContext> {
     let fscache_path = { 
         let mut path = config.cache_path.join(FSCACHE_PLAYLISTS);
-        path.push(&*plid);
+        path.push(plid);
         path
     };
     let fscache_tmpdir = config.cache_path.join(FSCACHE_TEMPDIR);
@@ -516,7 +516,13 @@ pub async fn browse_releases_tab(client: Client, config: Arc<AppConfig>, ucid: A
         for res in results {
             match res {
                 it::browse::out::RichGridItem::RichItemRenderer { content: it::browse::out::RichItemContent::PlaylistRenderer { playlist_id, video_count } } => {
-                    album_fetch_tasks.spawn(browse_playlist(client.clone(), config.clone(), playlist_id, parse_yt_number(&video_count), progress.clone()));
+                    let client = client.clone();
+                    let config = config.clone();
+                    let count_hint = parse_yt_number(&video_count);
+                    let progress = progress.clone();
+                    album_fetch_tasks.spawn(async move {
+                        browse_playlist(client, config, &playlist_id, count_hint, progress).await.with_context(|| format!("Failed to fetch album with ID {playlist_id}"))
+                    });
                 },
                 it::browse::out::RichGridItem::RichItemRenderer { .. } => bail!("Found a video in a playlist grid"),
                 it::browse::out::RichGridItem::ContinuationItemRenderer { continuation_endpoint } => pending_requests.push_back(it::browse::Input {
@@ -626,7 +632,12 @@ pub async fn browse_releases_homepage(client: Client, config: Arc<AppConfig>, uc
             match res {
                 it::browse::out::GridItem::GridPlaylistRenderer { playlist_id, mut video_count_text } => {
                     let video_count = video_count_text.runs.pop().and_then(|t| parse_yt_number(&t.text));
-                    album_fetch_tasks.spawn(browse_playlist(client.clone(), config.clone(), playlist_id, video_count, progress.clone()));
+                    let client = client.clone();
+                    let config = config.clone();
+                    let progress = progress.clone();
+                    album_fetch_tasks.spawn(async move {
+                        browse_playlist(client, config, &playlist_id, video_count, progress).await.with_context(|| format!("Failed to fetch album with ID {playlist_id}"))
+                    });
                 }
                 it::browse::out::GridItem::ContinuationItemRenderer { continuation_endpoint } => pending_requests.push_back(it::browse::Input {
                     continuation: Some(continuation_endpoint.continuation_command.token),

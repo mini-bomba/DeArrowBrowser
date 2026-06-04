@@ -335,14 +335,55 @@ pub async fn browse_channel(client: Client, config: Arc<AppConfig>, mode: &Brows
     })
 }
 
-pub async fn browse_playlist(client: Client, config: Arc<AppConfig>, plid: &str, count_hint: Option<usize>, progress: Arc<state::BrowseProgress>) -> Result<Vec<String>, ErrorContext> {
-    let fscache_path = { 
+struct PlaylistScraperState<'a> {
+    new_video_ids: Vec<String>,
+    pending_requests: VecDeque<it::browse::Input<'a>>,
+}
+
+impl PlaylistScraperState<'_> {
+    fn process_playlist_item(
+        &mut self,
+        item: it::browse::out::PlaylistRendererItem,
+    ) -> Result<(), ErrorContext> {
+        use it::browse::out::PlaylistRendererItem;
+        match item {
+            PlaylistRendererItem::PlaylistVideoRenderer { video_id } => {
+                self.new_video_ids.push(video_id);
+            }
+            PlaylistRendererItem::LockupViewModel {
+                content_id,
+                content_type,
+            } if content_type == "LOCKUP_CONTENT_TYPE_VIDEO" => self.new_video_ids.push(content_id),
+            PlaylistRendererItem::LockupViewModel { content_type, .. } => {
+                bail!("Found item of type '{content_type}' in a playlist",)
+            }
+            PlaylistRendererItem::ContinuationItemRenderer {
+                continuation_endpoint,
+            } => self.pending_requests.push_back(it::browse::Input {
+                continuation: Some(continuation_endpoint.continuation_command.token),
+                context: it::Context::default(),
+                browse_id: None,
+                params: None,
+            }),
+        }
+        Ok(())
+    }
+}
+
+pub async fn browse_playlist(
+    client: Client,
+    config: Arc<AppConfig>,
+    plid: &str,
+    count_hint: Option<usize>,
+    progress: Arc<state::BrowseProgress>,
+) -> Result<Vec<String>, ErrorContext> {
+    let fscache_path = {
         let mut path = config.cache_path.join(FSCACHE_PLAYLISTS);
         path.push(plid);
         path
     };
     let fscache_tmpdir = config.cache_path.join(FSCACHE_TEMPDIR);
-    
+
     let cached_video_ids: Vec<String> = match File::open(&fscache_path).await {
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => vec![],
         Err(err) => {
@@ -371,25 +412,30 @@ pub async fn browse_playlist(client: Client, config: Arc<AppConfig>, plid: &str,
         }
     }
 
-    let mut new_video_ids = vec![];
     let playlist_browse_id = format!("VL{plid}");
-    let mut pending_requests: VecDeque<it::browse::Input> = VecDeque::from([it::browse::Input {
-        browse_id: Some(&playlist_browse_id),
-        params: None,
-        context: it::Context::default(),
-        continuation: None,
-    }]);
+    let mut state = PlaylistScraperState {
+        new_video_ids: vec![],
+        pending_requests: VecDeque::from([it::browse::Input {
+            browse_id: Some(&playlist_browse_id),
+            params: None,
+            context: it::Context::default(),
+            continuation: None,
+        }]),
+    };
 
-    while let Some(request) = pending_requests.pop_front() {
+    while let Some(request) = state.pending_requests.pop_front() {
         let is_continuation = request.continuation.is_some();
         let resp = client.post(IT_BROWSE_URL.clone()).json(&request).send().await.context("Failed to send browse request")?;
         let resp = resp.error_for_status().context("Browse request failed")?;
 
-        let results = if is_continuation {
+        let previous_len = state.new_video_ids.len();
+        if is_continuation {
             let mut resp: it::browse::out::PlaylistContinuation = resp.json_debug("playlist").await.context("Failed to decode browse continuation response")?;
-            
-            resp.on_response_received_actions.pop().context("Failed to decode browse continuation response - decoded actions list was empty")?
-                .append_continuation_items_action.continuation_items
+
+            for item in resp.on_response_received_actions.pop().context("Failed to decode browse continuation response - decoded actions list was empty")?
+                .append_continuation_items_action.continuation_items {
+                state.process_playlist_item(item)?;
+            }
         } else {
             let mut resp: it::browse::out::BrowseOutput = resp.json_debug("playlist").await.context("Failed to decode browse playlist response")?;
 
@@ -413,35 +459,36 @@ pub async fn browse_playlist(client: Client, config: Arc<AppConfig>, plid: &str,
             let Some(tab) = resp.contents.two_column_browse_results_renderer.tabs.pop() else {
                 bail!("Failed to decode browse playlist response - decoded tabs list was empty");
             };
-            #[allow(clippy::match_wildcard_for_single_variants)]
-            match tab.tab_renderer.content {
-                it::browse::out::TabContent::SectionListRenderer { mut contents } => 
-                    match contents.pop().context("Failed to decode browse playlist response - no section renderer found")?
-                                  .item_section_renderer.contents.pop().context("Failed to decode browse playlist response - no playlist renderer found")? {
-                        it::browse::out::ItemSectionItem::PlaylistVideoListRenderer { contents } => contents,
-                        _ => bail!("Failed to decode browse playlist response - found a renderer other than PlaylistVideoListRenderer"),
-                    }
-                _ => bail!("Failed to decode browse playlist response - wrong video renderer kind returned"),
+            let it::browse::out::TabContent::SectionListRenderer { mut contents } = tab.tab_renderer.content else {
+                bail!("Failed to decode browse playlist response - wrong video renderer kind returned")
+            };
+            let renderer_contents = contents.pop().context("Failed to decode browse playlist response - no section renderer found")?
+                          .item_section_renderer.contents;
+            if renderer_contents.is_empty() {
+                bail!("Failed to decode browse playlist response - no playlist renderer found");
             }
-        };
-
-        let previous_len = new_video_ids.len();
-        for res in results {
-            match res {
-                it::browse::out::PlaylistRendererItem::PlaylistVideoRenderer { video_id } => new_video_ids.push(video_id),
-                it::browse::out::PlaylistRendererItem::ContinuationItemRenderer { continuation_endpoint } => pending_requests.push_back(it::browse::Input {
-                    continuation: Some(continuation_endpoint.continuation_command.token),
-                    context: it::Context::default(),
-                    browse_id: None,
-                    params: None,
-                }),
+            for item in renderer_contents {
+                match item {
+                    it::browse::out::ItemSectionItem::PlaylistVideoListRenderer { contents } => {
+                        for item in contents {
+                            state.process_playlist_item(item)?;
+                        }
+                    },
+                    it::browse::out::ItemSectionItem::LockupViewModel { content_id, content_type } => {
+                        state.process_playlist_item(it::browse::out::PlaylistRendererItem::LockupViewModel { content_id, content_type })?;
+                    },
+                    it::browse::out::ItemSectionItem::ContinuationItemRenderer { continuation_endpoint } => {
+                        state.process_playlist_item(it::browse::out::PlaylistRendererItem::ContinuationItemRenderer { continuation_endpoint })?;
+                    },
+                    it::browse::out::ItemSectionItem::ShelfRenderer { .. } => bail!("Unexpected shelf found in playlist"),
+                }
             }
         }
-        progress.videos_fetched.fetch_add(new_video_ids.len() - previous_len, Ordering::Relaxed);
+        progress.videos_fetched.fetch_add(state.new_video_ids.len() - previous_len, Ordering::Relaxed);
     }
 
     // cache results
-    if !new_video_ids.is_empty() {
+    if !state.new_video_ids.is_empty() {
         match TemporaryFile::new(fscache_path, &fscache_tmpdir).await {
             Err(err) => {
                 warn!("Got an unexpected error while trying to open the playlist cache entry for '{plid}' for writing: {err}");
@@ -449,7 +496,7 @@ pub async fn browse_playlist(client: Client, config: Arc<AppConfig>, plid: &str,
             Ok(mut file) => {
                 let result: std::io::Result<()> = async {
                     let mut file = BufWriter::new(&mut *file);
-                    for videoid in &new_video_ids {
+                    for videoid in &state.new_video_ids {
                         file.write_all(videoid.as_bytes()).await?;
                         file.write_all(b"\n").await?;
                     }
@@ -468,7 +515,7 @@ pub async fn browse_playlist(client: Client, config: Arc<AppConfig>, plid: &str,
         }
     }
 
-    Ok(new_video_ids)
+    Ok(state.new_video_ids)
 }
 
 // this targets registered artist channels
@@ -971,6 +1018,10 @@ mod it {
                     title: TextRuns,
                     endpoint: ShelfEndpoint,
                 },
+                LockupViewModel {
+                    content_id: String,
+                    content_type: String,
+                },
                 ContinuationItemRenderer {
                     continuation_endpoint: ContinuationEndpoint,
                 },
@@ -981,6 +1032,10 @@ mod it {
             pub enum PlaylistRendererItem {
                 PlaylistVideoRenderer {
                     video_id: String
+                },
+                LockupViewModel {
+                    content_id: String,
+                    content_type: String,
                 },
                 ContinuationItemRenderer {
                     continuation_endpoint: ContinuationEndpoint,

@@ -79,17 +79,17 @@ fn VideoDetailsTable(props: &VideoDetailsTableProps) -> Html {
                 MetadataState::Ready(data) => html! {<>
                     if let Some(duration) = data.duration {
                         if props.tab == VideoPageTab::Thumbnails {
-                            <div>{format!("Random thumbnail timestamp: {}", duration*data.random_thumbnail)}</div>
+                            <div>{format!("Random thumbnail timestamp: {:.3}", duration*data.random_thumbnail)}</div>
                         }
                         <div>{format!("Video duration: {duration}")}</div>
                     } else {
                         if props.tab == VideoPageTab::Thumbnails {
-                            <div>{format!("Random thumbnail: {}%", data.random_thumbnail*100.)}</div>
+                            <div>{format!("Random thumbnail: {:.3}%", data.random_thumbnail*100.)}</div>
                         }
                         <div>{"Video duration: "}<em>{"Unknown"}</em></div>
                     }
                     <div title="This is the fraction of the video that has not been covered by any live SponsorBlock skip segments. Sections marked by SponsorBlock are excluded from possible random thumbnail timestamp picks">
-                        {format!("% of video unmarked: {}%", data.fraction_unmarked*100.)}
+                        {format!("% of video unmarked: {:.3}%", data.fraction_unmarked*100.)}
                     </div>
                     <div title="If there is no marked outro, the last 10% of the video is assumed to be an outro and is excluded from possible random thumbnail timestamp picks">
                         {"Has a marked outro: "}

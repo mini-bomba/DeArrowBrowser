@@ -38,7 +38,7 @@ pub fn YoutubeIframe(props: &YoutubeProps) -> Html {
         AttrValue::Rc(url.as_str().into())
     });
 
-    html! {<iframe src={&*embed_url} allowfullscreen=true />}
+    html! {<iframe src={&*embed_url} allowfullscreen=true referrerpolicy="strict-origin-when-cross-origin" />}
 }
 
 #[derive(Properties, PartialEq, Clone)]

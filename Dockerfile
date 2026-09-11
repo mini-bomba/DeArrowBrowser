@@ -15,7 +15,10 @@
 #  You should have received a copy of the GNU Affero General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-FROM dearrow-browser:builder-base AS builder
+FROM docker.io/library/alpine:edge AS builder
+RUN echo https://dl-cdn.alpinelinux.org/alpine/edge/testing >> /etc/apk/repositories
+RUN apk --no-cache add git rust cargo pkgconfig openssl-dev rust-wasm binaryen dart-sass wasm-bindgen trunk
+
 ADD . /source
 WORKDIR /source
 # Bring back .dockerignored files to avoid triggering "uncommited changes" labels in info menus
